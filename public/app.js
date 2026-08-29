@@ -200,20 +200,10 @@ function renderOnboarding(step = 0, authMode = 'register') {
 
         ${isLogin ? `
           <form class="onboarding-card auth-fade" data-onboarding-form="login">
-            <label>Email<input name="email" type="email" value="${onboarding.email || 'soyelroot@tatudin.cl'}" placeholder="artist@studio.com" required /></label>
-            <label>Contraseña<input name="password" type="password" value="password123" placeholder="Tu contraseña" required /></label>
+            <label>Email<input name="email" type="email" value="${onboarding.email || ''}" placeholder="artist@studio.com" autocomplete="email" required /></label>
+            <label>Contraseña<input name="password" type="password" placeholder="Tu contraseña" autocomplete="current-password" required /></label>
             <button class="primary" type="submit" style="margin-top: 6px;">Iniciar sesión <span>→</span></button>
             <p class="form-error"></p>
-
-            <div class="demo-access-panel" style="margin-top: 14px; padding: 10px 12px; background: var(--surface-low); border-radius: var(--radius-md); border: 1px dashed var(--line);">
-              <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em;">⚡ Acceso Rápido Demo (1-Click):</p>
-              <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                <button type="button" class="demo-quick-btn" data-demo-email="soyelroot@tatudin.cl" data-demo-pass="password123" style="font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1.5px solid var(--red); background: #ffdad9; cursor: pointer; font-weight: 800; color: #900019;">⚡ Superadmin (Root)</button>
-                <button type="button" class="demo-quick-btn" data-demo-email="estudio@tatudin.com" data-demo-pass="password123" style="font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: #ffffff; cursor: pointer; font-weight: 700; color: var(--ink);">👑 Dueño Estudio</button>
-                <button type="button" class="demo-quick-btn" data-demo-email="matias@tatudin.com" data-demo-pass="password123" style="font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: #ffffff; cursor: pointer; font-weight: 700; color: var(--ink);">🎨 Residente</button>
-                <button type="button" class="demo-quick-btn" data-demo-email="diego.nomad@tatudin.com" data-demo-pass="password123" style="font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: #ffffff; cursor: pointer; font-weight: 700; color: var(--ink);">✈️ Nómade</button>
-              </div>
-            </div>
 
             <div class="auth-switch-prompt">
               ¿No tienes una cuenta? <button type="button" class="text-button" data-switch-auth="register">Regístrate gratis</button>

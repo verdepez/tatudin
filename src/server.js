@@ -40,10 +40,20 @@ async function hashPassword(password) {
 }
 
 async function verifyPassword(password, storedHash) {
-  const [salt, key] = storedHash.split(':');
-  if (!salt || !key) return false;
-  const derivedKey = await scrypt(password, salt, 64);
-  return crypto.timingSafeEqual(Buffer.from(key, 'hex'), derivedKey);
+  try {
+    if (!storedHash || typeof storedHash !== 'string') return false;
+    const parts = storedHash.split(':');
+    if (parts.length !== 2) return false;
+    const [salt, key] = parts;
+    if (!salt || !key) return false;
+    const derivedKey = await scrypt(password, salt, 64);
+    const keyBuf = Buffer.from(key, 'hex');
+    if (keyBuf.length !== derivedKey.length) return false;
+    return crypto.timingSafeEqual(keyBuf, derivedKey);
+  } catch (err) {
+    console.warn('[AUTH] Password verification warning:', err.message);
+    return false;
+  }
 }
 
 function parseCookies(request) {
@@ -462,19 +472,44 @@ app.post('/api/auth/login', async (request, response) => {
   const { email, password } = request.body;
   if (!email?.trim() || !password) return response.status(400).json({ error: 'Email y contraseña son obligatorios' });
   try {
-    const result = await pool.query('SELECT id, email, password_hash, full_name FROM users WHERE email = LOWER($1)', [email.trim()]);
-    if (!result.rowCount || !(await verifyPassword(password, result.rows[0].password_hash))) {
+    const cleanEmail = email.trim().toLowerCase();
+    const result = await pool.query('SELECT id, email, password_hash, full_name, is_superadmin FROM users WHERE email = $1', [cleanEmail]);
+    if (!result.rowCount || !result.rows[0]) {
       return response.status(401).json({ error: 'Email o contraseña incorrectos' });
     }
     const user = result.rows[0];
-    const membership = await pool.query('SELECT studio_id FROM studio_memberships WHERE user_id = $1 AND status = \'active\' LIMIT 1', [user.id]);
-    const studioId = membership.rows[0]?.studio_id || null;
+    const valid = await verifyPassword(password, user.password_hash);
+    if (!valid) {
+      return response.status(401).json({ error: 'Email o contraseña incorrectos' });
+    }
+
+    let membership = await pool.query("SELECT studio_id FROM studio_memberships WHERE user_id = $1 AND status = 'active' ORDER BY id ASC LIMIT 1", [user.id]);
+    let studioId = membership.rows[0]?.studio_id || null;
+
+    if (!studioId) {
+      const defStudio = await pool.query("INSERT INTO studios (name, account_type, currency, timezone) VALUES ($1, 'independent', 'CLP', 'America/Santiago') RETURNING id", [`Estudio de ${user.full_name || 'Artista'}`]);
+      studioId = defStudio.rows[0].id;
+      await pool.query("INSERT INTO studio_memberships (user_id, studio_id, role, commission_percent, status) VALUES ($1, $2, 'owner', 100.00, 'active') ON CONFLICT (user_id, studio_id) DO UPDATE SET status = 'active'", [user.id, studioId]);
+      await seedDefaultCategories(pool, studioId, 'independent');
+    }
 
     const sessionId = crypto.randomBytes(32).toString('hex');
-    await pool.query('INSERT INTO sessions (id, user_id, active_studio_id, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL \'14 days\')', [sessionId, user.id, studioId]);
+    await pool.query("INSERT INTO sessions (id, user_id, active_studio_id, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '14 days')", [sessionId, user.id, studioId]);
     setSessionCookie(response, sessionId);
-    return response.json({ user: { id: user.id, email: user.email, fullName: user.full_name } });
-  } catch (error) { return response.status(500).json({ error: error.message }); }
+
+    const isSuper = Boolean(user.is_superadmin || user.email === 'soyelroot@tatudin.cl');
+    return response.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.full_name,
+        isSuperAdmin: isSuper
+      }
+    });
+  } catch (error) {
+    console.error('[AUTH] Login internal error:', error);
+    return response.status(500).json({ error: 'Error al iniciar sesión: ' + error.message });
+  }
 });
 
 app.post('/api/auth/logout', async (request, response) => {
@@ -1467,48 +1502,6 @@ async function ensureAuthSchema() {
   )`);
   await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT FALSE');
 
-  // Ensure Master Superadmin soyelroot@tatudin.cl exists
-  try {
-    const rootEmail = 'soyelroot@tatudin.cl';
-    const rootHash = await hashPassword('password123');
-    let rootRes = await pool.query('SELECT id FROM users WHERE email = $1', [rootEmail]);
-    let rootUserId;
-    if (!rootRes.rowCount) {
-      const insRoot = await pool.query(
-        'INSERT INTO users (email, password_hash, full_name, is_superadmin) VALUES ($1, $2, $3, TRUE) RETURNING id',
-        [rootEmail, rootHash, 'Administrador General Tatudin']
-      );
-      rootUserId = insRoot.rows[0].id;
-    } else {
-      rootUserId = rootRes.rows[0].id;
-      await pool.query(
-        'UPDATE users SET password_hash = $1, full_name = $2, is_superadmin = TRUE WHERE id = $3',
-        [rootHash, 'Administrador General Tatudin', rootUserId]
-      );
-    }
-
-    // Ensure Root user has a studio membership
-    let rootStudioRes = await pool.query(`
-      SELECT s.id FROM studios s
-      JOIN studio_memberships sm ON sm.studio_id = s.id
-      WHERE sm.user_id = $1 LIMIT 1
-    `, [rootUserId]);
-
-    if (!rootStudioRes.rowCount) {
-      const insSt = await pool.query(
-        "INSERT INTO studios (name, account_type, currency, timezone) VALUES ('Tatudin Master Studio', 'studio', 'CLP', 'America/Santiago') RETURNING id"
-      );
-      const rootStudioId = insSt.rows[0].id;
-      await pool.query(
-        "INSERT INTO studio_memberships (user_id, studio_id, role, commission_percent) VALUES ($1, $2, 'owner', 100.00)",
-        [rootUserId, rootStudioId]
-      );
-      await seedDefaultCategories(pool, rootStudioId, 'studio');
-    }
-  } catch (rootErr) {
-    console.warn('[DB] Root user initialization warning:', rootErr.message);
-  }
-
   // 3. Sessions
   await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -1667,6 +1660,52 @@ async function ensureAuthSchema() {
     }
   } catch (seedErr) {
     console.warn('Warning seeding categories:', seedErr.message);
+  }
+
+  // Ensure Master Superadmin soyelroot@tatudin.cl exists with active studio
+  try {
+    const rootEmail = 'soyelroot@tatudin.cl';
+    const rootHash = await hashPassword('password123');
+    let rootRes = await pool.query('SELECT id FROM users WHERE email = $1', [rootEmail]);
+    let rootUserId;
+    if (!rootRes.rowCount) {
+      const insRoot = await pool.query(
+        'INSERT INTO users (email, password_hash, full_name, is_superadmin) VALUES ($1, $2, $3, TRUE) RETURNING id',
+        [rootEmail, rootHash, 'Administrador General Tatudin']
+      );
+      rootUserId = insRoot.rows[0].id;
+    } else {
+      rootUserId = rootRes.rows[0].id;
+      await pool.query(
+        'UPDATE users SET password_hash = $1, full_name = $2, is_superadmin = TRUE WHERE id = $3',
+        [rootHash, 'Administrador General Tatudin', rootUserId]
+      );
+    }
+
+    // Ensure Master Studio exists and is linked to Root
+    let rootStudioRes = await pool.query(`
+      SELECT s.id FROM studios s
+      JOIN studio_memberships sm ON sm.studio_id = s.id
+      WHERE sm.user_id = $1 LIMIT 1
+    `, [rootUserId]);
+
+    let masterStudioId;
+    if (!rootStudioRes.rowCount) {
+      const insSt = await pool.query(
+        "INSERT INTO studios (name, account_type, currency, timezone) VALUES ('Tatudin Master Studio', 'studio', 'CLP', 'America/Santiago') RETURNING id"
+      );
+      masterStudioId = insSt.rows[0].id;
+      await pool.query(
+        "INSERT INTO studio_memberships (user_id, studio_id, role, commission_percent, status) VALUES ($1, $2, 'owner', 100.00, 'active') ON CONFLICT (user_id, studio_id) DO UPDATE SET status = 'active', role = 'owner'",
+        [rootUserId, masterStudioId]
+      );
+    } else {
+      masterStudioId = rootStudioRes.rows[0].id;
+    }
+    await seedDefaultCategories(pool, masterStudioId, 'studio');
+    console.log('[DB] Master Superadmin (soyelroot@tatudin.cl) initialized and ready.');
+  } catch (rootErr) {
+    console.error('[DB] Root user initialization error:', rootErr.message);
   }
 
   // Auto-seed sample studio data on fresh databases
