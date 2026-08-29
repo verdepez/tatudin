@@ -11,12 +11,18 @@ const port = Number(process.env.PORT || 3000);
 const databaseUrl = process.env.DATABASE_URL;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const isLocalDb = !databaseUrl || databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1') || databaseUrl.includes('@db:') || databaseUrl.includes('@postgres:');
-const pool = databaseUrl
+const isInternalDb = !databaseUrl || 
+  databaseUrl.includes('localhost') || 
+  databaseUrl.includes('127.0.0.1') || 
+  databaseUrl.includes('.railway.internal') || 
+  databaseUrl.includes('railway.internal') || 
+  databaseUrl.includes('@db:') || 
+  databaseUrl.includes('@postgres:');
+
+let pool = databaseUrl
   ? new Pool({
       connectionString: databaseUrl,
-      options: '-c timezone=America/Santiago',
-      ssl: isLocalDb ? false : { rejectUnauthorized: false }
+      ssl: isInternalDb ? false : { rejectUnauthorized: false }
     })
   : null;
 const scrypt = promisify(crypto.scrypt);
@@ -1092,25 +1098,39 @@ app.post('/api/transactions', requireAuth, async (request, response) => {
 
 async function ensureAuthSchema() {
   if (!pool) {
-    console.warn('DATABASE_URL is not set. Database operations will fail until DATABASE_URL is configured.');
+    console.warn('[DB] DATABASE_URL is not set in environment variables.');
     return;
   }
 
-  // Retry connection up to 10 times with backoff in case database is still starting up
+  try {
+    const rawUrl = process.env.DATABASE_URL || '';
+    const sanitized = rawUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
+    console.log(`[DB] Connecting to database: ${sanitized}`);
+  } catch {}
+
   let connected = false;
-  for (let attempt = 1; attempt <= 10; attempt++) {
+  for (let attempt = 1; attempt <= 12; attempt++) {
     try {
       await pool.query('SELECT 1');
       connected = true;
       break;
     } catch (connErr) {
-      console.log(`Waiting for database to accept connections (attempt ${attempt}/10): ${connErr.message}`);
-      await new Promise((r) => setTimeout(r, 2000));
+      const errStr = String(connErr?.message || connErr?.code || connErr);
+      console.log(`[DB] Waiting for database (attempt ${attempt}/12): ${errStr}`);
+      
+      // If error is related to SSL protocol or unsupported SSL, switch pool to non-SSL
+      if (errStr.toLowerCase().includes('ssl') || errStr.toLowerCase().includes('protocol') || errStr.toLowerCase().includes('handshake')) {
+        console.log('[DB] Switching connection to non-SSL mode...');
+        try { await pool.end(); } catch {}
+        pool = new Pool({ connectionString: databaseUrl, ssl: false });
+      }
+      
+      await new Promise((r) => setTimeout(r, 2500));
     }
   }
 
   if (!connected) {
-    throw new Error('Could not establish connection to PostgreSQL after 10 attempts.');
+    throw new Error('Could not establish connection to PostgreSQL after 12 attempts. Please verify DATABASE_URL in Railway Variables.');
   }
 
   // 1. Studios
