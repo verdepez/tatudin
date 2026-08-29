@@ -75,11 +75,25 @@ async function requireAuth(request, response, next) {
       WHERE s_t.id = $1 AND s_t.expires_at > NOW() LIMIT 1
     `, [sessionId]);
 
-    if (!result.rowCount || !result.rows[0].studio_id) {
-      return response.status(401).json({ error: 'Sesión no válida o sin estudio asignado' });
+    if (!result.rowCount) {
+      return response.status(401).json({ error: 'Sesión no válida o expirada' });
     }
-    request.user = result.rows[0];
-    request.studioId = result.rows[0].studio_id;
+
+    let userRow = result.rows[0];
+    if (!userRow.studio_id) {
+      // Auto-assign default personal studio if user somehow has no studio membership
+      const defStudio = await pool.query("INSERT INTO studios (name, account_type, currency, timezone) VALUES ($1, 'independent', 'CLP', 'America/Santiago') RETURNING id, name", [`Estudio de ${userRow.full_name || 'Artista'}`]);
+      const newStudioId = defStudio.rows[0].id;
+      await pool.query("INSERT INTO studio_memberships (user_id, studio_id, role) VALUES ($1, $2, 'owner')", [userRow.id, newStudioId]);
+      await pool.query('UPDATE sessions SET active_studio_id = $1 WHERE id = $2', [newStudioId, sessionId]);
+      await seedDefaultCategories(pool, newStudioId, 'independent');
+      userRow.studio_id = newStudioId;
+      userRow.role = 'owner';
+      userRow.studio_name = defStudio.rows[0].name;
+    }
+
+    request.user = userRow;
+    request.studioId = userRow.studio_id;
     request.sessionId = sessionId;
     return next();
   } catch (error) { return response.status(500).json({ error: error.message }); }
@@ -151,18 +165,45 @@ app.post('/api/auth/login', async (request, response) => {
   if (!email?.trim() || !password) return response.status(400).json({ error: 'Email y contraseña son obligatorios' });
   try {
     const result = await pool.query('SELECT id, email, password_hash, full_name FROM users WHERE email = LOWER($1)', [email.trim()]);
-    if (!result.rowCount || !(await verifyPassword(password, result.rows[0].password_hash))) {
+    if (!result.rowCount || !result.rows[0].password_hash || !(await verifyPassword(password, result.rows[0].password_hash))) {
       return response.status(401).json({ error: 'Email o contraseña incorrectos' });
     }
     const user = result.rows[0];
-    const membership = await pool.query('SELECT studio_id FROM studio_memberships WHERE user_id = $1 AND status = \'active\' LIMIT 1', [user.id]);
-    const studioId = membership.rows[0]?.studio_id || null;
+    let membership = await pool.query('SELECT studio_id FROM studio_memberships WHERE user_id = $1 AND status = \'active\' LIMIT 1', [user.id]);
+    let studioId = membership.rows[0]?.studio_id || null;
+
+    if (!studioId) {
+      const defStudio = await pool.query("INSERT INTO studios (name, account_type, currency, timezone) VALUES ($1, 'independent', 'CLP', 'America/Santiago') RETURNING id", [`Estudio de ${user.full_name || 'Artista'}`]);
+      studioId = defStudio.rows[0].id;
+      await pool.query("INSERT INTO studio_memberships (user_id, studio_id, role) VALUES ($1, $2, 'owner')", [user.id, studioId]);
+      await seedDefaultCategories(pool, studioId, 'independent');
+    }
 
     const sessionId = crypto.randomBytes(32).toString('hex');
     await pool.query('INSERT INTO sessions (id, user_id, active_studio_id, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL \'14 days\')', [sessionId, user.id, studioId]);
     setSessionCookie(response, sessionId);
     return response.json({ user: { id: user.id, email: user.email, fullName: user.full_name } });
   } catch (error) { return response.status(500).json({ error: error.message }); }
+});
+
+app.post('/api/auth/seed-demo', async (_request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    console.log('[DB] Ejecutando siembra de datos demo bajo demanda...');
+    await seedStudioData(pool);
+    return response.json({
+      ok: true,
+      message: 'Datos de prueba sembrados exitosamente',
+      accounts: [
+        { role: 'Administrador / Dueño', email: 'estudio@tatudin.com', password: 'password123' },
+        { role: 'Artista Residente', email: 'matias@tatudin.com', password: 'password123' },
+        { role: 'Artista Nómade', email: 'diego.nomad@tatudin.com', password: 'password123' }
+      ]
+    });
+  } catch (error) {
+    console.error('[DB] Error sembrando datos demo:', error);
+    return response.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/auth/logout', async (request, response) => {
@@ -1313,15 +1354,12 @@ async function ensureAuthSchema() {
     console.warn('Warning seeding categories:', seedErr.message);
   }
 
-  // Auto-seed sample studio data on fresh databases
+  // Ensure sample studio data and demo accounts are always synced with valid passwords
   try {
-    const ownerCheck = await pool.query("SELECT id FROM users WHERE email = 'estudio@tatudin.com'");
-    if (!ownerCheck.rowCount) {
-      console.log('[DB] Base de datos limpia detectada: Sembrando automáticamente estudio demo, artistas, boxes y agenda...');
-      await seedStudioData(pool);
-    }
+    console.log('[DB] Sincronizando datos de estudio y cuentas demo (estudio@tatudin.com / password123)...');
+    await seedStudioData(pool);
   } catch (demoSeedErr) {
-    console.warn('[DB] Demo auto-seeding warning:', demoSeedErr.message);
+    console.warn('[DB] Demo seeding notice:', demoSeedErr.message);
   }
 }
 

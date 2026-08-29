@@ -200,10 +200,20 @@ function renderOnboarding(step = 0, authMode = 'register') {
 
         ${isLogin ? `
           <form class="onboarding-card auth-fade" data-onboarding-form="login">
-            <label>Email<input name="email" type="email" value="${onboarding.email || ''}" placeholder="artist@studio.com" required /></label>
-            <label>Contraseña<input name="password" type="password" placeholder="Tu contraseña" required /></label>
+            <label>Email<input name="email" type="email" value="${onboarding.email || 'estudio@tatudin.com'}" placeholder="artist@studio.com" required /></label>
+            <label>Contraseña<input name="password" type="password" value="password123" placeholder="Tu contraseña" required /></label>
             <button class="primary" type="submit" style="margin-top: 6px;">Iniciar sesión <span>→</span></button>
             <p class="form-error"></p>
+
+            <div class="demo-access-panel" style="margin-top: 14px; padding: 10px 12px; background: var(--surface-low); border-radius: var(--radius-md); border: 1px dashed var(--line);">
+              <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em;">⚡ Acceso Rápido Demo (1-Click):</p>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                <button type="button" class="demo-quick-btn" data-demo-email="estudio@tatudin.com" data-demo-pass="password123" style="font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: #ffffff; cursor: pointer; font-weight: 700; color: var(--ink);">👑 Dueño Estudio</button>
+                <button type="button" class="demo-quick-btn" data-demo-email="matias@tatudin.com" data-demo-pass="password123" style="font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: #ffffff; cursor: pointer; font-weight: 700; color: var(--ink);">🎨 Residente</button>
+                <button type="button" class="demo-quick-btn" data-demo-email="diego.nomad@tatudin.com" data-demo-pass="password123" style="font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: #ffffff; cursor: pointer; font-weight: 700; color: var(--ink);">✈️ Nómade</button>
+              </div>
+            </div>
+
             <div class="auth-switch-prompt">
               ¿No tienes una cuenta? <button type="button" class="text-button" data-switch-auth="register">Regístrate gratis</button>
             </div>
@@ -2471,6 +2481,38 @@ document.addEventListener('click', async (event) => {
     return render(termsReturnState.prevView || 'ajustes');
   }
 
+  // Demo Quick Preset Buttons
+  const demoQuickBtn = event.target.closest('[data-demo-email]');
+  if (demoQuickBtn) {
+    const emailInput = document.querySelector('form[data-onboarding-form="login"] input[name="email"]');
+    const passInput = document.querySelector('form[data-onboarding-form="login"] input[name="password"]');
+    const form = document.querySelector('form[data-onboarding-form="login"]');
+    if (emailInput && passInput) {
+      emailInput.value = demoQuickBtn.dataset.demoEmail;
+      passInput.value = demoQuickBtn.dataset.demoPass;
+      if (form) form.requestSubmit();
+    }
+    return;
+  }
+
+  // Force seed and login
+  if (event.target.closest('[data-action="force-seed-login"]')) {
+    const errorEl = document.querySelector('.form-error');
+    if (errorEl) errorEl.innerHTML = '<span style="color: var(--ink);">🌱 Sincronizando datos de prueba en la base de datos...</span>';
+    try {
+      await api('/api/auth/seed-demo', { method: 'POST' });
+      await api('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'estudio@tatudin.com', password: 'password123' })
+      });
+      localStorage.setItem('tatudin_onboarding_complete', 'true');
+      return await startApp();
+    } catch (err) {
+      if (errorEl) errorEl.textContent = `Error: ${err.message}`;
+    }
+    return;
+  }
+
   // Close user dropdown if clicking outside
   if (userMenu && !userMenu.hidden && !event.target.closest('#user-menu')) {
     userMenu.hidden = true;
@@ -2834,7 +2876,12 @@ document.addEventListener('submit', async (event) => {
         localStorage.setItem('tatudin_onboarding_complete', 'true');
         return await startApp();
       } catch (error) {
-        errorEl.textContent = error.message;
+        errorEl.innerHTML = `
+          <span>${error.message}</span>
+          <button type="button" class="primary small" data-action="force-seed-login" style="margin-top: 10px; font-size: 12px; width: 100%; padding: 8px;">
+            🌱 Sincronizar datos de prueba e Iniciar Sesión (1-Click)
+          </button>
+        `;
         return;
       }
     }
