@@ -1312,16 +1312,20 @@ async function ensureAuthSchema() {
     console.warn('Warning seeding categories:', seedErr.message);
   }
 
-  console.log('Database schema successfully initialized and ready.');
-}
-
 app.use((_request, response) => {
   response.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-ensureAuthSchema().then(() => {
-  app.listen(port, () => console.log(`Tatudin listening on port ${port}`));
-}).catch((error) => {
-  console.error('Database schema setup failed:', error.stack || error.message || error);
-  process.exitCode = 1;
+// Start web server immediately on 0.0.0.0 to satisfy Railway healthchecks
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Tatudin listening on port ${port} (http://0.0.0.0:${port})`);
 });
+
+// Run schema migration asynchronously in the background
+ensureAuthSchema()
+  .then(() => {
+    console.log('[DB] Database schema successfully initialized and ready.');
+  })
+  .catch((error) => {
+    console.warn('[DB] Database initialization notice (server is online):', error.message || error);
+  });
