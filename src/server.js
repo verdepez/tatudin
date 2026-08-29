@@ -1091,18 +1091,62 @@ app.post('/api/transactions', requireAuth, async (request, response) => {
 });
 
 async function ensureAuthSchema() {
-  if (!pool) return;
+  if (!pool) {
+    console.warn('DATABASE_URL is not set. Database operations will fail until DATABASE_URL is configured.');
+    return;
+  }
+
+  // Retry connection up to 10 times with backoff in case database is still starting up
+  let connected = false;
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    try {
+      await pool.query('SELECT 1');
+      connected = true;
+      break;
+    } catch (connErr) {
+      console.log(`Waiting for database to accept connections (attempt ${attempt}/10): ${connErr.message}`);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+
+  if (!connected) {
+    throw new Error('Could not establish connection to PostgreSQL after 10 attempts.');
+  }
+
+  // 1. Studios
+  await pool.query(`CREATE TABLE IF NOT EXISTS studios (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    account_type TEXT NOT NULL DEFAULT 'independent' CHECK (account_type IN ('independent', 'studio')),
+    currency CHAR(3) NOT NULL DEFAULT 'CLP',
+    timezone TEXT NOT NULL DEFAULT 'America/Santiago',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  await pool.query(`ALTER TABLE studios ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'independent' CHECK (account_type IN ('independent', 'studio'))`);
+
+  // 2. Users
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
-    full_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id SERIAL PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+
+  // 3. Sessions
   await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
-    id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     active_studio_id INTEGER REFERENCES studios(id) ON DELETE SET NULL,
-    expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+  await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS active_studio_id INTEGER REFERENCES studios(id) ON DELETE SET NULL`);
+
+  // 4. Studio Memberships
   await pool.query(`CREATE TABLE IF NOT EXISTS studio_memberships (
-    id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
     role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'resident', 'nomad')),
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
@@ -1110,6 +1154,10 @@ async function ensureAuthSchema() {
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, studio_id)
   )`);
+  await pool.query(`ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS commission_percent NUMERIC(5, 2) NOT NULL DEFAULT 70.00`);
+
+  // 5. Spaces / Boxes
   await pool.query(`CREATE TABLE IF NOT EXISTS spaces (
     id SERIAL PRIMARY KEY,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
@@ -1120,6 +1168,8 @@ async function ensureAuthSchema() {
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+
+  // 6. Guest Spots
   await pool.query(`CREATE TABLE IF NOT EXISTS guest_spot_requests (
     id SERIAL PRIMARY KEY,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
@@ -1133,7 +1183,8 @@ async function ensureAuthSchema() {
     notes TEXT DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
-  await pool.query(`ALTER TABLE studios ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'independent' CHECK (account_type IN ('independent', 'studio'))`);
+
+  // 7. Commitment Categories
   await pool.query(`CREATE TABLE IF NOT EXISTS commitment_categories (
     id SERIAL PRIMARY KEY,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
@@ -1146,16 +1197,55 @@ async function ensureAuthSchema() {
     is_system BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
-  await pool.query(`ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-  await pool.query(`ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS commission_percent NUMERIC(5, 2) NOT NULL DEFAULT 70.00`);
+
+  // 8. Clients
+  await pool.query(`CREATE TABLE IF NOT EXISTS clients (
+    id SERIAL PRIMARY KEY,
+    studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+
+  // 9. Appointments
+  await pool.query(`CREATE TABLE IF NOT EXISTS appointments (
+    id SERIAL PRIMARY KEY,
+    studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+    category_id INTEGER REFERENCES commitment_categories(id) ON DELETE SET NULL,
+    client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+    artist_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    space_id INTEGER REFERENCES spaces(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    notes TEXT NOT NULL DEFAULT '',
+    starts_at TIMESTAMPTZ NOT NULL,
+    duration_minutes INTEGER NOT NULL DEFAULT 180 CHECK (duration_minutes > 0),
+    status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled')),
+    price NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (price >= 0),
+    deposit NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (deposit >= 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
   await pool.query(`ALTER TABLE appointments ALTER COLUMN client_id DROP NOT NULL`);
   await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES commitment_categories(id) ON DELETE SET NULL`);
   await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''`);
   await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS artist_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
   await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS space_id INTEGER REFERENCES spaces(id) ON DELETE SET NULL`);
-  await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS active_studio_id INTEGER REFERENCES studios(id) ON DELETE SET NULL`);
+
+  // 10. Transactions
+  await pool.query(`CREATE TABLE IF NOT EXISTS transactions (
+    id SERIAL PRIMARY KEY,
+    studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('income', 'expense')),
+    description TEXT NOT NULL,
+    amount NUMERIC(12, 2) NOT NULL CHECK (amount >= 0),
+    occurred_on DATE NOT NULL,
+    artist_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
   await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS artist_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
 
+  // 11. User Portfolios
   await pool.query(`CREATE TABLE IF NOT EXISTS user_portfolios (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -1176,6 +1266,7 @@ async function ensureAuthSchema() {
     UNIQUE (user_id)
   )`);
 
+  // 12. Portfolio Gallery Items
   await pool.query(`CREATE TABLE IF NOT EXISTS portfolio_gallery_items (
     id SERIAL PRIMARY KEY,
     portfolio_id INTEGER NOT NULL REFERENCES user_portfolios(id) ON DELETE CASCADE,
@@ -1188,6 +1279,7 @@ async function ensureAuthSchema() {
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
 
+  // Seed default categories for existing studios
   try {
     const allStudios = await pool.query('SELECT id, account_type FROM studios');
     for (const st of allStudios.rows) {
@@ -1200,6 +1292,8 @@ async function ensureAuthSchema() {
   } catch (seedErr) {
     console.warn('Warning seeding categories:', seedErr.message);
   }
+
+  console.log('Database schema successfully initialized and ready.');
 }
 
 app.use((_request, response) => {
@@ -1209,6 +1303,6 @@ app.use((_request, response) => {
 ensureAuthSchema().then(() => {
   app.listen(port, () => console.log(`Tatudin listening on port ${port}`));
 }).catch((error) => {
-  console.error('Database schema setup failed:', error.message);
+  console.error('Database schema setup failed:', error.stack || error.message || error);
   process.exitCode = 1;
 });
