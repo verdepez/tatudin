@@ -1660,17 +1660,26 @@ textarea {
   justify-content: space-between;
   min-height: 40px;
   color: var(--ink);
+  position: relative;
 }
 
 .onboarding-top strong {
   font-size: 20px;
   letter-spacing: -0.03em;
+  font-weight: 800;
 }
 
-.onboarding-top span {
+.onboarding-top-spacer {
+  width: 28px;
+  height: 28px;
+  display: inline-block;
+}
+
+.onboarding-step-badge {
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
+  animation: authFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .onboarding-close, .text-button {
@@ -1681,6 +1690,18 @@ textarea {
 
 .onboarding-close {
   font-size: 24px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  animation: authFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.onboarding-close:hover {
+  background: rgba(9, 4, 28, 0.06);
 }
 
 .progress {
@@ -1689,6 +1710,7 @@ textarea {
   background: var(--line);
   border-radius: var(--radius-pill);
   overflow: hidden;
+  animation: authFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .progress i {
@@ -1697,6 +1719,21 @@ textarea {
   background: var(--ink);
   border-radius: var(--radius-pill);
   transition: width 0.3s ease;
+}
+
+.auth-fade {
+  animation: authFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes authFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .onboarding-card {

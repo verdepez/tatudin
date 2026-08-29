@@ -115,15 +115,25 @@ function saveOnboarding(values) {
   return api('/api/onboarding', { method: 'PUT', body: JSON.stringify(safeOnboarding) });
 }
 
-function onboardingHeader(step, title, description) {
+function onboardingHeader(step, title, description, isLogin = false) {
+  if (isLogin) {
+    return `
+      <div class="onboarding-top">
+        <span class="onboarding-top-spacer"></span>
+        <strong>tatudin</strong>
+        <span class="onboarding-top-spacer"></span>
+      </div>
+      ${title ? `<div class="auth-fade"><h1>${title}</h1><p>${description}</p></div>` : ''}
+    `;
+  }
   return `
     <div class="onboarding-top">
-      <button class="onboarding-close" data-onboarding-back aria-label="Volver">×</button>
+      ${step ? '<button class="onboarding-close" data-onboarding-back aria-label="Volver">×</button>' : '<span class="onboarding-top-spacer"></span>'}
       <strong>tatudin</strong>
-      <span>${step ? `${step} / 5` : ''}</span>
+      ${step ? `<span class="onboarding-step-badge">${step} / 5</span>` : '<span class="onboarding-top-spacer"></span>'}
     </div>
     ${step ? `<div class="progress"><i style="width:${step * 20}%"></i></div>` : ''}
-    ${title ? `<h1>${title}</h1><p>${description}</p>` : ''}
+    ${title ? `<div class="auth-fade"><h1>${title}</h1><p>${description}</p></div>` : ''}
   `;
 }
 
@@ -139,7 +149,7 @@ function hideSplash() {
 
 function onboardingFooter(back = true) {
   return `
-    <footer class="onboarding-footer">
+    <footer class="onboarding-footer auth-fade">
       ${back ? '<button class="text-button" data-onboarding-back>← Atrás</button>' : '<span></span>'}
       <button class="primary" data-onboarding-next>Continuar <span>→</span></button>
     </footer>
@@ -155,7 +165,7 @@ function renderOnboarding(step = 0, authMode = 'register') {
   app.innerHTML = '';
   if (step === 0) {
     app.innerHTML = `
-      <section class="onboarding welcome">
+      <section class="onboarding welcome auth-fade">
         ${onboardingHeader()}
         <div class="welcome-brand">
           <span class="brand-mark">t</span>
@@ -180,8 +190,8 @@ function renderOnboarding(step = 0, authMode = 'register') {
   if (step === 1) {
     const isLogin = authMode === 'login';
     app.innerHTML = `
-      <section class="onboarding" data-step="1">
-        ${onboardingHeader(1, isLogin ? 'Bienvenido de vuelta' : 'Crea tu cuenta', isLogin ? 'Ingresa tus credenciales para acceder a tu estudio.' : 'Únete al espacio para tatuadores profesionales.')}
+      <section class="onboarding auth-view-section" data-step="1">
+        ${onboardingHeader(1, isLogin ? 'Bienvenido de vuelta' : 'Crea tu cuenta', isLogin ? 'Ingresa tus credenciales para acceder a tu estudio.' : 'Únete al espacio para tatuadores profesionales.', isLogin)}
         
         <div class="auth-tabs">
           <button type="button" class="auth-tab ${!isLogin ? 'active' : ''}" data-switch-auth="register">Crear cuenta</button>
@@ -189,7 +199,7 @@ function renderOnboarding(step = 0, authMode = 'register') {
         </div>
 
         ${isLogin ? `
-          <form class="onboarding-card" data-onboarding-form="login">
+          <form class="onboarding-card auth-fade" data-onboarding-form="login">
             <label>Email<input name="email" type="email" value="${onboarding.email || ''}" placeholder="artist@studio.com" required /></label>
             <label>Contraseña<input name="password" type="password" placeholder="Tu contraseña" required /></label>
             <button class="primary" type="submit" style="margin-top: 6px;">Iniciar sesión <span>→</span></button>
@@ -199,7 +209,7 @@ function renderOnboarding(step = 0, authMode = 'register') {
             </div>
           </form>
         ` : `
-          <form class="onboarding-card" data-onboarding-form="register">
+          <form class="onboarding-card auth-fade" data-onboarding-form="register">
             <label>Nombre completo<input name="fullName" value="${onboarding.fullName || ''}" placeholder="Tu nombre completo" required /></label>
             <label>Email<input name="email" type="email" value="${onboarding.email || ''}" placeholder="artist@studio.com" required /></label>
             <label>Crea una contraseña<input name="password" type="password" placeholder="Mínimo 8 caracteres" minlength="8" required /></label>
@@ -210,7 +220,6 @@ function renderOnboarding(step = 0, authMode = 'register') {
             </div>
           </form>
         `}
-        ${onboardingFooter(false)}
       </section>
     `;
     return;
