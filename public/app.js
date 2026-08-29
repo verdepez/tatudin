@@ -56,38 +56,17 @@ const ROLE_MAP = {
   nomad: { label: 'Nómade', class: 'role-nomad' }
 };
 
-let debugLogsBuffer = [];
-function logToDebugConsole(msg) {
-  const time = new Date().toLocaleTimeString();
-  const logEl = document.getElementById('debug-log-output');
-  const line = `[${time}] ${msg}`;
-  debugLogsBuffer.push(line);
-  if (debugLogsBuffer.length > 60) debugLogsBuffer.shift();
-  if (logEl) {
-    logEl.textContent = debugLogsBuffer.join('\n');
-    logEl.scrollTop = logEl.scrollHeight;
+const api = (url, options = {}) => fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options }).then(async (response) => {
+  let data = {};
+  const text = await response.text();
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (err) {
+    throw new Error(text || `Error ${response.status}: No se pudo procesar la solicitud`);
   }
-}
-
-const api = (url, options = {}) => {
-  const method = options.method || 'GET';
-  const shortBody = options.body ? ` [Body: ${options.body.slice(0, 80)}]` : '';
-  logToDebugConsole(`> ${method} ${url}${shortBody}`);
-  return fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options }).then(async (response) => {
-    let data = {};
-    const text = await response.text();
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch (err) {
-      logToDebugConsole(`< ${method} ${url} HTTP ${response.status} (Texto plano: ${text.slice(0, 100)})`);
-      throw new Error(text || `Error ${response.status}: No se pudo procesar la solicitud`);
-    }
-    const respSummary = JSON.stringify(data).slice(0, 100);
-    logToDebugConsole(`< ${method} ${url} HTTP ${response.status} ${response.ok ? '✓ OK' : '⚠ FALLÓ'} [${respSummary}]`);
-    if (!response.ok) throw new Error(data.error || 'No se pudo completar la operación');
-    return data;
-  });
-};
+  if (!response.ok) throw new Error(data.error || 'No se pudo completar la operación');
+  return data;
+});
 
 let clients = [];
 let members = [];
@@ -243,48 +222,8 @@ function renderOnboarding(step = 0, authMode = 'register') {
           </form>
         `}
         <p class="terms" style="margin-top: 14px; text-align: center;">Plataforma profesional regulada por la <button type="button" class="text-link-btn" data-action="open-terms" data-from-step="1" data-auth-mode="${authMode}">Ley N° 19.628 de Protección de la Vida Privada</button>.</p>
-
-        <!-- Live Debug / Diagnostics Panel -->
-        <div id="tatudin-debug-panel" class="debug-panel-container">
-          <div class="debug-panel-header">
-            <strong>🛠️ MODO DEBUG / DIAGNÓSTICO EN VIVO</strong>
-            <span id="debug-status-pill" class="debug-status-pill">Verificando...</span>
-          </div>
-          <div class="debug-panel-body">
-            <div class="debug-grid">
-              <div class="debug-card">
-                <span class="debug-label">ESTADO BASE DE DATOS</span>
-                <div id="debug-db-status" class="debug-val">Consultando...</div>
-              </div>
-              <div class="debug-card">
-                <span class="debug-label">SUPERADMIN (ROOT)</span>
-                <div id="debug-root-status" class="debug-val">Consultando...</div>
-              </div>
-              <div class="debug-card">
-                <span class="debug-label">TABLAS ENCONTRADAS</span>
-                <div id="debug-tables-status" class="debug-val">Consultando...</div>
-              </div>
-            </div>
-
-            <div class="debug-actions-row">
-              <button type="button" class="debug-btn" id="btn-debug-refresh">🔄 Refrescar</button>
-              <button type="button" class="debug-btn" id="btn-debug-reset-root">👑 Crear / Resetear Root</button>
-              <button type="button" class="debug-btn" id="btn-debug-init-db">🌱 Inicializar BD</button>
-              <button type="button" class="debug-btn debug-btn-primary" id="btn-debug-autologin-root">⚡ Auto-Login Superadmin</button>
-            </div>
-
-            <div class="debug-console-log">
-              <div class="debug-log-header">
-                <span>Consola de Peticiones y Diagnóstico en Vivo:</span>
-                <button type="button" class="debug-clear-btn" id="btn-debug-clear-logs">Limpiar</button>
-              </div>
-              <pre id="debug-log-output" class="debug-log-text">Iniciando diagnóstico...</pre>
-            </div>
-          </div>
-        </div>
       </section>
     `;
-    setTimeout(() => initDebugMode(), 0);
     return;
   }
   if (step === 2) {
@@ -3671,152 +3610,6 @@ document.addEventListener('change', async (event) => {
     }
   }
 });
-
-// ---------------- LIVE DEBUG MODE HELPERS ----------------
-async function refreshDebugInfo() {
-  const pill = document.getElementById('debug-status-pill');
-  const dbStatusEl = document.getElementById('debug-db-status');
-  const rootStatusEl = document.getElementById('debug-root-status');
-  const tablesStatusEl = document.getElementById('debug-tables-status');
-
-  logToDebugConsole('Consultando diagnóstico del servidor /api/debug/info...');
-  try {
-    const res = await fetch('/api/debug/info');
-    const data = await res.json();
-    logToDebugConsole(`Diagnóstico recibido (Node ${data.nodeVersion || 'N/A'}, Puerto ${data.port || '3000'})`);
-
-    const db = data.database || {};
-    if (db.connected) {
-      if (pill) {
-        pill.className = 'debug-status-pill online';
-        pill.textContent = '🟢 BD Conectada';
-      }
-      if (dbStatusEl) {
-        dbStatusEl.className = 'debug-val ok';
-        dbStatusEl.textContent = `ONLINE (${db.dbName || 'Postgres'})`;
-      }
-      logToDebugConsole(`✓ PostgreSQL OK: DB "${db.dbName}", Usuario "${db.dbUser}", Hora servidor: ${db.dbTime}`);
-    } else {
-      if (pill) {
-        pill.className = 'debug-status-pill offline';
-        pill.textContent = '🔴 BD Desconectada';
-      }
-      if (dbStatusEl) {
-        dbStatusEl.className = 'debug-val err';
-        dbStatusEl.textContent = `ERROR: ${db.error || 'No conectada'}`;
-      }
-      logToDebugConsole(`❌ Error de conexión BD: ${db.error || 'Sin conexión'}`);
-      if (db.isLocalhostOnRailway) {
-        logToDebugConsole(`⚠️ ATENCIÓN: DATABASE_URL está configurada como "localhost". En Railway, cada servicio tiene su propia IP. Debes vincular el servicio Postgres cambiando el valor de DATABASE_URL por "\${{Postgres.DATABASE_URL}}" en las Variables de tatudin.`);
-      }
-    }
-
-    if (tablesStatusEl) {
-      const tableCount = (db.tables || []).length;
-      tablesStatusEl.className = tableCount >= 5 ? 'debug-val ok' : 'debug-val err';
-      tablesStatusEl.textContent = `${tableCount} tablas (${(db.tables || []).slice(0, 4).join(', ')}...)`;
-      logToDebugConsole(`Tablas detectadas (${tableCount}): ${(db.tables || []).join(', ') || 'Ninguna'}`);
-    }
-
-    if (rootStatusEl) {
-      if (db.rootUser) {
-        rootStatusEl.className = 'debug-val ok';
-        rootStatusEl.textContent = `Configurado (ID #${db.rootUser.id})`;
-        logToDebugConsole(`✓ Superadmin OK: ${db.rootUser.email} (is_superadmin: ${db.rootUser.is_superadmin})`);
-      } else {
-        rootStatusEl.className = 'debug-val err';
-        rootStatusEl.textContent = 'No encontrado (Usa botón Crear Root)';
-        logToDebugConsole('⚠️ Superadmin soyelroot@tatudin.cl NO existe aún en la BD.');
-      }
-    }
-
-    if (Array.isArray(data.recentLogs) && data.recentLogs.length > 0) {
-      data.recentLogs.slice(0, 5).forEach((l) => {
-        logToDebugConsole(`[Server ${l.level}] ${l.message}`);
-      });
-    }
-  } catch (err) {
-    if (pill) {
-      pill.className = 'debug-status-pill offline';
-      pill.textContent = '🔴 Servidor Inaccesible';
-    }
-    logToDebugConsole(`❌ Error consultando /api/debug/info: ${err.message}`);
-  }
-}
-
-async function initDebugMode() {
-  const panel = document.getElementById('tatudin-debug-panel');
-  if (!panel) return;
-
-  const btnRefresh = document.getElementById('btn-debug-refresh');
-  const btnResetRoot = document.getElementById('btn-debug-reset-root');
-  const btnInitDb = document.getElementById('btn-debug-init-db');
-  const btnAutoLogin = document.getElementById('btn-debug-autologin-root');
-  const btnClearLogs = document.getElementById('btn-debug-clear-logs');
-
-  if (btnRefresh) {
-    btnRefresh.onclick = () => refreshDebugInfo();
-  }
-
-  if (btnClearLogs) {
-    btnClearLogs.onclick = () => {
-      debugLogsBuffer = [];
-      const logEl = document.getElementById('debug-log-output');
-      if (logEl) logEl.textContent = 'Consola limpiada.';
-    };
-  }
-
-  if (btnResetRoot) {
-    btnResetRoot.onclick = async () => {
-      logToDebugConsole('Enviando solicitud POST /api/debug/reset-root...');
-      try {
-        const res = await fetch('/api/debug/reset-root', { method: 'POST' });
-        const text = await res.text();
-        logToDebugConsole(`Respuesta reset-root (HTTP ${res.status}): ${text}`);
-        await refreshDebugInfo();
-      } catch (err) {
-        logToDebugConsole(`❌ Error en reset-root: ${err.message}`);
-      }
-    };
-  }
-
-  if (btnInitDb) {
-    btnInitDb.onclick = async () => {
-      logToDebugConsole('Enviando solicitud POST /api/debug/init-db...');
-      try {
-        const res = await fetch('/api/debug/init-db', { method: 'POST' });
-        const text = await res.text();
-        logToDebugConsole(`Respuesta init-db (HTTP ${res.status}): ${text}`);
-        await refreshDebugInfo();
-      } catch (err) {
-        logToDebugConsole(`❌ Error en init-db: ${err.message}`);
-      }
-    };
-  }
-
-  if (btnAutoLogin) {
-    btnAutoLogin.onclick = async () => {
-      logToDebugConsole('⚡ Iniciando proceso de Auto-Login Superadmin...');
-      try {
-        logToDebugConsole('1. Asegurando usuario soyelroot@tatudin.cl en BD...');
-        await fetch('/api/debug/reset-root', { method: 'POST' });
-        
-        logToDebugConsole('2. Ejecutando inicio de sesión...');
-        const loginData = await api('/api/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ email: 'soyelroot@tatudin.cl', password: 'password123' })
-        });
-        logToDebugConsole('3. Sesión establecida con éxito. Redirigiendo...');
-        localStorage.setItem('tatudin_onboarding_complete', 'true');
-        await startApp();
-      } catch (err) {
-        logToDebugConsole(`❌ Error en Auto-Login: ${err.message}`);
-      }
-    };
-  }
-
-  await refreshDebugInfo();
-}
 
 // Session verification and bootstrap
 api('/api/auth/me')
