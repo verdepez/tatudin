@@ -1706,11 +1706,18 @@ async function ensureAuthSchema() {
     }
   };
 
-  try {
-    const rawUrl = process.env.DATABASE_URL || '';
-    const sanitized = rawUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
-    console.log(`[DB] Connecting to database: ${sanitized}`);
-  } catch {}
+  const candidateUrls = [];
+  const baseRaw = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_PRIVATE_URL || process.env.POSTGRES_URL || '';
+  if (baseRaw) {
+    candidateUrls.push({ url: baseRaw, ssl: false });
+    candidateUrls.push({ url: baseRaw, ssl: { rejectUnauthorized: false } });
+    if (baseRaw.includes('localhost') || baseRaw.includes('127.0.0.1')) {
+      const internalUrl = baseRaw.replace(/@(localhost|127\.0\.0\.1):/, '@postgres.railway.internal:');
+      const serviceUrl = baseRaw.replace(/@(localhost|127\.0\.0\.1):/, '@postgres:');
+      candidateUrls.push({ url: internalUrl, ssl: false });
+      candidateUrls.push({ url: serviceUrl, ssl: false });
+    }
+  }
 
   let connected = false;
   for (let attempt = 1; attempt <= 12; attempt++) {
@@ -1722,10 +1729,11 @@ async function ensureAuthSchema() {
       const errStr = String(connErr?.message || connErr?.code || connErr);
       console.log(`[DB] Waiting for database (attempt ${attempt}/12): ${errStr}`);
       
-      if (errStr.toLowerCase().includes('ssl') || errStr.toLowerCase().includes('protocol') || errStr.toLowerCase().includes('handshake')) {
-        console.log('[DB] Switching connection to non-SSL mode...');
+      // Try next candidate URL configuration
+      const cand = candidateUrls[(attempt - 1) % candidateUrls.length];
+      if (cand) {
         try { await pool.end(); } catch {}
-        pool = new Pool({ connectionString: databaseUrl, ssl: false });
+        pool = new Pool({ connectionString: cand.url, ssl: cand.ssl });
       }
       
       await new Promise((r) => setTimeout(r, 2000));
