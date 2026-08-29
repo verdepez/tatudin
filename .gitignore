@@ -1,7 +1,23 @@
+# Dependencies
 node_modules/
+
+# Environment variables
 .env
+.env.local
+
+# Logs & OS metadata
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.DS_Store
 *.log
+.DS_Store
+Thumbs.db
+
+# Design mockups, wireframes & Stitch assets (non-executable)
+png/
+imagen/
+stitch_tatudin_app_artist_view/
+stitch_tatudin_app_estudio_view/
+DESIGN.md
+tatudin_contexto_proyecto.md
+

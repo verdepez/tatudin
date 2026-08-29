@@ -31,7 +31,6 @@ const sessionDuration = 1000 * 60 * 60 * 24 * 14;
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use('/imagen', express.static(path.join(__dirname, '..', 'imagen')));
 
 async function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
