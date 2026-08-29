@@ -3,8 +3,6 @@ import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 
 const { Pool } = pg;
-const databaseUrl = process.env.DATABASE_URL || 'postgres://tatudin:tatudin@db:5432/tatudin';
-const pool = new Pool({ connectionString: databaseUrl, options: '-c timezone=America/Santiago' });
 const scrypt = promisify(crypto.scrypt);
 
 async function hashPassword(password) {
@@ -13,8 +11,10 @@ async function hashPassword(password) {
   return `${salt}:${derivedKey.toString('hex')}`;
 }
 
-async function seed() {
+export async function seedStudioData(passedPool = null) {
   console.log('🌱 Iniciando seeding de datos para Tatudin Estudio...');
+  const isStandalone = !passedPool;
+  const pool = passedPool || new Pool({ connectionString: process.env.DATABASE_URL || 'postgres://tatudin:tatudin@db:5432/tatudin' });
   const client = await pool.connect();
 
   try {
@@ -715,13 +715,19 @@ async function seed() {
     console.log(`🔑 Credenciales de Acceso Estudio:`);
     console.log(`   Email: ${ownerEmail}`);
     console.log(`   Password: ${defaultPassword}`);
+    return { ok: true, ownerEmail, defaultPassword };
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Error en el seeding:', err);
+    throw err;
   } finally {
     client.release();
-    await pool.end();
+    if (isStandalone) {
+      await pool.end();
+    }
   }
 }
 
-seed();
+if (process.argv[1] && process.argv[1].endsWith('seed_studio.js')) {
+  seedStudioData().catch(console.error);
+}

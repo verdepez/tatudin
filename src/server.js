@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { seedStudioData } from './seed_studio.js';
 
 const { Pool } = pg;
 const app = express();
@@ -1310,6 +1311,17 @@ async function ensureAuthSchema() {
     }
   } catch (seedErr) {
     console.warn('Warning seeding categories:', seedErr.message);
+  }
+
+  // Auto-seed sample studio data on fresh databases
+  try {
+    const ownerCheck = await pool.query("SELECT id FROM users WHERE email = 'estudio@tatudin.com'");
+    if (!ownerCheck.rowCount) {
+      console.log('[DB] Base de datos limpia detectada: Sembrando automáticamente estudio demo, artistas, boxes y agenda...');
+      await seedStudioData(pool);
+    }
+  } catch (demoSeedErr) {
+    console.warn('[DB] Demo auto-seeding warning:', demoSeedErr.message);
   }
 }
 
