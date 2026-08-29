@@ -1,0 +1,18 @@
+{
+  "name": "Tatudin",
+  "short_name": "Tatudin",
+  "description": "Agenda y operaciones para tatuadores y estudios.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fdf7ff",
+  "theme_color": "#221c35",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

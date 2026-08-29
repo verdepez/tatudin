@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-on-surface": "#f5eeff",
+                    "surface-container-low": "#f7f1ff",
+                    "background": "#fdf7ff",
+                    "on-surface-variant": "#48454d",
+                    "primary": "#09041c",
+                    "tertiary": "#1c0002",
+                    "on-tertiary-fixed-variant": "#920023",
+                    "on-secondary": "#ffffff",
+                    "on-primary-container": "#8b83a2",
+                    "on-secondary-fixed-variant": "#464652",
+                    "on-error": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "surface-dim": "#ded6ee",
+                    "error": "#ba1a1a",
+                    "primary-fixed": "#e8ddff",
+                    "on-background": "#1d192a",
+                    "secondary-fixed": "#e3e1f0",
+                    "tertiary-container": "#49000c",
+                    "surface-container-high": "#ece5fc",
+                    "on-primary-fixed": "#1e1830",
+                    "surface-variant": "#e6dff7",
+                    "inverse-primary": "#cbc2e3",
+                    "outline-variant": "#cac5cd",
+                    "primary-container": "#221c35",
+                    "surface": "#fdf7ff",
+                    "surface-container": "#f2ebff",
+                    "on-tertiary-fixed": "#40000a",
+                    "on-surface": "#1d192a",
+                    "secondary-fixed-dim": "#c7c5d4",
+                    "on-secondary-container": "#62616e",
+                    "primary-fixed-dim": "#cbc2e3",
+                    "on-tertiary": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#e6dff7",
+                    "secondary-container": "#e0deed",
+                    "tertiary-fixed": "#ffdad9",
+                    "inverse-surface": "#322e40",
+                    "tertiary-fixed-dim": "#ffb3b3",
+                    "outline": "#79767d",
+                    "on-secondary-fixed": "#1a1b25",
+                    "on-tertiary-container": "#ff3552",
+                    "on-primary-fixed-variant": "#4a435e",
+                    "surface-bright": "#fdf7ff",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-tint": "#625a77",
+                    "secondary": "#5d5d6a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-max": "1280px",
+                    "unit": "8px",
+                    "gutter": "24px",
+                    "section-gap": "64px",
+                    "margin-desktop": "40px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "label-md": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "headline-md": ["Manrope"],
+                    "label-sm": ["Manrope"],
+                    "display-lg": ["Manrope"],
+                    "body-lg": ["Manrope"],
+                    "body-md": ["Manrope"],
+                    "headline-lg": ["Manrope"]
+            },
+            "fontSize": {
+                    "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #fdf7ff;
+        }
+        .organic-blob {
+            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="text-on-background min-h-screen pb-24">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-4 w-full sticky top-0 z-40 bg-background dark:bg-background">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-surface-variant">
+<img alt="Artist profile picture" class="w-full h-full object-cover" data-alt="A sophisticated close-up portrait of a professional tattoo artist in a brightly lit, minimalist studio. The artist has artistic tattoos on their arms and is wearing a clean, modern black apron. The lighting is soft and airy, emphasizing a sense of professional calm and artistic precision. The background is a clean white studio wall with subtle hints of sterilized equipment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyl_6lD-tEl7Jc8urv49mk-ucwM6P9AmHlheJFALBCk09xJVpjEY5kjQSTJ62M91oWVYuTlAfbDXu7JhGG8JDApyz09TpJQb2Rs4mjVAWJxMfgxx8rw0Q1vzwP2fxgtTVS-3ro4PAEwPFBMiTqYJMwcdIakanfQIBOy6RW8AJvvkPOmNv60wImD_vRv-a9QU8C809qH5vBFXCtsJ4EHGRfhnNUrwxFanSgi_taGYLhK-CHmy5YOZcRFuenV8pXPOKT3wjT6w5uCvw"/>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">Tatudin</h1>
+</div>
+<button class="w-12 h-12 flex items-center justify-center rounded-full hover:bg-surface-container-low dark:hover:bg-primary-container transition-colors cursor-pointer active:scale-95 duration-200">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed">notifications</span>
+</button>
+<button class="w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer active:scale-95 duration-200 ml-2">
+<span class="material-symbols-outlined">filter_list</span>
+</button></header>
+<main class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-6">
+<!-- Calendar Header & Weekly Switcher -->
+<section class="mb-10">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-primary">September 2024</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">4 appointments scheduled this week</p>
+</div>
+<div class="flex gap-2">
+<button class="p-2 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="px-6 py-2 rounded-xl bg-primary text-on-primary font-label-md text-label-md">Today</button>
+<button class="p-2 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+<!-- Weekly Horizontal View -->
+<div class="grid grid-cols-7 gap-2 md:gap-4 overflow-x-auto pb-4">
+<div class="flex flex-col items-center p-3 min-w-[64px] rounded-2xl bg-surface-container-lowest border border-surface-variant/30 text-on-surface-variant">
+<span class="font-label-sm text-label-sm mb-2">Mon</span>
+<span class="font-headline-md text-headline-md">09</span>
+</div>
+<div class="flex flex-col items-center p-3 min-w-[64px] rounded-2xl bg-surface-container-lowest border border-surface-variant/30 text-on-surface-variant">
+<span class="font-label-sm text-label-sm mb-2">Tue</span>
+<span class="font-headline-md text-headline-md">10</span>
+</div>
+<!-- Active Day -->
+<div class="flex flex-col items-center p-3 min-w-[64px] rounded-2xl bg-primary text-on-primary shadow-xl scale-105">
+<span class="font-label-sm text-label-sm mb-2">Wed</span>
+<span class="font-headline-md text-headline-md">11</span>
+<div class="w-1.5 h-1.5 rounded-full bg-on-tertiary-container mt-1"></div>
+</div>
+<div class="flex flex-col items-center p-3 min-w-[64px] rounded-2xl bg-surface-container-lowest border border-surface-variant/30 text-on-surface-variant">
+<span class="font-label-sm text-label-sm mb-2">Thu</span>
+<span class="font-headline-md text-headline-md">12</span>
+</div>
+<div class="flex flex-col items-center p-3 min-w-[64px] rounded-2xl bg-surface-container-lowest border border-surface-variant/30 text-on-surface-variant">
+<span class="font-label-sm text-label-sm mb-2">Fri</span>
+<span class="font-headline-md text-headline-md">13</span>
+</div>
+<div class="flex flex-col items-center p-3 min-w-[64px] rounded-2xl bg-surface-container-lowest border border-surface-variant/30 text-on-surface-variant">
+<span class="font-label-sm text-label-sm mb-2">Sat</span>
+<span class="font-headline-md text-headline-md">14</span>
+</div>
+<div class="flex flex-col items-center p-3 min-w-[64px] rounded-2xl bg-surface-container-lowest border border-surface-variant/30 text-on-surface-variant">
+<span class="font-label-sm text-label-sm mb-2">Sun</span>
+<span class="font-headline-md text-headline-md">15</span>
+</div>
+</div>
+</section>
+<!-- Timeline Section -->
+<section class="relative space-y-6">
+<!-- Time Indicator (Current Line) -->
+<div class="absolute left-16 right-0 top-[140px] h-[2px] bg-on-tertiary-container/30 z-10 flex items-center">
+<div class="w-3 h-3 rounded-full bg-on-tertiary-container -ml-1.5"></div>
+</div>
+<!-- 10:00 AM Slot -->
+<div class="flex gap-4">
+<div class="w-12 text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant/60">10:00</span>
+</div>
+<div class="flex-1 min-h-[80px] border-t border-surface-variant/20 pt-4">
+<!-- Appointment Card 1 -->
+<div class="bg-surface-container-lowest rounded-3xl p-6 shadow-sm border border-surface-variant/30 flex flex-col md:flex-row justify-between items-start gap-4 hover:shadow-md transition-shadow">
+<div class="flex gap-4">
+<div class="w-14 h-14 rounded-2xl overflow-hidden organic-blob bg-secondary-container">
+<img alt="Client portrait" class="w-full h-full object-cover" data-alt="A portrait of a stylish woman with a modern, artistic vibe in a bright, lavender-toned studio setting. She is wearing a soft minimalist outfit that reflects the 'Operational Calm' aesthetic of the app. The lighting is ethereal and high-key, creating a clean and professional atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDsiXFAQ6SMZ9w0UQJmFbEhju2f9-SQUQg8wzzU2jaSqZ1hlsGzC_6XfCMH3UyOYX7aM1XGbnvBD8rUOkH4XdM6tZzO2unNhczN904gyFvuFf9IRgfFQXS41jFnKe9TWRW-sVkzYK6RuODOv2DO25iGciVNoSr1-i7qLQV5yJePwX9GJfUV6cE58ClK9RZgAbdSNc91SYCGP4ZqqM4PS_kCAWNHwz1UyvAE8c5P1DpVfnZzz8PakwJ36lf_saSeo5Zu896Ju8b9Ngo"/>
+</div>
+<div>
+<h3 class="font-headline-md text-[20px] text-primary">Julianne V.</h3>
+<div class="flex items-center gap-2 mt-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Half-Sleeve Floral</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">3h Session</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col items-end gap-3 self-stretch md:self-auto">
+<span class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-label-sm">Deposit Paid</span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">person</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Artist: Soren</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 11:00 AM - Empty/Airy Gap -->
+<div class="flex gap-4">
+<div class="w-12 text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant/60">11:00</span>
+</div>
+<div class="flex-1 min-h-[40px] border-t border-surface-variant/20"></div>
+</div>
+<!-- 1:00 PM Slot -->
+<div class="flex gap-4">
+<div class="w-12 text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant/60">13:00</span>
+</div>
+<div class="flex-1 min-h-[80px] border-t border-surface-variant/20 pt-4">
+<!-- Appointment Card 2 (In-Progress) -->
+<div class="bg-primary-container text-on-primary rounded-3xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start gap-4">
+<div class="flex gap-4">
+<div class="w-14 h-14 rounded-2xl overflow-hidden organic-blob bg-primary-fixed">
+<img alt="Client portrait" class="w-full h-full object-cover" data-alt="A portrait of a man with expressive features in a minimalist environment with soft, diffused lighting. The background features lavender and deep purple tones that match the Tatudin branding. The mood is calm and creative, emphasizing the premium nature of the digital tattoo management experience." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2pQY_GU3HXvt5zT2X5dVu2gX6NR9wLItr1pbuWhsVnY_xqYiAlYk-Al0ZbjixqZog_gH95zrtUde-fLTFlkIlRndFOSoPcFkn4QNBYw43V7VnzUObjeAW6gjyiG27hozt7qApRlHNeESKPEh3IJIkm3nMlH1OBFVGW6O0micaP5Px48dtJaqvC8J_WNo8gfPB3uUsreQo9CaDUQE0ugDuG-xTCVOjCPFyyUSRyDgT5sta1yx4_kPEPyfEpjxm0ByCZBwss3iN8rA"/>
+</div>
+<div>
+<h3 class="font-headline-md text-[20px] text-primary-fixed">Marcus R.</h3>
+<div class="flex items-center gap-2 mt-1">
+<span class="font-label-sm text-label-sm text-primary-fixed-dim">Geometric Spine</span>
+<span class="w-1 h-1 rounded-full bg-primary-fixed/30"></span>
+<span class="font-label-sm text-label-sm text-primary-fixed-dim">5h Large Session</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col items-end gap-3 self-stretch md:self-auto">
+<span class="bg-on-tertiary-container text-on-tertiary px-3 py-1 rounded-full font-label-sm text-label-sm flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                                In Session
+                            </span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-primary-fixed-dim">person</span>
+<span class="font-label-sm text-label-sm text-primary-fixed-dim">Artist: Elara</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 2:00 PM Slot -->
+<div class="flex gap-4">
+<div class="w-12 text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant/60">14:00</span>
+</div>
+<div class="flex-1 min-h-[40px] border-t border-surface-variant/20"></div>
+</div>
+<!-- Decorative Organic Accent -->
+<div class="absolute -right-20 top-1/2 w-64 h-64 bg-surface-container-high organic-blob opacity-20 blur-3xl -z-10"></div>
+</section>
+</main>
+<!-- FAB: New Appointment -->
+<button class="fixed right-margin-mobile bottom-28 md:right-margin-desktop md:bottom-28 bg-primary text-on-primary w-14 h-14 rounded-2xl shadow-2xl flex items-center justify-center cursor-pointer active:scale-90 transition-transform z-50">
+<span class="material-symbols-outlined">add</span>
+</button>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 right-0 z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.05)] rounded-t-[32px] border-t border-surface-variant/20">
+<!-- Dashboard -->
+<a class="flex flex-col items-center justify-center gap-1 w-20 py-2 text-on-surface-variant hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[28px]">grid_view</span>
+<span class="font-label-sm text-[12px]">Dashboard</span>
+</a>
+<!-- Agenda (Active) -->
+<a class="flex flex-col items-center justify-center gap-1 w-20 py-2 bg-surface-container rounded-[20px] text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[28px]">calendar_today</span>
+<span class="font-label-sm text-[12px]">Agenda</span>
+</a>
+<!-- Finanzas -->
+<a class="flex flex-col items-center justify-center gap-1 w-20 py-2 text-on-surface-variant hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[28px]">payments</span>
+<span class="font-label-sm text-[12px]">Finanzas</span>
+</a>
+<!-- Comunicaciones -->
+<a class="flex flex-col items-center justify-center gap-1 w-20 py-2 text-on-surface-variant hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[28px]">chat_bubble</span>
+<span class="font-label-sm text-[12px]">Comunicaciones</span>
+</a>
+<!-- Menú -->
+<a class="flex flex-col items-center justify-center gap-1 w-20 py-2 text-on-surface-variant hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[28px]">menu</span>
+<span class="font-label-sm text-[12px]">Menú</span>
+</a>
+</nav>
+<div class="fixed inset-0 z-[60] flex items-center justify-center px-margin-mobile" id="filter-overlay">
+<!-- Backdrop with blur -->
+<div class="absolute inset-0 bg-primary/40 backdrop-blur-sm"></div>
+<!-- Menu Container -->
+<div class="relative w-full max-w-sm bg-surface-container-lowest rounded-[32px] p-6 shadow-2xl animate-in fade-in zoom-in duration-300">
+<!-- Header -->
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-headline-md text-headline-md text-primary">Filtrar calendarios</h2>
+<button class="p-2 rounded-full hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">close</span>
+</button>
+</div>
+<!-- Options List -->
+<div class="space-y-4">
+<!-- All Calendars -->
+<div class="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low border border-surface-variant/30">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">calendar_today</span>
+<span class="font-body-md text-body-md text-primary">Todos los calendarios</span>
+</div>
+<span class="material-symbols-outlined text-primary font-bold">check</span>
+</div>
+<!-- Divider -->
+<div class="h-px bg-outline-variant/20 my-2"></div>
+<!-- Santiago Office -->
+<div class="flex justify-between items-center p-3">
+<div class="flex items-center gap-3">
+<div class="w-3 h-3 rounded-full bg-on-tertiary-container"></div>
+<span class="font-body-md text-body-md text-on-surface">Santiago Office</span>
+</div>
+<div class="w-12 h-6 bg-primary rounded-full relative flex items-center px-1">
+<div class="w-4 h-4 bg-white rounded-full ml-auto"></div>
+</div>
+</div>
+<!-- Berlin Guest -->
+<div class="flex justify-between items-center p-3">
+<div class="flex items-center gap-3">
+<div class="w-3 h-3 rounded-full bg-secondary"></div>
+<span class="font-body-md text-body-md text-on-surface">Berlin Guest</span>
+</div>
+<div class="w-12 h-6 bg-surface-container-high rounded-full relative flex items-center px-1">
+<div class="w-4 h-4 bg-white rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Action Button -->
+<button class="w-full mt-8 py-4 bg-primary text-on-primary rounded-2xl font-label-md text-label-md hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
+      Aplicar filtros
+    </button>
+</div>
+</div></body></html>

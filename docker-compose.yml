@@ -1,0 +1,37 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://tatudin:tatudin@db:5432/tatudin
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./tests:/app/tests
+      - ./package.json:/app/package.json
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tatudin
+      POSTGRES_USER: tatudin
+      POSTGRES_PASSWORD: tatudin
+    ports:
+      - "5432:5432"
+    volumes:
+      - tatudin-postgres:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tatudin -d tatudin"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  tatudin-postgres:

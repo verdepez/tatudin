@@ -1,0 +1,246 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Tatudin - Clientes</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#1d192a",
+                        "on-primary-fixed": "#1e1830",
+                        "on-tertiary-fixed-variant": "#920023",
+                        "primary-container": "#221c35",
+                        "error": "#ba1a1a",
+                        "primary-fixed-dim": "#cbc2e3",
+                        "secondary-fixed-dim": "#c7c5d4",
+                        "surface-tint": "#625a77",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#ece5fc",
+                        "on-surface": "#1d192a",
+                        "surface-bright": "#fdf7ff",
+                        "on-surface-variant": "#48454d",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "tertiary-container": "#49000c",
+                        "surface": "#fdf7ff",
+                        "outline-variant": "#cac5cd",
+                        "on-secondary-fixed-variant": "#464652",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#ded6ee",
+                        "outline": "#79767d",
+                        "surface-container-highest": "#e6dff7",
+                        "primary-fixed": "#e8ddff",
+                        "primary": "#09041c",
+                        "tertiary": "#1c0002",
+                        "secondary": "#5d5d6a",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb3b3",
+                        "on-tertiary-container": "#ff3552",
+                        "secondary-container": "#e0deed",
+                        "inverse-surface": "#322e40",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f7f1ff",
+                        "on-secondary-container": "#62616e",
+                        "on-primary-fixed-variant": "#4a435e",
+                        "secondary-fixed": "#e3e1f0",
+                        "inverse-primary": "#cbc2e3",
+                        "background": "#fdf7ff",
+                        "on-tertiary-fixed": "#40000a",
+                        "on-secondary-fixed": "#1a1b25",
+                        "on-primary-container": "#8b83a2",
+                        "tertiary-fixed": "#ffdad9",
+                        "error-container": "#ffdad6",
+                        "surface-variant": "#e6dff7",
+                        "inverse-on-surface": "#f5eeff",
+                        "surface-container": "#f2ebff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "unit": "8px",
+                        "margin-desktop": "40px",
+                        "section-gap": "64px",
+                        "gutter": "24px",
+                        "container-max": "1280px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "label-sm": ["Manrope"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "display-lg": ["Manrope"],
+                        "body-md": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #fdf7ff;
+            color: #1d192a;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-24">
+<!-- TopAppBar Component -->
+<header class="bg-background dark:bg-primary docked full-width top-0 z-40">
+<div class="flex justify-between items-center w-full px-margin-mobile py-unit max-w-container-max mx-auto h-16">
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-surface-container-low dark:hover:bg-primary-container transition-colors rounded-full text-on-background dark:text-on-primary">
+<span class="material-symbols-outlined" data-icon="menu">arrow_back</span>
+</button>
+<span class="text-headline-md font-headline-md font-bold text-primary dark:text-primary-fixed">Tatudin</span>
+</div>
+<div class="flex items-center">
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden border-2 border-outline-variant/30">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="A professional studio logo portrait for a tattoo artist management application, presented in a minimalist circular frame. The aesthetic is clean and editorial, featuring soft lavender and deep purple tones with high-key studio lighting. The overall mood is sophisticated, organized, and creative, reflecting the operational calm brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-9QYUw-Ut7EafIPQOwhk8h0fpJ2ebWx-CuFxl3x_vv6Aj04SZxO0BQ4ETYypWgYi9I9TTqtlS1ZT2keappPF9K6h9PqjAXBcOG-l3ELqbVzvXPR7bI15f8yfA7xjHbBPhjSn_H6UFwgcp4QKXa9y8YMQmSqTuTI7tei_uQKVZEc38IkZLKKkBK7ADCE5EGXR_cHB9MhffO17f7ybRM-AqmDOkejeKauCJBOlu1wYL4DKnLE3YPGcEc6xSN_7I3SpP9r5RsjGekj8">
+</div>
+</div>
+</div>
+</header>
+<main class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-8">
+<!-- Search Header Section -->
+<section class="mb-section-gap">
+<div class="flex flex-col gap-6">
+<h1 class="text-headline-lg-mobile md:text-headline-lg font-headline-lg text-primary">Clientes</h1>
+<!-- Active Search Bar -->
+<div class="relative w-full max-w-2xl">
+<div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline" data-icon="search">search</span>
+</div>
+<input class="w-full bg-surface-container-low border-b border-primary py-4 pl-12 pr-12 rounded-t-xl text-body-md font-body-md focus:outline-none focus:ring-0 transition-all border-l-0 border-r-0 border-t-0" placeholder="Buscar por nome ou e-mail..." type="text" value="Cat">
+<div class="absolute inset-y-0 right-4 flex items-center">
+<button class="p-1 hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="close">close</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Search Results Count -->
+<div class="mb-gutter">
+<p class="text-label-md font-label-md text-on-secondary-container">1 resultado encontrado para "Cat"</p>
+</div>
+<!-- Bento Grid Result Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Main Client Card -->
+<div class="md:col-span-8 bg-surface-container-lowest rounded-xl p-8 shadow-sm border border-outline-variant/20 flex flex-col md:flex-row gap-8 items-start">
+<div class="w-32 h-32 rounded-full overflow-hidden bg-secondary-fixed flex-shrink-0">
+<img alt="Catalina Vega" class="w-full h-full object-cover" data-alt="A high-end editorial portrait of a woman named Catalina Vega in a minimalist studio setting. The lighting is soft and diffused, creating a serene and professional atmosphere. The color palette consists of muted lavender backgrounds and deep purple accents, maintaining a digital sanctuary aesthetic. She has a subtle, calm expression suitable for a premium tattoo studio client profile." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlr5-L2XNOiPy-kdAe2nGEOXjNwt6B0dxF_L9V5H48HjmYgKgIqg1bFlNKax0YY148NZsa7QoP5m2dMrGs7FKVocLma_0FItgctxhKQ0sn-h3pqXJld4Z0g7AA55HHDbHW2cBVsTls2ha5VP83eb3MRJaw160-ryMYNnHU9F5eA6VR_yaY5oyBuxx7IGpOI35rTDEDbBRpVq3H5MG6jCPa_lJjaiExuBtAmN0QUHaAWMe0Nayt8ZLPZ7XkgZsEb7CRQ3PSPDQU2is">
+</div>
+<div class="flex-grow space-y-4">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<h2 class="text-headline-md font-headline-md text-on-surface">Catalina Vega</h2>
+<span class="bg-primary-fixed text-on-primary-fixed-variant px-3 py-0.5 rounded-full text-label-sm font-label-sm">VIP Client</span>
+</div>
+<p class="text-body-md font-body-md text-on-surface-variant">catalina.v@email.com • +56 9 8765 4321</p>
+</div>
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-container-high px-4 py-2 rounded-lg text-label-md font-label-md text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="brush">brush</span>
+                            Neo-Traditional
+                        </span>
+<span class="bg-surface-container-high px-4 py-2 rounded-lg text-label-md font-label-md text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="event_available">event_available</span>
+                            3 Sessions
+                        </span>
+</div>
+<div class="pt-4 flex gap-3">
+<button class="bg-primary text-on-primary px-6 py-2.5 rounded-lg text-label-md font-label-md hover:opacity-90 transition-opacity">
+                            View Profile
+                        </button>
+<button class="bg-secondary-fixed text-on-secondary-fixed-variant px-6 py-2.5 rounded-lg text-label-md font-label-md hover:bg-secondary-container transition-colors">
+                            New Appointment
+                        </button>
+</div>
+</div>
+</div>
+<!-- Quick Stats Side Card -->
+<div class="md:col-span-4 bg-primary-container text-on-primary-container rounded-xl p-8 shadow-sm flex flex-col justify-between">
+<div>
+<h3 class="text-label-md font-label-md uppercase tracking-wider opacity-70 mb-6">Last Project</h3>
+<div class="space-y-2">
+<p class="text-headline-md font-headline-md text-white">Hummingbird Backpiece</p>
+<p class="text-body-md font-body-md text-on-primary-container/80">Completed: Oct 12, 2023</p>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-on-primary-container/10">
+<div class="flex justify-between items-end">
+<div>
+<p class="text-label-sm font-label-sm opacity-70">Total Revenue</p>
+<p class="text-headline-md font-headline-md text-white">$1,450.00</p>
+</div>
+<span class="material-symbols-outlined text-primary-fixed-dim text-4xl" data-icon="payments">payments</span>
+</div>
+</div>
+</div>
+<!-- Asymmetric Gallery Section -->
+<div class="md:col-span-5 bg-surface-container rounded-xl p-6 overflow-hidden">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-label-md font-label-md text-on-surface">Sketch History</h3>
+<span class="material-symbols-outlined text-outline" data-icon="more_horiz">more_horiz</span>
+</div>
+<div class="aspect-square rounded-lg overflow-hidden bg-white">
+<img alt="Tattoo Sketch" class="w-full h-full object-cover" data-alt="A delicate and artistic tattoo sketch of a hummingbird among botanical flowers, drawn with fine lines on a soft-textured paper. The visual style is minimal and sophisticated, reflecting the creative brand identity of a high-end studio. The lighting is bright and airy, with soft shadows that emphasize the organic flow of the ink-like drawing." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBgaqUsAnr9O8HRbjzDtqGrvH5qKNlKyCW74YGcKEvSXlR0YXep62n2y11sXiAOx9jmflfNmnUO1Gw_UFylgzuj5Ow12o2zaGZv0hYsZCgWJyKJIT0FI0VIQfF7OrkWSp4k-ifXBfb9AW2uzy9sJb3eXoa3TUEoERrSTNLl7YhpL3EoEOoU9Vfp_V4Vif0d7xuH1dBEEo-mPMaYqXQADSCvD1lKy6XKePUr_AKVxNa9_f9bEHGfnHCMbafKycBOVcQyXx0oukTFnfw">
+</div>
+</div>
+<!-- Notes Section -->
+<div class="md:col-span-7 bg-surface-container-lowest rounded-xl p-8 border border-outline-variant/10">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary" data-icon="sticky_note_2">sticky_note_2</span>
+<h3 class="text-headline-md font-headline-md text-on-surface">Client Notes</h3>
+</div>
+<div class="space-y-4">
+<div class="p-4 bg-surface-container-low rounded-lg">
+<p class="text-body-md font-body-md text-on-surface-variant italic">"Prefers sessions in the afternoon. Very sensitive skin on the upper back area, requires extra numbing cream."</p>
+<p class="text-label-sm font-label-sm text-on-primary-container mt-2">— Updated 2 weeks ago</p>
+</div>
+<div class="p-4 bg-surface-container-low rounded-lg">
+<p class="text-body-md font-body-md text-on-surface-variant italic">"Interested in a small forearm piece next year. Sent reference photos of botanical line work."</p>
+<p class="text-label-sm font-label-sm text-on-primary-container mt-2">— Added by Studio Admin</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar Component -->
+
+
+
+
+
+</body></html>

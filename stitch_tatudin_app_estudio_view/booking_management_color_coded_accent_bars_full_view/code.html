@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-background": "#1d192a",
+                    "surface-tint": "#625a77",
+                    "outline": "#79767d",
+                    "on-tertiary-fixed": "#40000a",
+                    "surface-container-highest": "#e6dff7",
+                    "on-primary-fixed-variant": "#4a435e",
+                    "on-error-container": "#93000a",
+                    "on-secondary-fixed-variant": "#464652",
+                    "surface-container": "#f2ebff",
+                    "on-error": "#ffffff",
+                    "primary-fixed-dim": "#cbc2e3",
+                    "primary-fixed": "#e8ddff",
+                    "on-tertiary-container": "#ff3552",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface-variant": "#48454d",
+                    "on-surface": "#1d192a",
+                    "tertiary-fixed-dim": "#ffb3b3",
+                    "surface-variant": "#e6dff7",
+                    "error": "#ba1a1a",
+                    "on-primary-container": "#8b83a2",
+                    "inverse-on-surface": "#f5eeff",
+                    "primary": "#09041c",
+                    "tertiary": "#1c0002",
+                    "secondary-fixed": "#e3e1f0",
+                    "secondary": "#5d5d6a",
+                    "tertiary-container": "#49000c",
+                    "secondary-fixed-dim": "#c7c5d4",
+                    "surface": "#fdf7ff",
+                    "inverse-surface": "#322e40",
+                    "on-tertiary-fixed-variant": "#920023",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "surface-bright": "#fdf7ff",
+                    "on-primary": "#ffffff",
+                    "background": "#fdf7ff",
+                    "on-secondary-fixed": "#1a1b25",
+                    "on-secondary-container": "#62616e",
+                    "tertiary-fixed": "#ffdad9",
+                    "surface-container-low": "#f7f1ff",
+                    "surface-container-high": "#ece5fc",
+                    "outline-variant": "#cac5cd",
+                    "inverse-primary": "#cbc2e3",
+                    "surface-dim": "#ded6ee",
+                    "secondary-container": "#e0deed",
+                    "primary-container": "#221c35",
+                    "on-primary-fixed": "#1e1830",
+                    "error-container": "#ffdad6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "24px",
+                    "unit": "8px",
+                    "margin-mobile": "16px",
+                    "margin-desktop": "40px",
+                    "container-max": "1280px",
+                    "section-gap": "64px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Manrope"],
+                    "body-md": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "body-lg": ["Manrope"],
+                    "label-sm": ["Manrope"],
+                    "headline-md": ["Manrope"],
+                    "display-lg": ["Manrope"],
+                    "label-md": ["Manrope"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #fdf7ff;
+            font-family: 'Manrope', sans-serif;
+        }
+        .calendar-card {
+            box-shadow: 0 4px 24px -4px rgba(34, 28, 53, 0.05);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="text-on-surface">
+<!-- TopAppBar -->
+<header class="bg-surface docked full-width top-0 z-40 fixed">
+<div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop h-16 w-full max-w-container-max mx-auto">
+<button class="text-on-surface-variant hover:opacity-80 transition-opacity scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="arrow_back" data-stitch-orig-opacity="0">arrow_back</span>
+</button>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary tracking-tight">                      Tatudin</h1>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto min-h-screen pb-12">
+<!-- Header Section with Secondary CTA -->
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-gutter">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Booking Calendars</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-xl">Manage your availability and appointment flows across different locations and session types.</p>
+</div>
+<button class="flex items-center gap-2 bg-secondary-container text-on-secondary-container px-6 py-3 rounded-xl hover:opacity-80 transition-opacity active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+<span class="font-label-md text-label-md">Nuevo calendario</span>
+</button>
+</div>
+<!-- Asymmetric Bento-style Grid for Calendars -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Primary Card: Santiago Office -->
+<div class="md:col-span-8 bg-surface-container-lowest calendar-card rounded-xl border border-outline-variant/10 flex flex-col justify-between group relative overflow-hidden pl-gutter py-gutter pr-gutter"><div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-container"></div>
+<div class="flex justify-between items-start mb-8">
+<div class="flex gap-4 items-center">
+<div class="w-12 h-12 rounded-xl bg-primary-container text-on-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="location_on">location_on</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-primary">Santiago Office</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Central Studio Space</p>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="share">share</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+<div class="bg-surface p-4 rounded-xl border border-outline-variant/5">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">Session Type</p>
+<p class="font-body-lg text-body-lg text-on-surface font-semibold">Tattoo session (3h)</p>
+</div>
+<div class="bg-surface p-4 rounded-xl border border-outline-variant/5">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">Activity</p>
+<p class="font-body-lg text-body-lg text-on-surface font-semibold">12 appointments this month</p>
+</div>
+</div>
+<div class="flex items-center justify-between pt-6 border-t border-outline-variant/10">
+<div class="flex -space-x-2">
+<img class="w-8 h-8 rounded-full border-2 border-surface" data-alt="Close up photo of a detailed linework tattoo being prepared on skin in a clean environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGxUwBSVFWAsFaISQH_HfT_PL7kkInvttXTvxgv5YdD9Z4M76X0L3NjnQk25L1A6iEQU0enWAK9_y7d6r1KrAUZFHDwmQzMFYHsV0WbTnmmtqM-XXcEuqWzp8etULJHvhNH5b5cW7MsreYxgL2NVJJhAN1KbWPWtgOmSCB41lqk3u-9k9FImd5pq1zyU149WqpKihcsdibwvWbPtkft8ATwNPjx39xLpA_oy8R_5surSAVwX5HH3rqYJK83rwbNxvluqo9g3EaSMw"/>
+<img class="w-8 h-8 rounded-full border-2 border-surface" data-alt="Minimalist small moon tattoo design on a client's wrist." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOSDZep4etd5X1Zn0i8MXyv-aD_e0TbVq0XCfS2gAtmOsDWRKInC7J3Y2yOc_EyDBKrpcenx8H548D9mfD1NWTzB1tBrQyqc6cjinzH8UUaPUVdlXHqG8MNZh1gCQtKu_nT-Gx7HTkYWMQ0G1Q4vSc9eci-R1CauTeTJKZzcg5EQdCreDYYESUCKDrnbxsVAbwM3IhN9wmIMJ2sg3fkNk9tNMmL5ONrPbYP6B9YkhPLU3S5H_fwO3L4qf8rA4U-aqr3rtV-Ky0biQ"/>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest border-2 border-surface flex items-center justify-center text-[10px] font-bold">+9</div>
+</div>
+<span class="bg-primary-container text-on-primary-container px-3 py-1 rounded-full font-label-sm text-label-sm">Active Now</span>
+</div>
+</div>
+<!-- Secondary Card: Guest Spot -->
+<div class="md:col-span-4 bg-surface-container-lowest calendar-card rounded-xl border border-outline-variant/10 flex flex-col justify-between relative overflow-hidden pl-gutter py-gutter pr-gutter"><div class="absolute left-0 top-0 bottom-0 w-1 bg-on-tertiary-container"></div>
+<div>
+<div class="flex justify-between items-start mb-6">
+<div class="w-10 h-10 rounded-xl bg-tertiary-fixed text-on-tertiary-fixed-variant flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="flight">flight</span>
+</div>
+<div class="flex gap-1">
+<button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="share" style="font-size: 18px">share</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="settings" style="font-size: 18px">settings</span>
+</button>
+</div>
+</div>
+<h3 class="font-headline-md text-headline-md text-primary mb-1">Berlin Guest</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4">Blackwork Sessions</p>
+<div class="space-y-3">
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="schedule" style="font-size: 20px">schedule</span>
+<span class="font-label-md text-label-md">6h sessions</span>
+</div>
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="calendar_month" style="font-size: 20px">calendar_month</span>
+<span class="font-label-md text-label-md">Next: June 12-18</span>
+</div>
+</div>
+</div>
+<div class="pt-6 mt-6 border-t border-outline-variant/10">
+<p class="font-body-md text-body-md text-tertiary font-medium">8 slots remaining</p>
+</div>
+</div>
+<!-- Tertiary Card: Consultations -->
+<div class="md:col-span-4 bg-surface-container-lowest calendar-card rounded-xl border border-outline-variant/10 relative overflow-hidden pl-gutter py-gutter pr-gutter"><div class="absolute left-0 top-0 bottom-0 w-1 bg-surface-dim"></div>
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-headline-md text-headline-md text-primary">Consultations</h3>
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Discovery calls and design reviews (15 min)</p>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-outline"></span>
+<span class="font-label-md text-label-md text-on-surface-variant">Paused</span>
+</div>
+</div>
+<!-- Analytics Visual Hint Card -->
+<div class="md:col-span-8 bg-primary-container text-on-primary-fixed p-gutter rounded-xl overflow-hidden relative group">
+<div class="relative z-10 h-full flex flex-col justify-center">
+<h3 class="font-headline-md text-headline-md text-primary-fixed mb-2">Booking Insights</h3>
+<p class="font-body-md text-body-md text-on-primary-container max-w-sm mb-6">Your calendar efficiency has increased by 14% this month. Santiago Office remains your most active hub.</p>
+<button class="w-fit px-6 py-2 bg-primary-fixed-dim text-primary rounded-full font-label-md text-label-md hover:opacity-90 transition-opacity">
+                        View Detailed Stats
+                    </button>
+</div>
+<!-- Abstract "Ink flow" decoration -->
+<div class="absolute right-0 top-0 w-1/2 h-full opacity-20 pointer-events-none">
+<svg class="w-full h-full scale-150 rotate-45" viewbox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+<path d="M44.7,-76.4C58.1,-69.2,69.2,-58.1,76.4,-44.7C83.7,-31.3,87.1,-15.7,86.1,-0.6C85.1,14.5,79.7,29,71.2,41.4C62.7,53.8,51,64.2,37.6,71.2C24.2,78.2,9.1,81.8,-5.5,81.3C-20,80.8,-34.9,76.2,-48.1,68.4C-61.2,60.6,-72.6,49.6,-79.1,36.2C-85.5,22.8,-87,6.9,-84.9,-8.5C-82.7,-23.9,-76.9,-38.8,-67.2,-50.8C-57.5,-62.7,-43.8,-71.8,-29.9,-77.7C-16,-83.6,-1.9,-86.3,13,-85.4C27.9,-84.4,44.7,-76.4Z" fill="#cbc2e3" transform="translate(100 100)"></path>
+</svg>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<!-- Desktop Navigation Drawer (Sidebar placeholder) -->
+<aside class="hidden md:flex fixed inset-y-0 left-0 z-50 w-72 flex-col bg-surface border-r border-outline-variant/20 p-gutter">
+<div class="mb-12">
+<h1 class="font-headline-md text-headline-md text-primary">Tatudin</h1>
+</div>
+<div class="flex items-center gap-4 mb-10 p-2 bg-surface-container-low rounded-xl">
+<img class="w-12 h-12 rounded-full" data-alt="Detailed close-up of a professional tattoo artist's workstation, showing clean ink caps, sterile needles, and a soft purple ambient light reflecting off stainless steel surfaces." src="https://lh3.googleusercontent.com/aida-public/AB6AXuApJf5CW0iKBBNJFC-SjCMpoqSDlzKloftZ-jdkC06ieviTkgmsHOgB4TtiRopvLAJ76calZE37lY_4K0a4dT0VImXpdLsnVqv_wFGcQFRCPxwVkFvNDbTKOWbr2wNWC5ju9mwq0sdPvWx2Omxz8nbTSQY6eQzz-Igh2bs6he0dcUpWoxNxDuDfythE6uhFrpqvx7VM9Bc6NBzC8vCA8fRdg2FID2CxSrHTkTcy8EByReHhNLgPJMfTSitP2OpwiK4lxyz5ZHuuiJ8"/>
+<div>
+<p class="font-label-md text-label-md text-primary">Alex Ink</p>
+<p class="text-[12px] text-on-surface-variant">Lead Artist</p>
+</div>
+</div>
+<nav class="space-y-2">
+<div class="flex items-center gap-3 p-3 rounded-lg text-primary bg-surface-container font-semibold transition-all duration-300 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</div>
+<div class="flex items-center gap-3 p-3 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:pl-5 transition-all duration-300 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="event_note">event_note</span>
+<span class="font-body-md text-body-md">Schedule</span>
+</div>
+<div class="flex items-center gap-3 p-3 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:pl-5 transition-all duration-300 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="palette">palette</span>
+<span class="font-body-md text-body-md">Artist Portfolio</span>
+</div>
+<div class="flex items-center gap-3 p-3 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:pl-5 transition-all duration-300 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Studio Settings</span>
+</div>
+</nav>
+<div class="mt-auto pt-6 border-t border-outline-variant/10">
+<div class="flex items-center gap-3 p-3 rounded-lg text-error hover:bg-error-container/10 transition-all duration-300 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-body-md text-body-md">Sign Out</span>
+</div>
+</div>
+</aside>
+<!-- Adjust Main Padding for Desktop Sidebar -->
+<style>
+        @media (min-width: 768px) {
+            main { margin-left: 288px; }
+            header { left: 288px; width: calc(100% - 288px); }
+        }
+    </style>
+</body></html>

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Public Booking Page Settings</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-surface": "#322e40",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-container": "#62616e",
+                    "secondary-container": "#e0deed",
+                    "on-secondary": "#ffffff",
+                    "on-primary-fixed-variant": "#4a435e",
+                    "on-primary-fixed": "#1e1830",
+                    "surface-dim": "#ded6ee",
+                    "on-secondary-fixed-variant": "#464652",
+                    "surface-bright": "#fdf7ff",
+                    "on-error": "#ffffff",
+                    "outline-variant": "#cac5cd",
+                    "on-tertiary-container": "#ff3552",
+                    "primary-container": "#221c35",
+                    "error": "#ba1a1a",
+                    "on-background": "#1d192a",
+                    "secondary-fixed-dim": "#c7c5d4",
+                    "secondary-fixed": "#e3e1f0",
+                    "on-tertiary-fixed-variant": "#920023",
+                    "surface-container-highest": "#e6dff7",
+                    "secondary": "#5d5d6a",
+                    "primary": "#09041c",
+                    "error-container": "#ffdad6",
+                    "background": "#fdf7ff",
+                    "surface": "#fdf7ff",
+                    "outline": "#79767d",
+                    "surface-container-high": "#ece5fc",
+                    "surface-container-low": "#f7f1ff",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed-dim": "#ffb3b3",
+                    "on-surface": "#1d192a",
+                    "primary-fixed-dim": "#cbc2e3",
+                    "tertiary": "#1c0002",
+                    "surface-container": "#f2ebff",
+                    "on-primary": "#ffffff",
+                    "surface-tint": "#625a77",
+                    "on-primary-container": "#8b83a2",
+                    "on-secondary-fixed": "#1a1b25",
+                    "surface-variant": "#e6dff7",
+                    "tertiary-fixed": "#ffdad9",
+                    "inverse-primary": "#cbc2e3",
+                    "inverse-on-surface": "#f5eeff",
+                    "on-error-container": "#93000a",
+                    "tertiary-container": "#49000c",
+                    "primary-fixed": "#e8ddff",
+                    "on-tertiary-fixed": "#40000a",
+                    "on-surface-variant": "#48454d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-mobile": "16px",
+                    "unit": "8px",
+                    "container-max": "1280px",
+                    "gutter": "24px",
+                    "section-gap": "64px",
+                    "margin-desktop": "40px"
+            },
+            "fontFamily": {
+                    "label-sm": ["Manrope"],
+                    "headline-md": ["Manrope"],
+                    "display-lg": ["Manrope"],
+                    "headline-lg": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "body-md": ["Manrope"],
+                    "body-lg": ["Manrope"],
+                    "label-md": ["Manrope"]
+            },
+            "fontSize": {
+                    "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        /* Hide scrollbar for clean aesthetic but allow scrolling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #e6dff7;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #cbc2e3;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface-container-low text-on-surface font-body-md min-h-screen flex flex-col md:flex-row antialiased">
+<!-- Desktop Sidebar Navigation (Persistent per Style Guidance, derived from BottomNavBar JSON) -->
+<aside class="hidden md:flex flex-col w-64 fixed h-screen top-0 left-0 bg-surface-container-lowest shadow-[4px_0_24px_0_rgba(34,28,53,0.03)] z-40">
+<div class="px-8 py-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">Tatudin</h1>
+</div>
+<nav class="flex flex-col gap-2 px-4 mt-8 flex-grow">
+<!-- Schedule -->
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+<span class="font-label-md text-label-md">Schedule</span>
+</a>
+<!-- Clients -->
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-md text-label-md">Clients</span>
+</a>
+<!-- Inventory -->
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">kettle</span>
+<span class="font-label-md text-label-md">Inventory</span>
+</a>
+<!-- Settings (Active) -->
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl bg-secondary-container text-on-secondary-container" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</nav>
+<div class="p-8">
+<button class="flex items-center gap-3 text-secondary hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Sign Out</span>
+</button>
+</div>
+</aside>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col md:ml-64 relative">
+<!-- TopAppBar (JSON) - Hidden on desktop as sidebar handles branding, visible on mobile -->
+<header class="w-full top-0 sticky bg-background dark:bg-on-background flat no shadows z-40 md:hidden">
+<div class="flex items-center justify-between px-margin-mobile py-4 w-full max-w-container-max mx-auto">
+<button class="text-primary dark:text-primary-fixed hover:opacity-80 transition-opacity active:scale-95 transition-transform flex items-center justify-center p-2">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">Tatudin</h1>
+<button class="text-primary dark:text-primary-fixed hover:opacity-80 transition-opacity active:scale-95 transition-transform flex items-center justify-center p-2">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</header>
+<!-- Page Content Canvas -->
+<main class="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-8 md:py-12 pb-32 md:pb-24">
+<div class="flex items-center gap-4 mb-6">
+<div class="w-12 h-12 rounded-xl bg-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-fixed-variant">
+      edit_note
+    </span>
+</div>
+<span class="font-label-md text-label-md tracking-wider text-on-surface-variant uppercase">
+    Form Settings
+  </span>
+</div><div class="mb-10">
+<h2 class="font-display-lg text-display-lg hidden md:block text-primary">Public Page</h2>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:hidden text-primary">Public Page</h2>
+<p class="font-body-lg text-body-lg text-secondary mt-2">Customize your client-facing booking experience.</p>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column (Primary Details) -->
+<div class="lg:col-span-8 flex flex-col gap-gutter">
+<!-- Artist Branding Card -->
+<section class="bg-surface-container-lowest rounded-xl p-6 md:p-8 shadow-[0_4px_32px_0_rgba(34,28,53,0.04)] relative overflow-hidden">
+<!-- Decorative top gradient line -->
+<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-fixed-dim to-transparent"></div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-8">Artist Profile</h3>
+<!-- Avatar Section -->
+<div class="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-8">
+<div class="w-24 h-24 rounded-full bg-surface-variant flex-shrink-0 relative group cursor-pointer overflow-hidden ring-4 ring-surface-container-lowest shadow-sm" data-alt="A high-end, professional portrait of a modern tattoo artist standing in a minimalist, brightly lit studio. The lighting is soft and diffused, creating a serene 'light mode' aesthetic with gentle lavender and deep purple ambient undertones. The artist appears calm and approachable, styled in clean, sophisticated dark clothing that contrasts smoothly against the pristine white background. The overall mood is premium, organized, and creative without relying on heavy or dark clichés." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBZMttmYKd5P8G26SXFV0d9ccfy6k_TEzMdOm0D5-DB3r4Id8-gtPoYV_oZWoyszYvSbjbjEJbyCOSMcqKaiVub-FCMh6N_t6_-xc7aojyTnURWL1MFkACPRxzxoQMfEqohPMHoPf7533BeF7m9lu8tmc7s97ByJ60SAac1vvQdHeUOvV9HsPB1Ug7LEVblEgkCo4O9bpaWjMn9qhjrYI-gJOpJs0lkaubrwy7oAfOlUZeGkFfhPwlZsdSXMt4ON5jaKRhlAT05LlU'); background-size: cover; background-position: center;">
+<div class="absolute inset-0 bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary">photo_camera</span>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<button class="bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-label-md px-4 py-2 rounded-lg transition-colors w-fit">
+                                    Change Avatar
+                                </button>
+<p class="font-label-sm text-label-sm text-outline">JPG or PNG, max 5MB.</p>
+</div>
+</div>
+<!-- Form Fields -->
+<div class="flex flex-col gap-6">
+<div>
+<label class="font-label-sm text-label-sm text-secondary block mb-2">Studio / Artist Name</label>
+<input class="w-full bg-transparent border-b border-surface-variant focus:border-primary pb-2 outline-none font-body-md text-body-md text-on-surface transition-colors placeholder:text-outline-variant" type="text" value="Aura Ink Studio"/>
+</div>
+<div>
+<label class="font-label-sm text-label-sm text-secondary block mb-2">Instagram Handle</label>
+<div class="flex items-center">
+<span class="text-outline font-body-md text-body-md mr-1">@</span>
+<input class="w-full bg-transparent border-b border-surface-variant focus:border-primary pb-2 outline-none font-body-md text-body-md text-on-surface transition-colors" type="text" value="aura.ink"/>
+</div>
+</div>
+<div>
+<label class="font-label-sm text-label-sm text-secondary block mb-2">Artist Bio</label>
+<textarea class="w-full bg-surface-container rounded-lg border border-transparent focus:border-primary-fixed p-4 outline-none font-body-md text-body-md text-on-surface transition-colors resize-none placeholder:text-outline-variant" rows="4">Specializing in fine-line botanical and soft geometric blackwork. Creating a calm, focused environment for every piece.</textarea>
+<p class="font-label-sm text-label-sm text-outline mt-2 text-right">104 / 500</p>
+</div>
+</div>
+</section>
+<!-- Meeting Location Card -->
+<section class="bg-surface-container-lowest rounded-xl p-6 md:p-8 shadow-[0_4px_32px_0_rgba(34,28,53,0.04)]">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-6">Meeting Location</h3>
+<p class="font-body-md text-body-md text-secondary mb-6">Select the primary way clients will meet with you.</p>
+<div class="flex flex-col gap-4">
+<!-- Radio Option 1 -->
+<label class="flex items-start gap-4 p-4 rounded-xl border border-primary bg-surface-container-low cursor-pointer transition-colors group">
+<div class="mt-1 flex-shrink-0 relative w-5 h-5">
+<input checked="" class="peer sr-only" name="location" type="radio"/>
+<div class="w-5 h-5 rounded-full border-2 border-primary peer-checked:bg-primary transition-colors flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-surface-container-lowest opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+</div>
+</div>
+<div class="flex-grow">
+<span class="font-label-md text-label-md text-on-surface block mb-1">Tattoo Studio</span>
+<span class="font-body-md text-body-md text-secondary block">Clients come to your primary location.</span>
+</div>
+<span class="material-symbols-outlined text-primary">storefront</span>
+</label>
+<!-- Radio Option 2 -->
+<label class="flex items-start gap-4 p-4 rounded-xl border border-surface-variant hover:border-outline-variant cursor-pointer transition-colors group">
+<div class="mt-1 flex-shrink-0 relative w-5 h-5">
+<input class="peer sr-only" name="location" type="radio"/>
+<div class="w-5 h-5 rounded-full border-2 border-outline peer-checked:border-primary peer-checked:bg-primary transition-colors flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-surface-container-lowest opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+</div>
+</div>
+<div class="flex-grow">
+<span class="font-label-md text-label-md text-on-surface block mb-1">Online Consultation</span>
+<span class="font-body-md text-body-md text-secondary block">Video call links automatically generated.</span>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-secondary transition-colors">videocam</span>
+</label>
+<!-- Radio Option 3 -->
+<label class="flex items-start gap-4 p-4 rounded-xl border border-surface-variant hover:border-outline-variant cursor-pointer transition-colors group">
+<div class="mt-1 flex-shrink-0 relative w-5 h-5">
+<input class="peer sr-only" name="location" type="radio"/>
+<div class="w-5 h-5 rounded-full border-2 border-outline peer-checked:border-primary peer-checked:bg-primary transition-colors flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-surface-container-lowest opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+</div>
+</div>
+<div class="flex-grow">
+<span class="font-label-md text-label-md text-on-surface block mb-1">Guest Spot</span>
+<span class="font-body-md text-body-md text-secondary block">Temporary location, updates on your page.</span>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-secondary transition-colors">flight_takeoff</span>
+</label>
+<!-- Radio Option 4 -->
+<label class="flex items-start gap-4 p-4 rounded-xl border border-surface-variant hover:border-outline-variant cursor-pointer transition-colors group">
+<div class="mt-1 flex-shrink-0 relative w-5 h-5">
+<input class="peer sr-only" name="location" type="radio"/>
+<div class="w-5 h-5 rounded-full border-2 border-outline peer-checked:border-primary peer-checked:bg-primary transition-colors flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-surface-container-lowest opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+</div>
+</div>
+<div class="flex-grow">
+<span class="font-label-md text-label-md text-on-surface block mb-1">Custom Address</span>
+<span class="font-body-md text-body-md text-secondary block">Provide an address upon deposit confirmation.</span>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-secondary transition-colors">pin_drop</span>
+</label>
+</div>
+</section>
+</div>
+<!-- Right Column (Visual Customization) -->
+<div class="lg:col-span-4 flex flex-col gap-gutter">
+<!-- Visual Customization Card -->
+<section class="bg-surface-container-lowest rounded-xl p-6 md:p-8 shadow-[0_4px_32px_0_rgba(34,28,53,0.04)]">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-8">Customization</h3>
+<!-- Accent Color -->
+<div class="mb-8">
+<label class="font-label-sm text-label-sm text-secondary block mb-3">Accent Color</label>
+<div class="flex gap-3">
+<button class="w-10 h-10 rounded-full bg-[#1d192a] ring-2 ring-offset-2 ring-[#1d192a] transition-all"></button>
+<button class="w-10 h-10 rounded-full bg-[#625a77] hover:scale-110 transition-all"></button>
+<button class="w-10 h-10 rounded-full bg-[#a388b1] hover:scale-110 transition-all"></button>
+<button class="w-10 h-10 rounded-full bg-[#d0c6d3] hover:scale-110 transition-all"></button>
+<!-- Custom color picker button -->
+<button class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center hover:bg-surface-container transition-colors text-outline">
+<span class="material-symbols-outlined text-[20px]">add</span>
+</button>
+</div>
+</div>
+<!-- Hero Background -->
+<div class="mb-8">
+<label class="font-label-sm text-label-sm text-secondary block mb-3">Hero Background</label>
+<div class="w-full h-32 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center cursor-pointer hover:bg-surface-container transition-colors group relative overflow-hidden">
+<!-- Placeholder Image -->
+<div class="absolute inset-0 bg-cover bg-center opacity-30" data-alt="An abstract, soft-focus background image intended for a high-end tattoo artist's booking page. The visual features gentle, organic, flowing shapes reminiscent of ink dispersing in water, rendered in extremely subtle shades of pale lavender, soft white, and muted deep purple. The lighting is ambient and high-key, ensuring text overlaid on this image remains perfectly legible. The aesthetic embodies 'Operational Calm,' feeling like a digital sanctuary—clean, breathable, and minimalist." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBEtk2i3WrMffD-Tq-ooVXANXOge2Oiuqx527OUNbo6-445Q-ukzwXEhHCow_-s505D4zrRKL0btIc8gv0u3l0rf9nEgpRT_KG4cPTOVg3J3TjE1v_JZyAYUcwd62BqRVfzSvKQ8SzcrCEorYnHXbIaW1xePVNnL_il3Q_jcfRbtqJ3ePOkA1plgbWTddtxU9L3qK5E1Kx5yvP1FwK9VWyGrUP8yDlUbynQTPVY3Gtd7SE4XP0APfppFSEZb081ldxAl6r_maBhp2c');">
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors mb-2 z-10">wallpaper</span>
+<span class="font-label-md text-label-md text-secondary group-hover:text-primary transition-colors z-10">Upload Image</span>
+</div>
+</div>
+<!-- Toggles -->
+<div class="flex flex-col gap-6 pt-4 border-t border-surface-variant">
+<div class="flex items-center justify-between">
+<div>
+<span class="font-label-md text-label-md text-on-surface block">Portfolio Preview</span>
+<span class="font-label-sm text-label-sm text-outline block">Show recent Instagram posts.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:border-outline-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between">
+<div>
+<span class="font-label-md text-label-md text-on-surface block">Show Availability</span>
+<span class="font-label-sm text-label-sm text-outline block">Display open slots publicly.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:border-outline-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</section>
+</div>
+</div>
+<!-- Page Level Actions (Save) -->
+<div class="mt-8 flex justify-end gap-4"><div class="flex flex-col items-center w-full gap-6">
+<div class="flex flex-wrap justify-center sm:justify-end gap-4 w-full">
+<button class="px-8 py-3 rounded-full font-label-md text-label-md bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors shadow-sm flex items-center gap-2">
+      Save Changes
+    </button>
+<button class="px-8 py-3 rounded-full font-label-md text-label-md bg-primary text-on-primary hover:bg-on-primary-fixed transition-colors shadow-sm flex items-center gap-2">
+      Continue
+      <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+<button class="px-6 py-2 rounded-full font-label-md text-label-md text-secondary hover:text-on-surface hover:bg-surface-container transition-colors">
+    Cancel
+  </button>
+</div></div>
+</main>
+</div>
+<!-- BottomNavBar (JSON) - Hidden on desktop, visible on mobile -->
+</body></html>

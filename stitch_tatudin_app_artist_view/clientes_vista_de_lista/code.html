@@ -1,0 +1,315 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Tatudin - Clientes List View</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-background": "#1d192a",
+                    "on-primary-fixed": "#1e1830",
+                    "on-tertiary-fixed-variant": "#920023",
+                    "primary-container": "#221c35",
+                    "error": "#ba1a1a",
+                    "primary-fixed-dim": "#cbc2e3",
+                    "secondary-fixed-dim": "#c7c5d4",
+                    "surface-tint": "#625a77",
+                    "on-error": "#ffffff",
+                    "surface-container-high": "#ece5fc",
+                    "on-surface": "#1d192a",
+                    "surface-bright": "#fdf7ff",
+                    "on-surface-variant": "#48454d",
+                    "surface-container-lowest": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "tertiary-container": "#49000c",
+                    "surface": "#fdf7ff",
+                    "outline-variant": "#cac5cd",
+                    "on-secondary-fixed-variant": "#464652",
+                    "on-tertiary": "#ffffff",
+                    "surface-dim": "#ded6ee",
+                    "outline": "#79767d",
+                    "surface-container-highest": "#e6dff7",
+                    "primary-fixed": "#e8ddff",
+                    "primary": "#09041c",
+                    "tertiary": "#1c0002",
+                    "secondary": "#5d5d6a",
+                    "on-secondary": "#ffffff",
+                    "tertiary-fixed-dim": "#ffb3b3",
+                    "on-tertiary-container": "#ff3552",
+                    "secondary-container": "#e0deed",
+                    "inverse-surface": "#322e40",
+                    "on-primary": "#ffffff",
+                    "surface-container-low": "#f7f1ff",
+                    "on-secondary-container": "#62616e",
+                    "on-primary-fixed-variant": "#4a435e",
+                    "secondary-fixed": "#e3e1f0",
+                    "inverse-primary": "#cbc2e3",
+                    "background": "#fdf7ff",
+                    "on-tertiary-fixed": "#40000a",
+                    "on-secondary-fixed": "#1a1b25",
+                    "on-primary-container": "#8b83a2",
+                    "tertiary-fixed": "#ffdad9",
+                    "error-container": "#ffdad6",
+                    "surface-variant": "#e6dff7",
+                    "inverse-on-surface": "#f5eeff",
+                    "surface-container": "#f2ebff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-mobile": "16px",
+                    "unit": "8px",
+                    "margin-desktop": "40px",
+                    "section-gap": "64px",
+                    "gutter": "24px",
+                    "container-max": "1280px"
+            },
+            "fontFamily": {
+                    "label-md": ["Manrope"],
+                    "body-lg": ["Manrope"],
+                    "label-sm": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "headline-lg": ["Manrope"],
+                    "headline-md": ["Manrope"],
+                    "display-lg": ["Manrope"],
+                    "body-md": ["Manrope"]
+            },
+            "fontSize": {
+                    "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #fdf7ff;
+            color: #1d192a;
+            font-family: 'Manrope', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="min-h-screen pb-24">
+<!-- TopAppBar -->
+<header class="bg-background dark:bg-primary docked full-width top-0 z-40 sticky">
+<div class="flex justify-between items-center w-full px-margin-mobile py-unit max-w-container-max mx-auto">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-background dark:text-on-primary hover:bg-surface-container-low dark:hover:bg-primary-container transition-colors p-2 rounded-full">arrow_back</button>
+<h1 class="text-headline-md font-headline-md font-bold text-primary dark:text-primary-fixed">Tatudin</h1>
+</div>
+<div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center overflow-hidden border border-outline-variant/30">
+<img alt="Profile" class="w-full h-full object-cover" data-alt="A professional studio portrait of a modern tattoo artist with subtle facial piercings and a focused expression. The lighting is soft and artistic, reflecting a creative yet organized workspace. The background is a blurred studio environment with soft lavender and deep purple tones, maintaining a premium and calm operational aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVxf3LTm4wFqdBm37WxLessWx5XXny7ZzsJooX-eMoaOcSFzydzUnV4VhwJfU_5S6q-M1B_SZv3tqfocqY83Qx6tyJXmFc2NzfMa6UoXC8_tmDRVboxP8dX07lMLJjzjAuBxc8zGQf_QSXwwD_m1qv3F_2U3n2bhcxsxKibm591TZudBHnazozyt4NykiD7b5T-7wO6iAx5z99Y1LefO3_-q-03HS1U3ju9Md-q8i7xLk8XI59imdEPoQ6wcxkPZ9C4IasO9fOna4">
+</div>
+</div>
+</header>
+<main class="max-w-container-max mx-auto px-margin-mobile mt-unit">
+<!-- Screen Header & View Toggle -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4 py-8">
+<div>
+<h2 class="text-headline-lg font-headline-lg text-primary">Clientes</h2>
+<p class="text-body-md text-on-surface-variant mt-1">Gerenciamento de alta densidade</p>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-low p-1 rounded-xl w-fit border border-outline-variant/10">
+<button class="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">grid_view</span>
+</button>
+<!-- Active List View Toggle -->
+<button class="p-2 rounded-lg bg-primary text-on-primary shadow-sm">
+<span class="material-symbols-outlined">format_list_bulleted</span>
+</button>
+<button class="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">calendar_view_day</span>
+</button>
+</div>
+</div>
+<!-- Search & Filter Actions -->
+<div class="flex gap-3 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+<div class="relative flex-1 min-w-[200px]">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-white border border-outline-variant/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-body-md font-body-md" placeholder="Buscar cliente..." type="text">
+</div>
+<button class="flex items-center gap-2 px-4 py-2 bg-white border border-outline-variant/30 rounded-xl text-label-md font-label-md hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+                Filtrar
+            </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-xl text-label-md font-label-md hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined">person_add</span>
+                Novo
+            </button>
+</div>
+<!-- High-Density List Layout -->
+<div class="bg-white rounded-xl shadow-sm border border-outline-variant/20 overflow-hidden">
+<!-- List Header -->
+<div class="grid grid-cols-12 gap-4 px-6 py-3 bg-surface-container-lowest border-b border-outline-variant/10 text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">
+<div class="col-span-5 md:col-span-6">Cliente</div>
+<div class="col-span-5 md:col-span-4">Contato</div>
+<div class="col-span-2 flex justify-end">Ações</div>
+</div>
+<!-- List Items -->
+<div class="divide-y divide-outline-variant/10">
+<!-- Client Row 1 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-3 items-center hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="col-span-5 md:col-span-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-label-sm text-xs border border-outline-variant/10">
+                            AF
+                        </div>
+<span class="text-body-md font-semibold text-on-background truncate">Amanda Ferreira</span>
+</div>
+<div class="col-span-5 md:col-span-4">
+<span class="text-body-md text-on-surface-variant">+55 11 98765-4321</span>
+</div>
+<div class="col-span-2 flex justify-end">
+<button class="p-1 text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Client Row 2 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-3 items-center hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="col-span-5 md:col-span-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-fixed text-on-primary-fixed-variant flex items-center justify-center font-label-sm text-xs border border-outline-variant/10">
+                            BR
+                        </div>
+<span class="text-body-md font-semibold text-on-background truncate">Bruno Rocha</span>
+</div>
+<div class="col-span-5 md:col-span-4">
+<span class="text-body-md text-on-surface-variant">+55 21 91234-5678</span>
+</div>
+<div class="col-span-2 flex justify-end">
+<button class="p-1 text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Client Row 3 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-3 items-center hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="col-span-5 md:col-span-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant flex items-center justify-center font-label-sm text-xs border border-outline-variant/10">
+                            CM
+                        </div>
+<span class="text-body-md font-semibold text-on-background truncate">Camila Mendes</span>
+</div>
+<div class="col-span-5 md:col-span-4">
+<span class="text-body-md text-on-surface-variant">+55 31 99887-7665</span>
+</div>
+<div class="col-span-2 flex justify-end">
+<button class="p-1 text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Client Row 4 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-3 items-center hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="col-span-5 md:col-span-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest text-on-surface flex items-center justify-center font-label-sm text-xs border border-outline-variant/10">
+                            DS
+                        </div>
+<span class="text-body-md font-semibold text-on-background truncate">Daniel Souza</span>
+</div>
+<div class="col-span-5 md:col-span-4">
+<span class="text-body-md text-on-surface-variant">+55 11 95544-3322</span>
+</div>
+<div class="col-span-2 flex justify-end">
+<button class="p-1 text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Client Row 5 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-3 items-center hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="col-span-5 md:col-span-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant flex items-center justify-center font-label-sm text-xs border border-outline-variant/10">
+                            EV
+                        </div>
+<span class="text-body-md font-semibold text-on-background truncate">Elena Vieira</span>
+</div>
+<div class="col-span-5 md:col-span-4">
+<span class="text-body-md text-on-surface-variant">+55 41 97766-5544</span>
+</div>
+<div class="col-span-2 flex justify-end">
+<button class="p-1 text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Client Row 6 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-3 items-center hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="col-span-5 md:col-span-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-sm text-xs border border-outline-variant/10">
+                            GL
+                        </div>
+<span class="text-body-md font-semibold text-on-background truncate">Gabriel Lima</span>
+</div>
+<div class="col-span-5 md:col-span-4">
+<span class="text-body-md text-on-surface-variant">+55 51 98899-0011</span>
+</div>
+<div class="col-span-2 flex justify-end">
+<button class="p-1 text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Client Row 7 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-3 items-center hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="col-span-5 md:col-span-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-sm text-xs border border-outline-variant/10">
+                            HN
+                        </div>
+<span class="text-body-md font-semibold text-on-background truncate">Heloísa Nunes</span>
+</div>
+<div class="col-span-5 md:col-span-4">
+<span class="text-body-md text-on-surface-variant">+55 19 96655-4433</span>
+</div>
+<div class="col-span-2 flex justify-end">
+<button class="p-1 text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Footer Pagination Placeholder -->
+<div class="px-6 py-4 bg-surface-container-lowest border-t border-outline-variant/10 flex justify-between items-center">
+<span class="text-label-sm text-on-surface-variant">Exibindo 7 de 142 clientes</span>
+<div class="flex gap-2">
+<button class="p-1 text-outline hover:text-primary disabled:opacity-30" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="p-1 text-outline hover:text-primary">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+
+
+
+</body></html>

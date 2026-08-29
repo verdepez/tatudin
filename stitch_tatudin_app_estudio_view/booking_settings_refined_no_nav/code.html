@@ -1,0 +1,280 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Booking Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#322e40",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-container": "#62616e",
+                        "secondary-container": "#e0deed",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed-variant": "#4a435e",
+                        "on-primary-fixed": "#1e1830",
+                        "surface-dim": "#ded6ee",
+                        "on-secondary-fixed-variant": "#464652",
+                        "surface-bright": "#fdf7ff",
+                        "on-error": "#ffffff",
+                        "outline-variant": "#cac5cd",
+                        "on-tertiary-container": "#ff3552",
+                        "primary-container": "#221c35",
+                        "error": "#ba1a1a",
+                        "on-background": "#1d192a",
+                        "secondary-fixed-dim": "#c7c5d4",
+                        "secondary-fixed": "#e3e1f0",
+                        "on-tertiary-fixed-variant": "#920023",
+                        "surface-container-highest": "#e6dff7",
+                        "secondary": "#5d5d6a",
+                        "primary": "#09041c",
+                        "error-container": "#ffdad6",
+                        "background": "#fdf7ff",
+                        "surface": "#fdf7ff",
+                        "outline": "#79767d",
+                        "surface-container-high": "#ece5fc",
+                        "surface-container-low": "#f7f1ff",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb3b3",
+                        "on-surface": "#1d192a",
+                        "primary-fixed-dim": "#cbc2e3",
+                        "tertiary": "#1c0002",
+                        "surface-container": "#f2ebff",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#625a77",
+                        "on-primary-container": "#8b83a2",
+                        "on-secondary-fixed": "#1a1b25",
+                        "surface-variant": "#e6dff7",
+                        "tertiary-fixed": "#ffdad9",
+                        "inverse-primary": "#cbc2e3",
+                        "inverse-on-surface": "#f5eeff",
+                        "on-error-container": "#93000a",
+                        "tertiary-container": "#49000c",
+                        "primary-fixed": "#e8ddff",
+                        "on-tertiary-fixed": "#40000a",
+                        "on-surface-variant": "#48454d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "unit": "8px",
+                        "container-max": "1280px",
+                        "gutter": "24px",
+                        "section-gap": "64px",
+                        "margin-desktop": "40px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "display-lg": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "body-md": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "label-md": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #fdf7ff;
+            color: #1d192a;
+        }
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #09041c;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #09041c;
+        }
+        .toggle-checkbox:focus + .toggle-label {
+            box-shadow: 0 0 0 2px rgba(9, 4, 28, 0.2);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-24 md:pb-8 flex flex-col font-body-md text-on-background bg-background selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky bg-background flex items-center justify-between px-margin-mobile py-4 max-w-container-max mx-auto z-40 transition-colors duration-300">
+<button aria-label="Go back" class="flex items-center justify-center p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary tracking-tight">Tatudin</h1>
+<button aria-label="More options" class="flex items-center justify-center p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">more_vert</span>
+</button>
+</header>
+<main class="flex-grow w-full max-w-3xl mx-auto px-margin-mobile md:px-margin-desktop py-8 flex flex-col gap-section-gap">
+<!-- Booking Rules Card -->
+<section class="bg-surface-container-lowest rounded-xl p-6 md:p-8 shadow-[0_4px_24px_0_rgba(34,28,53,0.03)] border border-outline-variant/30 flex flex-col gap-6 relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-br from-transparent to-surface-container-lowest opacity-50 pointer-events-none group-hover:opacity-70 transition-opacity"></div>
+<div class="flex items-center gap-3 relative z-10">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">rule</span>
+</div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">Booking Rules</h2>
+</div>
+<div class="flex flex-col gap-5 relative z-10">
+<!-- Minimum Notice -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-surface-container-highest/50">
+<div class="flex flex-col gap-1">
+<label class="font-body-md text-body-md font-medium text-on-surface" for="min-notice">Minimum Notice</label>
+<p class="font-label-sm text-label-sm text-on-surface-variant">How soon can clients book?</p>
+</div>
+<select class="bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-4 py-2 font-body-md text-body-md text-on-surface focus:ring-2 focus:ring-primary focus:border-primary outline-none min-w-[140px] appearance-none cursor-pointer transition-colors hover:border-outline" id="min-notice">
+<option value="12">12 hours</option>
+<option selected="" value="24">24 hours</option>
+<option value="48">48 hours</option>
+<option value="72">3 days</option>
+</select>
+</div>
+<!-- Maximum Window -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-surface-container-highest/50">
+<div class="flex flex-col gap-1">
+<label class="font-body-md text-body-md font-medium text-on-surface" for="max-window">Maximum Window</label>
+<p class="font-label-sm text-label-sm text-on-surface-variant">How far in advance can they book?</p>
+</div>
+<select class="bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-4 py-2 font-body-md text-body-md text-on-surface focus:ring-2 focus:ring-primary focus:border-primary outline-none min-w-[140px] appearance-none cursor-pointer transition-colors hover:border-outline" id="max-window">
+<option value="30">30 days</option>
+<option value="60">60 days</option>
+<option selected="" value="90">90 days</option>
+<option value="180">6 months</option>
+</select>
+</div>
+<!-- Deposit Required Toggle -->
+<div class="flex items-center justify-between gap-4 py-2">
+<div class="flex flex-col gap-1 pr-4">
+<span class="font-body-md text-body-md font-medium text-on-surface">Deposit required</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Require a deposit to secure the slot.</p>
+</div>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in flex-shrink-0">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out z-10 top-0 left-0" id="deposit-toggle" name="deposit-toggle" type="checkbox">
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-variant cursor-pointer transition-colors duration-200 ease-in-out" for="deposit-toggle"></label>
+</div>
+</div>
+<!-- Auto Confirmation Toggle -->
+<div class="flex items-center justify-between gap-4 py-2">
+<div class="flex flex-col gap-1 pr-4">
+<span class="font-body-md text-body-md font-medium text-on-surface">Automatic confirmation</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Accept appointments without review.</p>
+</div>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in flex-shrink-0">
+<input class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out z-10 top-0 left-0" id="auto-confirm-toggle" name="auto-confirm-toggle" type="checkbox">
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-variant cursor-pointer transition-colors duration-200 ease-in-out" for="auto-confirm-toggle"></label>
+</div>
+</div>
+</div>
+</section>
+<!-- Conflict Prevention Card -->
+<section class="bg-surface-container-lowest rounded-xl p-6 md:p-8 shadow-[0_4px_24px_0_rgba(34,28,53,0.03)] border border-outline-variant/30 flex flex-col gap-6 relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-tr from-surface-container-lowest to-surface-variant/20 opacity-50 pointer-events-none"></div>
+<div class="flex items-center gap-3 relative z-10">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">event_busy</span>
+</div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">Conflict prevention</h2>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant relative z-10 -mt-2">Connect your personal calendars to prevent double booking.</p>
+<div class="flex flex-col gap-4 relative z-10">
+<!-- Google Calendar -->
+<div class="flex items-center justify-between p-4 rounded-lg bg-surface hover:bg-surface-container transition-colors border border-outline-variant/20 cursor-pointer group/item">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 flex items-center justify-center bg-white rounded-md shadow-sm border border-outline-variant/10 text-[#4285F4]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">cloud</span>
+</div>
+<span class="font-body-md text-body-md font-medium text-on-surface">Google Calendar</span>
+</div>
+<span class="font-label-sm text-label-sm px-3 py-1 bg-surface-variant text-on-surface-variant rounded-full group-hover/item:bg-primary-container group-hover/item:text-on-primary-container transition-colors">Connected</span>
+</div>
+<!-- Apple Calendar -->
+<div class="flex items-center justify-between p-4 rounded-lg bg-surface hover:bg-surface-container transition-colors border border-outline-variant/20 cursor-pointer group/item">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 flex items-center justify-center bg-white rounded-md shadow-sm border border-outline-variant/10 text-on-surface">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">calendar_month</span>
+</div>
+<span class="font-body-md text-body-md font-medium text-on-surface">Apple Calendar</span>
+</div>
+<span class="font-label-sm text-label-sm px-3 py-1 border border-outline-variant/50 text-on-surface-variant rounded-full hover:bg-surface-container-high transition-colors">Connect</span>
+</div>
+<!-- Outlook Calendar -->
+<div class="flex items-center justify-between p-4 rounded-lg bg-surface hover:bg-surface-container transition-colors border border-outline-variant/20 cursor-pointer group/item">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 flex items-center justify-center bg-white rounded-md shadow-sm border border-outline-variant/10 text-[#0078D4]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">mail</span>
+</div>
+<span class="font-body-md text-body-md font-medium text-on-surface">Outlook Calendar</span>
+</div>
+<span class="font-label-sm text-label-sm px-3 py-1 border border-outline-variant/50 text-on-surface-variant rounded-full hover:bg-surface-container-high transition-colors">Connect</span>
+</div>
+</div>
+</section>
+<!-- Smart Sync Card -->
+<section class="bg-surface-container-lowest rounded-xl p-6 md:p-8 shadow-[0_4px_24px_0_rgba(34,28,53,0.03)] border border-outline-variant/30 flex flex-col gap-6 relative overflow-hidden">
+<div class="flex items-center gap-3 relative z-10">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">sync</span>
+</div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">Smart sync</h2>
+</div>
+<div class="flex flex-col gap-5 relative z-10">
+<!-- Import Appointments Toggle -->
+<div class="flex items-center justify-between gap-4 py-2 border-b border-surface-container-highest/50 pb-5">
+<div class="flex flex-col gap-1 pr-4">
+<span class="font-body-md text-body-md font-medium text-on-surface">Import previous appointments</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Bring past history into Tatudin.</p>
+</div>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in flex-shrink-0">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out z-10 top-0 left-0" id="import-toggle" name="import-toggle" type="checkbox">
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-variant cursor-pointer transition-colors duration-200 ease-in-out" for="import-toggle"></label>
+</div>
+</div>
+<!-- Sync External Toggle -->
+<div class="flex items-center justify-between gap-4 py-2">
+<div class="flex flex-col gap-1 pr-4">
+<span class="font-body-md text-body-md font-medium text-on-surface">Sync external calendars</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Keep all schedules aligned automatically.</p>
+</div>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in flex-shrink-0">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out z-10 top-0 left-0" id="sync-toggle" name="sync-toggle" type="checkbox">
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-variant cursor-pointer transition-colors duration-200 ease-in-out" for="sync-toggle"></label>
+</div>
+</div>
+</div>
+</section>
+<button class="w-full mt-8 py-4 px-8 bg-[#09041c] text-white rounded-xl flex items-center justify-center gap-2 font-body-md font-semibold hover:opacity-90 transition-opacity active:scale-[0.98]">
+<span class="">Continue</span>
+<span class="material-symbols-outlined">arrow_forward</span>
+</button></main>
+<!-- BottomNavBar -->
+
+
+
+
+</body></html>
