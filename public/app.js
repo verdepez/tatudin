@@ -127,6 +127,16 @@ function onboardingHeader(step, title, description) {
   `;
 }
 
+function hideSplash() {
+  const splash = document.querySelector('#app-splash');
+  if (splash) {
+    splash.classList.add('fade-out');
+    setTimeout(() => {
+      if (splash.parentNode) splash.style.display = 'none';
+    }, 400);
+  }
+}
+
 function onboardingFooter(back = true) {
   return `
     <footer class="onboarding-footer">
@@ -139,6 +149,9 @@ function onboardingFooter(back = true) {
 function renderOnboarding(step = 0, authMode = 'register') {
   closeModal();
   document.body.classList.add('onboarding-mode');
+  const ws = document.querySelector('#workspace');
+  if (ws) ws.style.display = 'flex';
+  hideSplash();
   app.innerHTML = '';
   if (step === 0) {
     app.innerHTML = `
@@ -335,6 +348,7 @@ function updateUserMenuUI() {
 }
 
 async function startApp() {
+  const ws = document.querySelector('#workspace');
   document.body.classList.remove('onboarding-mode');
   const healthEl = document.querySelector('#health');
   if (healthEl) healthEl.textContent = 'conectada';
@@ -348,10 +362,15 @@ async function startApp() {
       api('/api/categories').catch(() => []),
       api('/api/auth/studios').catch(() => [])
     ]);
-    if (meData?.user) {
-      currentUser = meData.user;
-      updateUserMenuUI();
+
+    if (!meData?.user) {
+      if (ws) ws.style.display = 'none';
+      hideSplash();
+      return renderOnboarding(1, 'login');
     }
+
+    currentUser = meData.user;
+    updateUserMenuUI();
     activeStudio = stData;
     members = memData;
     spaces = spData;
@@ -360,8 +379,13 @@ async function startApp() {
     updateStudioSidebarUI();
   } catch (e) {
     console.warn('Sync app dependencies:', e);
+    if (ws) ws.style.display = 'none';
+    hideSplash();
+    return renderOnboarding(1, 'login');
   }
 
+  if (ws) ws.style.display = 'flex';
+  hideSplash();
   await render('dashboard');
 }
 
@@ -2792,13 +2816,15 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
 }
 
-// Session restore or fallback
+// Session verification and bootstrap
 api('/api/auth/me')
-  .then(startApp)
-  .catch(() => {
-    if (localStorage.getItem('tatudin_onboarding_complete') === 'true') {
+  .then((data) => {
+    if (data?.user) {
       startApp();
     } else {
       renderOnboarding(0);
     }
+  })
+  .catch(() => {
+    renderOnboarding(0);
   });
