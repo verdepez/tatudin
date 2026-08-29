@@ -9,23 +9,45 @@ import { seedStudioData } from './seed_studio.js';
 const { Pool } = pg;
 const app = express();
 const port = Number(process.env.PORT || 3000);
-const databaseUrl = process.env.DATABASE_URL;
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rawDbUrl = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_PRIVATE_URL || process.env.POSTGRES_URL;
 
-const isInternalDb = !databaseUrl || 
-  databaseUrl.includes('localhost') || 
-  databaseUrl.includes('127.0.0.1') || 
-  databaseUrl.includes('.railway.internal') || 
-  databaseUrl.includes('railway.internal') || 
-  databaseUrl.includes('@db:') || 
-  databaseUrl.includes('@postgres:');
+function createPool() {
+  const pghost = process.env.PGHOST;
+  const pguser = process.env.PGUSER;
+  const pgpassword = process.env.PGPASSWORD;
+  const pgdatabase = process.env.PGDATABASE;
+  const pgport = process.env.PGPORT || 5432;
 
-let pool = databaseUrl
-  ? new Pool({
-      connectionString: databaseUrl,
-      ssl: isInternalDb ? false : { rejectUnauthorized: false }
-    })
-  : null;
+  if (pghost && pghost !== 'localhost' && pghost !== '127.0.0.1') {
+    const isInternal = pghost.includes('railway.internal');
+    return new Pool({
+      host: pghost,
+      port: Number(pgport),
+      user: pguser,
+      password: pgpassword,
+      database: pgdatabase,
+      ssl: isInternal ? false : { rejectUnauthorized: false }
+    });
+  }
+
+  if (rawDbUrl) {
+    const isInternal = rawDbUrl.includes('localhost') || 
+      rawDbUrl.includes('127.0.0.1') || 
+      rawDbUrl.includes('.railway.internal') || 
+      rawDbUrl.includes('railway.internal') || 
+      rawDbUrl.includes('@db:') || 
+      rawDbUrl.includes('@postgres:');
+
+    return new Pool({
+      connectionString: rawDbUrl,
+      ssl: isInternal ? false : { rejectUnauthorized: false }
+    });
+  }
+
+  return null;
+}
+
+let pool = createPool();
 const scrypt = promisify(crypto.scrypt);
 const sessionDuration = 1000 * 60 * 60 * 24 * 14;
 
@@ -590,13 +612,21 @@ app.post('/api/auth/logout', async (request, response) => {
 
 // ---------------- LIVE DEBUG & DIAGNOSTICS ----------------
 app.get('/api/debug/info', async (_request, response) => {
-  const envHasDbUrl = Boolean(process.env.DATABASE_URL);
-  const rawUrl = process.env.DATABASE_URL || '';
-  const sanitizedUrl = rawUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
-  
+  const envUrl = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_PRIVATE_URL || process.env.POSTGRES_URL || '';
+  const sanitizedUrl = envUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
+  const isLocalhost = envUrl.includes('localhost') || envUrl.includes('127.0.0.1');
+  const isRailway = Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_STATIC_URL || process.env.RAILWAY_SERVICE_ID || process.env.PORT);
+
+  // If pool was null or failed previously, reattempt creation
+  if (!pool) {
+    pool = createPool();
+  }
+
   let dbStatus = {
-    configured: envHasDbUrl,
-    urlSanitized: sanitizedUrl,
+    configured: Boolean(envUrl || process.env.PGHOST),
+    urlSanitized: sanitizedUrl || 'No configurada',
+    isLocalhostOnRailway: isLocalhost && isRailway,
+    pghost: process.env.PGHOST || null,
     connected: false,
     error: null,
     dbName: null,

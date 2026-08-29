@@ -3706,6 +3706,9 @@ async function refreshDebugInfo() {
         dbStatusEl.textContent = `ERROR: ${db.error || 'No conectada'}`;
       }
       logToDebugConsole(`❌ Error de conexión BD: ${db.error || 'Sin conexión'}`);
+      if (db.isLocalhostOnRailway) {
+        logToDebugConsole(`⚠️ ATENCIÓN: DATABASE_URL está configurada como "localhost". En Railway, cada servicio tiene su propia IP. Debes vincular el servicio Postgres cambiando el valor de DATABASE_URL por "\${{Postgres.DATABASE_URL}}" en las Variables de tatudin.`);
+      }
     }
 
     if (tablesStatusEl) {
