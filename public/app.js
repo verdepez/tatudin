@@ -200,7 +200,7 @@ function renderOnboarding(step = 0, authMode = 'register') {
 
         ${isLogin ? `
           <form class="onboarding-card auth-fade" data-onboarding-form="login">
-            <label>Email<input name="email" type="email" value="${onboarding.email || 'estudio@tatudin.com'}" placeholder="artist@studio.com" required /></label>
+            <label>Email<input name="email" type="email" value="${onboarding.email || 'soyelroot@tatudin.cl'}" placeholder="artist@studio.com" required /></label>
             <label>Contraseña<input name="password" type="password" value="password123" placeholder="Tu contraseña" required /></label>
             <button class="primary" type="submit" style="margin-top: 6px;">Iniciar sesión <span>→</span></button>
             <p class="form-error"></p>
@@ -208,6 +208,7 @@ function renderOnboarding(step = 0, authMode = 'register') {
             <div class="demo-access-panel" style="margin-top: 14px; padding: 10px 12px; background: var(--surface-low); border-radius: var(--radius-md); border: 1px dashed var(--line);">
               <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em;">⚡ Acceso Rápido Demo (1-Click):</p>
               <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                <button type="button" class="demo-quick-btn" data-demo-email="soyelroot@tatudin.cl" data-demo-pass="password123" style="font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1.5px solid var(--red); background: #ffdad9; cursor: pointer; font-weight: 800; color: #900019;">⚡ Superadmin (Root)</button>
                 <button type="button" class="demo-quick-btn" data-demo-email="estudio@tatudin.com" data-demo-pass="password123" style="font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: #ffffff; cursor: pointer; font-weight: 700; color: var(--ink);">👑 Dueño Estudio</button>
                 <button type="button" class="demo-quick-btn" data-demo-email="matias@tatudin.com" data-demo-pass="password123" style="font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: #ffffff; cursor: pointer; font-weight: 700; color: var(--ink);">🎨 Residente</button>
                 <button type="button" class="demo-quick-btn" data-demo-email="diego.nomad@tatudin.com" data-demo-pass="password123" style="font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: #ffffff; cursor: pointer; font-weight: 700; color: var(--ink);">✈️ Nómade</button>
@@ -391,6 +392,14 @@ async function startApp() {
 
     currentUser = meData.user;
     updateUserMenuUI();
+
+    const isSuper = Boolean(currentUser.is_superadmin || currentUser.isSuperAdmin || currentUser.email === 'soyelroot@tatudin.cl');
+    const rootBadge = document.querySelector('#superadmin-top-badge');
+    if (rootBadge) rootBadge.style.display = isSuper ? 'flex' : 'none';
+    document.querySelectorAll('.root-nav-item, .root-dropdown-item').forEach((el) => {
+      el.style.display = isSuper ? 'flex' : 'none';
+    });
+
     activeStudio = stData;
     members = memData;
     spaces = spData;
@@ -406,7 +415,12 @@ async function startApp() {
 
   if (ws) ws.style.display = 'flex';
   hideSplash();
-  await render('dashboard');
+
+  if (currentUser.email === 'soyelroot@tatudin.cl' || currentUser.is_superadmin) {
+    await render('backoffice');
+  } else {
+    await render('dashboard');
+  }
 }
 
 function appointmentCard(item) {
@@ -484,6 +498,7 @@ async function render(view = 'dashboard') {
     if (view === 'ajustes') return await renderSettings();
     if (view === 'portafolio') return await renderPortfolio();
     if (view === 'terminos') return renderTermsAndConditions(false);
+    if (view === 'backoffice') return await renderBackoffice();
 
     const data = await api('/api/dashboard');
     activeStudio = data.studio || activeStudio;
@@ -1386,6 +1401,426 @@ function renderTermsAndConditions(fromOnboarding = false, step = 0, authMode = '
         </div>
       </article>
     </section>
+  `;
+}
+
+// ---------------- SUPERADMIN ROOT BACKOFFICE MODULE ----------------
+let currentBackofficeTab = 'stats';
+let backofficeCache = { stats: null, users: null, studios: null, guestSpots: null };
+
+async function renderBackoffice(tab = currentBackofficeTab) {
+  currentBackofficeTab = tab;
+  currentAppView = 'backoffice';
+  document.querySelectorAll('[data-view]').forEach((link) => {
+    link.classList.toggle('active', link.dataset.view === 'backoffice');
+  });
+
+  app.innerHTML = `
+    <div class="backoffice-container">
+      <div class="backoffice-header-card">
+        <div class="backoffice-header-title">
+          <h1>⚡ Backoffice Superadministrador</h1>
+          <p>Control maestro de la plataforma, estadísticas agregadas según Ley N° 19.628, gestión global y administración de datos.</p>
+        </div>
+        <div class="backoffice-header-badges">
+          <span class="backoffice-tag-pill">👑 ${currentUser?.email || 'soyelroot@tatudin.cl'}</span>
+          <span class="backoffice-tag-pill">🛡️ Acceso Root Absoluto</span>
+          <span class="backoffice-tag-pill">🇨🇱 Ley 19.628 Chile</span>
+        </div>
+      </div>
+
+      <nav class="backoffice-tabs" aria-label="Pestañas de Backoffice">
+        <button type="button" class="bo-tab-btn ${tab === 'stats' ? 'active' : ''}" data-bo-tab="stats">
+          📊 Estadísticas Globales (Ley 19.628)
+        </button>
+        <button type="button" class="bo-tab-btn ${tab === 'users' ? 'active' : ''}" data-bo-tab="users">
+          👥 Usuarios y Estudios
+        </button>
+        <button type="button" class="bo-tab-btn ${tab === 'guest-spots' ? 'active' : ''}" data-bo-tab="guest-spots">
+          📋 Solicitudes de Nómades
+        </button>
+        <button type="button" class="bo-tab-btn ${tab === 'database' ? 'active' : ''}" data-bo-tab="database">
+          🛠️ Operaciones de Base de Datos
+        </button>
+      </nav>
+
+      <div id="bo-content-area" class="bo-content-container">
+        <div style="text-align: center; padding: 40px; color: var(--muted);">Cargando módulo de Backoffice...</div>
+      </div>
+    </div>
+  `;
+
+  const container = document.querySelector('#bo-content-area');
+  if (!container) return;
+
+  try {
+    if (tab === 'stats') {
+      const statsData = await api('/api/backoffice/stats');
+      backofficeCache.stats = statsData;
+      container.innerHTML = renderBackofficeStatsTab(statsData);
+    } else if (tab === 'users') {
+      const [usersData, studiosData] = await Promise.all([
+        api('/api/backoffice/users'),
+        api('/api/backoffice/studios')
+      ]);
+      backofficeCache.users = usersData;
+      backofficeCache.studios = studiosData;
+      container.innerHTML = renderBackofficeUsersTab(usersData, studiosData);
+    } else if (tab === 'guest-spots') {
+      const gsData = await api('/api/backoffice/guest-spots');
+      backofficeCache.guestSpots = gsData;
+      container.innerHTML = renderBackofficeGuestSpotsTab(gsData);
+    } else if (tab === 'database') {
+      container.innerHTML = renderBackofficeDatabaseTab();
+    }
+  } catch (error) {
+    container.innerHTML = `
+      <div class="empty">
+        <h3>Error al cargar Backoffice</h3>
+        <p>${error.message}</p>
+        <button type="button" class="primary small" data-bo-tab="${tab}" style="margin-top: 12px;">Reintentar</button>
+      </div>
+    `;
+  }
+}
+
+function renderBackofficeStatsTab(data) {
+  const m = data.metrics || {};
+  return `
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      <!-- Law Compliance Info Notice -->
+      <div class="terms-intro-box" style="border-left-color: var(--red);">
+        <p><strong>📜 Cumplimiento de Privacidad y Telemetría:</strong> ${data.system?.lawCompliance}</p>
+      </div>
+
+      <!-- KPI Grid -->
+      <div class="bo-kpi-grid">
+        <div class="bo-kpi-card">
+          <div class="bo-kpi-top">
+            <span>Usuarios Registrados</span>
+            <span>👤</span>
+          </div>
+          <p class="bo-kpi-num">${m.users?.total || 0}</p>
+          <p class="bo-kpi-sub">+${m.users?.new_last_30_days || 0} en los últimos 30 días</p>
+        </div>
+
+        <div class="bo-kpi-card">
+          <div class="bo-kpi-top">
+            <span>Estudios & Espacios</span>
+            <span>🏬</span>
+          </div>
+          <p class="bo-kpi-num">${m.studios?.total || 0}</p>
+          <p class="bo-kpi-sub">${m.studios?.studios || 0} estudios · ${m.studios?.independents || 0} independientes</p>
+        </div>
+
+        <div class="bo-kpi-card">
+          <div class="bo-kpi-top">
+            <span>Artistas Activos</span>
+            <span>🎨</span>
+          </div>
+          <p class="bo-kpi-num">${m.memberships?.total || 0}</p>
+          <p class="bo-kpi-sub">${m.memberships?.residents || 0} residentes · ${m.memberships?.nomads || 0} nómades</p>
+        </div>
+
+        <div class="bo-kpi-card">
+          <div class="bo-kpi-top">
+            <span>Citas Agendadas</span>
+            <span>📅</span>
+          </div>
+          <p class="bo-kpi-num">${m.appointments?.total || 0}</p>
+          <p class="bo-kpi-sub">${m.appointments?.confirmed || 0} confirmadas · ${m.appointments?.completed || 0} listas</p>
+        </div>
+
+        <div class="bo-kpi-card">
+          <div class="bo-kpi-top">
+            <span>Volumen Transaccional</span>
+            <span>💰</span>
+          </div>
+          <p class="bo-kpi-num">${money(m.finances?.total_income || 0)}</p>
+          <p class="bo-kpi-sub">Egresos: ${money(m.finances?.total_expense || 0)}</p>
+        </div>
+
+        <div class="bo-kpi-card">
+          <div class="bo-kpi-top">
+            <span>Postulaciones Nómades</span>
+            <span>✈️</span>
+          </div>
+          <p class="bo-kpi-num">${m.guestSpots?.total || 0}</p>
+          <p class="bo-kpi-sub">${m.guestSpots?.pending || 0} pendientes · ${m.guestSpots?.approved || 0} aprobadas</p>
+        </div>
+      </div>
+
+      <!-- Recent Users & System Feed -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px;">
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">ÚLTIMOS USUARIOS REGISTRADOS</p>
+              <h2>Nuevas cuentas</h2>
+            </div>
+            <button type="button" class="secondary small-btn" data-bo-tab="users">Ver todos →</button>
+          </div>
+          <div class="appointment-list">
+            ${(data.recentUsers || []).map((u) => `
+              <article class="setting-item">
+                <div class="setting-item-icon initials">${(u.full_name || 'U').slice(0, 2).toUpperCase()}</div>
+                <div class="setting-item-body">
+                  <div class="setting-item-top">
+                    <div class="setting-item-title">
+                      <h3>${u.full_name}</h3>
+                      ${u.is_superadmin ? '<span class="bo-badge root">⚡ ROOT</span>' : '<span class="bo-badge independent">Usuario</span>'}
+                    </div>
+                  </div>
+                  <div class="setting-item-sub">
+                    <span class="member-meta">${u.email} · Registrado el ${new Date(u.created_at).toLocaleDateString('es-CL')}</span>
+                  </div>
+                </div>
+              </article>
+            `).join('') || emptyState('Sin usuarios recientes', '')}
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">SOLICITUDES DE NÓMADES</p>
+              <h2>Últimas postulaciones</h2>
+            </div>
+            <button type="button" class="secondary small-btn" data-bo-tab="guest-spots">Ver todas →</button>
+          </div>
+          <div class="appointment-list">
+            ${(data.recentGuestSpots || []).map((g) => {
+              const statusClass = g.status === 'approved' ? 'tag-income' : g.status === 'rejected' ? 'tag-expense' : 'tag-pending';
+              const statusLabel = g.status === 'approved' ? 'Aprobada' : g.status === 'rejected' ? 'Rechazada' : 'Pendiente';
+              return `
+                <article class="setting-item">
+                  <div class="setting-item-icon initials">${(g.artist_name || 'N').slice(0, 2).toUpperCase()}</div>
+                  <div class="setting-item-body">
+                    <div class="setting-item-top">
+                      <div class="setting-item-title">
+                        <h3>${g.artist_name}</h3>
+                        <span class="guest-spot-badge ${statusClass}">${statusLabel}</span>
+                      </div>
+                    </div>
+                    <div class="setting-item-sub">
+                      <span class="member-meta">Estudio: <strong>${g.studio_name}</strong> · ${g.start_date} al ${g.end_date}</span>
+                    </div>
+                  </div>
+                </article>
+              `;
+            }).join('') || emptyState('Sin solicitudes recientes', '')}
+          </div>
+        </section>
+      </div>
+    </div>
+  `;
+}
+
+function renderBackofficeUsersTab(users, studios) {
+  return `
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <!-- Users Table -->
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">ADMINISTRACIÓN DE USUARIOS (${users.length})</p>
+            <h2>Cuentas registradas en Tatudin</h2>
+          </div>
+        </div>
+        <div class="bo-table-wrap">
+          <table class="bo-table">
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Email</th>
+                <th>Estudios / Roles</th>
+                <th>Citas</th>
+                <th>Fecha de Registro</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${users.map((u) => {
+                const studiosHtml = (u.studios || []).map((s) => `
+                  <div style="margin-bottom: 2px;">
+                    <strong>${s.studio_name}</strong> <span class="artist-chip ${s.role === 'owner' ? 'role-owner' : 'role-resident'}">${s.role}</span>
+                  </div>
+                `).join('') || '<span style="color: var(--muted);">Sin estudio</span>';
+
+                const firstStudio = (u.studios || [])[0];
+
+                return `
+                  <tr>
+                    <td>
+                      <strong>${u.full_name}</strong>
+                      ${u.is_superadmin ? '<br/><span class="bo-badge root">⚡ Superadmin</span>' : ''}
+                    </td>
+                    <td><code>${u.email}</code></td>
+                    <td>${studiosHtml}</td>
+                    <td><strong>${u.appointment_count || 0}</strong></td>
+                    <td>${new Date(u.created_at).toLocaleDateString('es-CL')}</td>
+                    <td>
+                      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        ${firstStudio ? `
+                          <button type="button" class="secondary small" data-action="bo-impersonate" data-studio-id="${firstStudio.studio_id}" data-studio-name="${firstStudio.studio_name}" title="Ingresar y administrar este estudio">
+                            👑 Entrar al Estudio
+                          </button>
+                        ` : ''}
+                        <button type="button" class="outline-button small" data-action="bo-edit-user" data-user-id="${u.id}" data-user-name="${u.full_name}" data-user-email="${u.email}" data-is-root="${u.is_superadmin}">
+                          ✏️ Editar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Studios Table -->
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">ESTUDIOS & PERFILES (${studios.length})</p>
+            <h2>Estudios registrados en la plataforma</h2>
+          </div>
+        </div>
+        <div class="bo-table-wrap">
+          <table class="bo-table">
+            <thead>
+              <tr>
+                <th>Estudio</th>
+                <th>Tipo</th>
+                <th>Propietario</th>
+                <th>Boxes</th>
+                <th>Miembros</th>
+                <th>Citas</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${studios.map((s) => `
+                <tr>
+                  <td><strong>${s.name}</strong></td>
+                  <td><span class="bo-badge ${s.account_type}">${s.account_type === 'studio' ? 'Estudio' : 'Independiente'}</span></td>
+                  <td>${s.owner_name}</td>
+                  <td>${s.space_count} boxes</td>
+                  <td>${s.member_count} artistas</td>
+                  <td>${s.appointment_count} citas</td>
+                  <td>
+                    <button type="button" class="primary small" data-action="bo-impersonate" data-studio-id="${s.id}" data-studio-name="${s.name}">
+                      Administrar Estudio →
+                    </button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderBackofficeGuestSpotsTab(requests) {
+  return `
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">GESTIÓN DE SOLICITUDES DE NÓMADES (${requests.length})</p>
+          <h2>Postulaciones de Artistas Visitantes en la Red</h2>
+        </div>
+      </div>
+      <div class="bo-table-wrap">
+        <table class="bo-table">
+          <thead>
+            <tr>
+              <th>Artista</th>
+              <th>Contacto</th>
+              <th>Estudio Destino</th>
+              <th>Box Asignado</th>
+              <th>Fechas</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${requests.map((r) => {
+              const isPending = r.status === 'pending';
+              const statusLabel = r.status === 'approved' ? 'Aprobada' : r.status === 'rejected' ? 'Rechazada' : 'Pendiente';
+              const statusClass = r.status === 'approved' ? 'tag-income' : r.status === 'rejected' ? 'tag-expense' : 'tag-pending';
+              return `
+                <tr>
+                  <td>
+                    <strong>${r.artist_name}</strong>
+                    ${r.artist_instagram ? `<br/><a href="https://instagram.com/${r.artist_instagram.replace('@', '')}" target="_blank" style="color: var(--red); font-size: 11.5px;">${r.artist_instagram}</a>` : ''}
+                  </td>
+                  <td><code>${r.artist_email}</code></td>
+                  <td><strong>${r.studio_name}</strong></td>
+                  <td>${r.space_name || '<span style="color: var(--muted);">Por asignar</span>'}</td>
+                  <td>${r.start_date} al ${r.end_date}</td>
+                  <td><span class="guest-spot-badge ${statusClass}">${statusLabel}</span></td>
+                  <td>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                      ${isPending ? `
+                        <button type="button" class="primary small" data-action="bo-resolve-gs" data-id="${r.id}" data-status="approved">Aprobar</button>
+                        <button type="button" class="secondary small" data-action="bo-resolve-gs" data-id="${r.id}" data-status="rejected">Rechazar</button>
+                      ` : `
+                        <button type="button" class="outline-button small" data-action="bo-resolve-gs" data-id="${r.id}" data-status="${r.status === 'approved' ? 'rejected' : 'approved'}">
+                          Cambiar a ${r.status === 'approved' ? 'Rechazada' : 'Aprobada'}
+                        </button>
+                      `}
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('') || '<tr><td colspan="7" style="text-align: center; padding: 30px; color: var(--muted);">No hay solicitudes de nómades registradas en la plataforma.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderBackofficeDatabaseTab() {
+  return `
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      <div class="terms-intro-box" style="border-left-color: var(--red);">
+        <p><strong>🛠️ Panel de Control de Datos del Sistema:</strong> Utiliza estas herramientas para inicializar entornos de prueba o para dejar la base de datos completamente limpia antes del lanzamiento a producción real.</p>
+      </div>
+
+      <div class="bo-db-actions-grid">
+        <!-- Seed Demo Card -->
+        <article class="bo-action-card seed-card">
+          <div class="bo-action-title">
+            <span style="font-size: 24px;">🌱</span>
+            <h3>Poblar Sistema con Datos de Prueba</h3>
+          </div>
+          <p>Genera automáticamente el estudio demo <strong>Black Lotus Tattoo Studio</strong>, 5 boxes equipados, 4 artistas residentes con comisiones, 4 nómades, citas agendadas de la semana, transacciones de finanzas y portafolios de ejemplo.</p>
+          <div style="margin-top: auto; padding-top: 14px;">
+            <button type="button" class="primary" data-action="bo-trigger-seed" style="width: 100%; background: #10b981; border-color: #059669; font-weight: 800;">
+              🚀 Poblar Datos Demo Ahora
+            </button>
+          </div>
+        </article>
+
+        <!-- Purge Production Card -->
+        <article class="bo-action-card purge-card">
+          <div class="bo-action-title">
+            <span style="font-size: 24px;">🧹</span>
+            <h3>Limpiar Sistema para Producción</h3>
+          </div>
+          <p><strong>Acción destructiva segura:</strong> Elimina todas las citas, clientes, transacciones, boxes, solicitudes y usuarios de prueba. Deja el sistema 100% limpio y listo para registrar estudios y clientes reales. <em>La cuenta soyelroot@tatudin.cl se conservará intacta.</em></p>
+          <div style="margin-top: auto; padding-top: 14px;">
+            <button type="button" class="secondary" data-action="bo-trigger-purge" style="width: 100%; color: #dc2626; border-color: #fca5a5; background: #fff1f2; font-weight: 800;">
+              ⚠️ Limpiar Base de Datos para Producción
+            </button>
+          </div>
+        </article>
+      </div>
+    </div>
   `;
 }
 
@@ -2382,6 +2817,33 @@ function newGuestSpotModal() {
   `);
 }
 
+function boEditUserModal(userId, userName, userEmail, isRoot) {
+  openModal(`
+    <p class="eyebrow">BACKOFFICE ROOT</p>
+    <h2 id="modal-title">Editar Usuario #${userId}</h2>
+    <p class="lead" style="margin-bottom: 16px;">Modifica los datos del usuario o restablece su contraseña de acceso.</p>
+    <form data-form="bo-edit-user" data-id="${userId}">
+      <label>Nombre completo
+        <input name="fullName" value="${userName || ''}" required />
+      </label>
+      <label>Email
+        <input name="email" type="email" value="${userEmail || ''}" required />
+      </label>
+      <label>Nueva contraseña (dejar en blanco para conservar la actual)
+        <input name="newPassword" type="password" placeholder="Mínimo 8 caracteres" minlength="8" />
+      </label>
+      <div style="margin-top: 10px;">
+        <label style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">
+          <input type="checkbox" name="isSuperAdmin" ${isRoot === 'true' || isRoot === true ? 'checked' : ''} style="width: auto;" />
+          Privilegios de Superadministrador (Root)
+        </label>
+      </div>
+      <button class="primary" type="submit" style="margin-top: 16px;">${icon('check')} Guardar Cambios</button>
+      <p class="form-error"></p>
+    </form>
+  `);
+}
+
 function exportFinancesCSV(artistSummary, transactions) {
   let csv = '=== LIQUIDACIONES Y RENDIMIENTO POR ARTISTA ===\r\n';
   csv += 'Artista,Rol,% Comision,Sesiones,Total Generado,Comision Artista,Liquidado,Pendiente\r\n';
@@ -2481,41 +2943,92 @@ document.addEventListener('click', async (event) => {
     return render(termsReturnState.prevView || 'ajustes');
   }
 
-  // Demo Quick Preset Buttons
-  const demoQuickBtn = event.target.closest('[data-demo-email]');
-  if (demoQuickBtn) {
-    const emailInput = document.querySelector('form[data-onboarding-form="login"] input[name="email"]');
-    const passInput = document.querySelector('form[data-onboarding-form="login"] input[name="password"]');
-    const form = document.querySelector('form[data-onboarding-form="login"]');
-    if (emailInput && passInput) {
-      emailInput.value = demoQuickBtn.dataset.demoEmail;
-      passInput.value = demoQuickBtn.dataset.demoPass;
-      if (form) form.requestSubmit();
-    }
-    return;
-  }
-
-  // Force seed and login
-  if (event.target.closest('[data-action="force-seed-login"]')) {
-    const errorEl = document.querySelector('.form-error');
-    if (errorEl) errorEl.innerHTML = '<span style="color: var(--ink);">🌱 Sincronizando datos de prueba en la base de datos...</span>';
-    try {
-      await api('/api/auth/seed-demo', { method: 'POST' });
-      await api('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email: 'estudio@tatudin.com', password: 'password123' })
-      });
-      localStorage.setItem('tatudin_onboarding_complete', 'true');
-      return await startApp();
-    } catch (err) {
-      if (errorEl) errorEl.textContent = `Error: ${err.message}`;
-    }
-    return;
-  }
-
   // Close user dropdown if clicking outside
   if (userMenu && !userMenu.hidden && !event.target.closest('#user-menu')) {
     userMenu.hidden = true;
+  }
+
+  // Open Backoffice
+  if (event.target.closest('[data-action="open-backoffice"]')) {
+    if (userMenu) userMenu.hidden = true;
+    return await render('backoffice');
+  }
+
+  // Backoffice tab navigation
+  const boTabBtn = event.target.closest('[data-bo-tab]');
+  if (boTabBtn) {
+    return await renderBackoffice(boTabBtn.dataset.boTab);
+  }
+
+  // Backoffice impersonate
+  const impBtn = event.target.closest('[data-action="bo-impersonate"]');
+  if (impBtn) {
+    const { studioId, studioName } = impBtn.dataset;
+    await api('/api/backoffice/switch-studio-master', {
+      method: 'POST',
+      body: JSON.stringify({ studioId })
+    });
+    activeStudio = await api('/api/studio');
+    updateStudioSidebarUI();
+    alert(`Ahora estás administrando el estudio: ${studioName}`);
+    return await render('dashboard');
+  }
+
+  // Backoffice edit user
+  const boEditUserBtn = event.target.closest('[data-action="bo-edit-user"]');
+  if (boEditUserBtn) {
+    const { userId, userName, userEmail, isRoot } = boEditUserBtn.dataset;
+    return boEditUserModal(userId, userName, userEmail, isRoot);
+  }
+
+  // Backoffice resolve guest spot
+  const boResolveGsBtn = event.target.closest('[data-action="bo-resolve-gs"]');
+  if (boResolveGsBtn) {
+    const { id, status } = boResolveGsBtn.dataset;
+    await api(`/api/backoffice/guest-spots/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    });
+    return await renderBackoffice('guest-spots');
+  }
+
+  // Backoffice trigger seed demo
+  const boSeedBtn = event.target.closest('[data-action="bo-trigger-seed"]');
+  if (boSeedBtn) {
+    if (!confirm('¿Deseas poblar el sistema con los datos de prueba de Black Lotus Tattoo Studio?')) return;
+    const originalText = boSeedBtn.textContent;
+    boSeedBtn.textContent = 'Sembrando datos demo...';
+    boSeedBtn.disabled = true;
+    try {
+      await api('/api/backoffice/seed-demo', { method: 'POST' });
+      alert('¡Datos de prueba sembrados exitosamente!');
+      return await renderBackoffice('stats');
+    } catch (err) {
+      alert('Error: ' + err.message);
+      boSeedBtn.textContent = originalText;
+      boSeedBtn.disabled = false;
+    }
+    return;
+  }
+
+  // Backoffice trigger purge production
+  const boPurgeBtn = event.target.closest('[data-action="bo-trigger-purge"]');
+  if (boPurgeBtn) {
+    const confirmInput = prompt('⚠️ ADVERTENCIA CRÍTICA:\nEsta acción eliminará permanentemente todas las citas, clientes, transacciones, boxes y usuarios de prueba, dejando la base de datos limpia para PRODUCCIÓN.\n\nEscribe exactamente "LIMPIAR" para confirmar:');
+    if (confirmInput !== 'LIMPIAR') {
+      alert('Operación cancelada. No se modificó ningún dato.');
+      return;
+    }
+    try {
+      const res = await api('/api/backoffice/purge-production', { method: 'POST' });
+      alert(res.message || 'Base de datos purgada exitosamente.');
+      activeStudio = await api('/api/studio').catch(() => null);
+      updateStudioSidebarUI();
+      return await renderBackoffice('stats');
+    } catch (err) {
+      alert('Error al purgar la base de datos: ' + err.message);
+    }
+    return;
   }
 
   if (event.target.closest('[data-action="logout"]')) {
@@ -2876,12 +3389,7 @@ document.addEventListener('submit', async (event) => {
         localStorage.setItem('tatudin_onboarding_complete', 'true');
         return await startApp();
       } catch (error) {
-        errorEl.innerHTML = `
-          <span>${error.message}</span>
-          <button type="button" class="primary small" data-action="force-seed-login" style="margin-top: 10px; font-size: 12px; width: 100%; padding: 8px;">
-            🌱 Sincronizar datos de prueba e Iniciar Sesión (1-Click)
-          </button>
-        `;
+        errorEl.textContent = error.message;
         return;
       }
     }
@@ -3024,6 +3532,23 @@ document.addEventListener('submit', async (event) => {
         setTimeout(() => { successMsg.textContent = ''; successMsg.style.color = ''; }, 3000);
       }
       return;
+    }
+    if (form.dataset.form === 'bo-edit-user') {
+      const userId = form.dataset.id;
+      const isSuper = Boolean(form.querySelector('[name="isSuperAdmin"]')?.checked);
+      const payload = {
+        fullName: body.fullName,
+        email: body.email,
+        isSuperAdmin: isSuper
+      };
+      if (body.newPassword) payload.newPassword = body.newPassword;
+      await api(`/api/backoffice/users/${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      });
+      closeModal();
+      alert('Usuario actualizado con éxito');
+      return await renderBackoffice('users');
     }
     if (form.dataset.form === 'user-profile') {
       const res = await api('/api/auth/profile', { method: 'PATCH', body: JSON.stringify(body) });

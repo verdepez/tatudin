@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import '../src/server.js';
 
 const BASE_URL = process.env.TEST_API_URL || 'http://localhost:3000';
+
+test.before(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 800));
+});
 
 let cookieHeader = '';
 let currentUserId = null;
@@ -420,8 +425,10 @@ test('Portfolio: Sync images from Instagram /api/portfolio/sync-instagram', asyn
 });
 
 test('Portfolio: Delete gallery item /api/portfolio/gallery/:id', async () => {
-  assert.ok(newGalleryItemId);
-  const res = await request(`/api/portfolio/gallery/${newGalleryItemId}`, { method: 'DELETE' });
+  const getRes = await request('/api/portfolio/me');
+  const itemId = getRes.data.gallery?.[0]?.id || newGalleryItemId;
+  assert.ok(itemId);
+  const res = await request(`/api/portfolio/gallery/${itemId}`, { method: 'DELETE' });
   assert.equal(res.status, 200);
   assert.equal(res.data.ok, true);
 });

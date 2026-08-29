@@ -63,7 +63,7 @@ async function requireAuth(request, response, next) {
   if (!sessionId) return response.status(401).json({ error: 'Debes iniciar sesión' });
   try {
     const result = await pool.query(`
-      SELECT u.id, u.email, u.full_name, s_t.id AS session_id,
+      SELECT u.id, u.email, u.full_name, u.is_superadmin, s_t.id AS session_id,
              COALESCE(s_t.active_studio_id, sm.studio_id) AS studio_id,
              sm.role, s.name AS studio_name
       FROM sessions s_t
@@ -81,7 +81,6 @@ async function requireAuth(request, response, next) {
 
     let userRow = result.rows[0];
     if (!userRow.studio_id) {
-      // Auto-assign default personal studio if user somehow has no studio membership
       const defStudio = await pool.query("INSERT INTO studios (name, account_type, currency, timezone) VALUES ($1, 'independent', 'CLP', 'America/Santiago') RETURNING id, name", [`Estudio de ${userRow.full_name || 'Artista'}`]);
       const newStudioId = defStudio.rows[0].id;
       await pool.query("INSERT INTO studio_memberships (user_id, studio_id, role) VALUES ($1, $2, 'owner')", [userRow.id, newStudioId]);
@@ -92,9 +91,13 @@ async function requireAuth(request, response, next) {
       userRow.studio_name = defStudio.rows[0].name;
     }
 
+    const isSuper = Boolean(userRow.is_superadmin || userRow.email === 'soyelroot@tatudin.cl');
+    userRow.is_superadmin = isSuper;
+
     request.user = userRow;
     request.studioId = userRow.studio_id;
     request.sessionId = sessionId;
+    request.isSuperAdmin = isSuper;
     return next();
   } catch (error) { return response.status(500).json({ error: error.message }); }
 }
@@ -124,6 +127,301 @@ async function seedDefaultCategories(clientOrPool, studioId, accountType = 'inde
     `, [studioId, cat.name, cat.kind, cat.color, cat.icon, cat.requires_client, cat.requires_space, cat.is_system]);
   }
 }
+
+async function requireSuperAdmin(request, response, next) {
+  return requireAuth(request, response, () => {
+    if (!request.isSuperAdmin) {
+      return response.status(403).json({ error: 'Acceso restringido: Se requieren privilegios de Administrador General (Root)' });
+    }
+    return next();
+  });
+}
+
+// ---------------- BACKOFFICE ROOT ENDPOINTS ----------------
+app.get('/api/backoffice/stats', requireSuperAdmin, async (_request, response) => {
+  try {
+    const [
+      usersCount,
+      studiosCount,
+      membershipsCount,
+      spacesCount,
+      appointmentsCount,
+      guestSpotsCount,
+      txSums,
+      recentUsers,
+      recentGuestSpots
+    ] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS total, 
+                         COUNT(CASE WHEN is_superadmin THEN 1 END)::int AS superadmins,
+                         COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END)::int AS new_last_30_days
+                  FROM users`),
+      pool.query(`SELECT COUNT(*)::int AS total,
+                         COUNT(CASE WHEN account_type = 'studio' THEN 1 END)::int AS studios,
+                         COUNT(CASE WHEN account_type = 'independent' THEN 1 END)::int AS independents
+                  FROM studios`),
+      pool.query(`SELECT COUNT(*)::int AS total,
+                         COUNT(CASE WHEN role = 'resident' THEN 1 END)::int AS residents,
+                         COUNT(CASE WHEN role = 'nomad' THEN 1 END)::int AS nomads,
+                         COUNT(CASE WHEN role = 'owner' THEN 1 END)::int AS owners
+                  FROM studio_memberships WHERE status = 'active'`),
+      pool.query(`SELECT COUNT(*)::int AS total,
+                         COUNT(CASE WHEN is_active THEN 1 END)::int AS active
+                  FROM spaces`),
+      pool.query(`SELECT COUNT(*)::int AS total,
+                         COUNT(CASE WHEN status = 'confirmed' THEN 1 END)::int AS confirmed,
+                         COUNT(CASE WHEN status = 'deposit_paid' THEN 1 END)::int AS deposit_paid,
+                         COUNT(CASE WHEN status = 'completed' THEN 1 END)::int AS completed,
+                         COUNT(CASE WHEN status = 'cancelled' THEN 1 END)::int AS cancelled,
+                         COALESCE(SUM(price), 0)::numeric AS total_price_volume,
+                         COALESCE(SUM(deposit), 0)::numeric AS total_deposit_volume
+                  FROM appointments`),
+      pool.query(`SELECT COUNT(*)::int AS total,
+                         COUNT(CASE WHEN status = 'pending' THEN 1 END)::int AS pending,
+                         COUNT(CASE WHEN status = 'approved' THEN 1 END)::int AS approved,
+                         COUNT(CASE WHEN status = 'rejected' THEN 1 END)::int AS rejected
+                  FROM guest_spot_requests`),
+      pool.query(`SELECT 
+                    COALESCE(SUM(CASE WHEN kind = 'income' THEN amount ELSE 0 END), 0)::numeric AS total_income,
+                    COALESCE(SUM(CASE WHEN kind = 'expense' THEN amount ELSE 0 END), 0)::numeric AS total_expense
+                  FROM transactions`),
+      pool.query(`SELECT u.id, u.email, u.full_name, u.is_superadmin, u.created_at,
+                         COUNT(DISTINCT sm.studio_id)::int AS studio_count
+                  FROM users u
+                  LEFT JOIN studio_memberships sm ON sm.user_id = u.id
+                  GROUP BY u.id
+                  ORDER BY u.created_at DESC LIMIT 6`),
+      pool.query(`SELECT g.*, s.name AS studio_name 
+                  FROM guest_spot_requests g
+                  JOIN studios s ON s.id = g.studio_id
+                  ORDER BY g.created_at DESC LIMIT 6`)
+    ]);
+
+    return response.json({
+      system: {
+        serverTime: new Date().toISOString(),
+        nodeVersion: process.version,
+        databaseStatus: 'connected',
+        lawCompliance: 'Ley N° 19.628 - Datos técnicos y estadísticos anonimizados y agregados para monitoreo de estabilidad y optimización de plataforma.'
+      },
+      metrics: {
+        users: usersCount.rows[0],
+        studios: studiosCount.rows[0],
+        memberships: membershipsCount.rows[0],
+        spaces: spacesCount.rows[0],
+        appointments: appointmentsCount.rows[0],
+        guestSpots: guestSpotsCount.rows[0],
+        finances: txSums.rows[0]
+      },
+      recentUsers: recentUsers.rows,
+      recentGuestSpots: recentGuestSpots.rows
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/backoffice/users', requireSuperAdmin, async (_request, response) => {
+  try {
+    const result = await pool.query(`
+      SELECT u.id, u.email, u.full_name, u.is_superadmin, u.created_at,
+             COALESCE(json_agg(json_build_object(
+               'studio_id', s.id,
+               'studio_name', s.name,
+               'role', sm.role,
+               'status', sm.status,
+               'account_type', s.account_type
+             )) FILTER (WHERE s.id IS NOT NULL), '[]') AS studios,
+             COUNT(DISTINCT a.id)::int AS appointment_count
+      FROM users u
+      LEFT JOIN studio_memberships sm ON sm.user_id = u.id
+      LEFT JOIN studios s ON s.id = sm.studio_id
+      LEFT JOIN appointments a ON a.artist_id = u.id
+      GROUP BY u.id
+      ORDER BY u.created_at DESC
+    `);
+    return response.json(result.rows);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/backoffice/users/:id', requireSuperAdmin, async (request, response) => {
+  const { id } = request.params;
+  const { fullName, email, newPassword, isSuperAdmin } = request.body;
+  try {
+    const userRes = await pool.query('SELECT id, email, is_superadmin FROM users WHERE id = $1', [id]);
+    if (!userRes.rowCount) return response.status(404).json({ error: 'Usuario no encontrado' });
+
+    let updates = [];
+    let values = [];
+    let idx = 1;
+
+    if (fullName) {
+      updates.push(`full_name = $${idx++}`);
+      values.push(fullName.trim());
+    }
+    if (email) {
+      updates.push(`email = LOWER($${idx++})`);
+      values.push(email.trim());
+    }
+    if (typeof isSuperAdmin === 'boolean') {
+      updates.push(`is_superadmin = $${idx++}`);
+      values.push(isSuperAdmin);
+    }
+    if (newPassword) {
+      if (newPassword.length < 8) return response.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+      const hash = await hashPassword(newPassword);
+      updates.push(`password_hash = $${idx++}`);
+      values.push(hash);
+    }
+
+    if (!updates.length) return response.status(400).json({ error: 'Nada para actualizar' });
+
+    values.push(id);
+    const result = await pool.query(
+      `UPDATE users SET ${updates.join(', ')} WHERE id = $${idx} RETURNING id, email, full_name, is_superadmin`,
+      values
+    );
+    return response.json({ ok: true, user: result.rows[0] });
+  } catch (error) {
+    if (error.code === '23505') return response.status(409).json({ error: 'Ese email ya está registrado' });
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/backoffice/studios', requireSuperAdmin, async (_request, response) => {
+  try {
+    const result = await pool.query(`
+      SELECT s.id, s.name, s.account_type, s.currency, s.timezone, s.created_at,
+             COUNT(DISTINCT sm.user_id)::int AS member_count,
+             COUNT(DISTINCT sp.id)::int AS space_count,
+             COUNT(DISTINCT a.id)::int AS appointment_count,
+             COALESCE(
+               (SELECT u.full_name FROM users u JOIN studio_memberships sm_own ON sm_own.user_id = u.id WHERE sm_own.studio_id = s.id AND sm_own.role = 'owner' LIMIT 1),
+               'Sin propietario'
+             ) AS owner_name
+      FROM studios s
+      LEFT JOIN studio_memberships sm ON sm.studio_id = s.id
+      LEFT JOIN spaces sp ON sp.studio_id = s.id
+      LEFT JOIN appointments a ON a.studio_id = s.id
+      GROUP BY s.id
+      ORDER BY s.created_at DESC
+    `);
+    return response.json(result.rows);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/backoffice/guest-spots', requireSuperAdmin, async (_request, response) => {
+  try {
+    const result = await pool.query(`
+      SELECT g.*, s.name AS studio_name, sp.name AS space_name
+      FROM guest_spot_requests g
+      JOIN studios s ON s.id = g.studio_id
+      LEFT JOIN spaces sp ON sp.id = g.space_id
+      ORDER BY g.created_at DESC
+    `);
+    return response.json(result.rows);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/backoffice/guest-spots/:id', requireSuperAdmin, async (request, response) => {
+  const { id } = request.params;
+  const { status, notes } = request.body;
+  if (!['pending', 'approved', 'rejected'].includes(status)) {
+    return response.status(400).json({ error: 'Estado inválido (pending, approved, rejected)' });
+  }
+  try {
+    const result = await pool.query(
+      'UPDATE guest_spot_requests SET status = $1, notes = COALESCE($2, notes) WHERE id = $3 RETURNING *',
+      [status, notes, id]
+    );
+    if (!result.rowCount) return response.status(404).json({ error: 'Solicitud no encontrada' });
+    return response.json({ ok: true, request: result.rows[0] });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/backoffice/switch-studio-master', requireSuperAdmin, async (request, response) => {
+  const { studioId } = request.body;
+  if (!studioId) return response.status(400).json({ error: 'studioId es requerido' });
+  try {
+    const check = await pool.query('SELECT id, name FROM studios WHERE id = $1', [studioId]);
+    if (!check.rowCount) return response.status(404).json({ error: 'Estudio no encontrado' });
+
+    // Superadmin master access
+    await pool.query(`
+      INSERT INTO studio_memberships (user_id, studio_id, role, commission_percent)
+      VALUES ($1, $2, 'owner', 100.00)
+      ON CONFLICT (user_id, studio_id) DO NOTHING
+    `, [request.user.id, studioId]);
+
+    await pool.query('UPDATE sessions SET active_studio_id = $1 WHERE id = $2', [studioId, request.sessionId]);
+    return response.json({ ok: true, activeStudioId: Number(studioId), studioName: check.rows[0].name });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/backoffice/seed-demo', requireSuperAdmin, async (_request, response) => {
+  try {
+    console.log('[Backoffice] Siembra de datos demo solicitada por Superadmin...');
+    await seedStudioData(pool);
+    return response.json({ ok: true, message: 'Datos demo sembrados exitosamente' });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/backoffice/purge-production', requireSuperAdmin, async (request, response) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    console.log('[Backoffice] Purga de base de datos para producción solicitada por Superadmin...');
+
+    await client.query('DELETE FROM appointments');
+    await client.query('DELETE FROM transactions');
+    await client.query('DELETE FROM guest_spot_requests');
+    await client.query('DELETE FROM portfolio_gallery_items');
+    await client.query('DELETE FROM user_portfolios WHERE user_id NOT IN (SELECT id FROM users WHERE is_superadmin = TRUE)');
+    await client.query('DELETE FROM clients');
+    await client.query('DELETE FROM spaces');
+    await client.query('DELETE FROM commitment_categories');
+
+    await client.query('DELETE FROM studio_memberships WHERE user_id NOT IN (SELECT id FROM users WHERE is_superadmin = TRUE)');
+    await client.query(`DELETE FROM studios WHERE id NOT IN (
+      SELECT sm.studio_id FROM studio_memberships sm JOIN users u ON u.id = sm.user_id WHERE u.is_superadmin = TRUE
+    )`);
+    await client.query('DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users WHERE is_superadmin = TRUE)');
+    await client.query('DELETE FROM users WHERE is_superadmin = FALSE AND email != $1', ['soyelroot@tatudin.cl']);
+
+    const rootStudio = await client.query(`
+      SELECT s.id FROM studios s 
+      JOIN studio_memberships sm ON sm.studio_id = s.id 
+      WHERE sm.user_id = $1 LIMIT 1
+    `, [request.user.id]);
+
+    if (rootStudio.rowCount) {
+      await seedDefaultCategories(client, rootStudio.rows[0].id, 'studio');
+    }
+
+    await client.query('COMMIT');
+    return response.json({
+      ok: true,
+      message: 'Base de datos purgada exitosamente. Todas las tablas quedaron limpias para producción.',
+      remainingUsersCount: 1
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    return response.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
 
 // ---------------- AUTH & MULTI-STUDIO ----------------
 app.post('/api/auth/register', async (request, response) => {
@@ -165,45 +463,18 @@ app.post('/api/auth/login', async (request, response) => {
   if (!email?.trim() || !password) return response.status(400).json({ error: 'Email y contraseña son obligatorios' });
   try {
     const result = await pool.query('SELECT id, email, password_hash, full_name FROM users WHERE email = LOWER($1)', [email.trim()]);
-    if (!result.rowCount || !result.rows[0].password_hash || !(await verifyPassword(password, result.rows[0].password_hash))) {
+    if (!result.rowCount || !(await verifyPassword(password, result.rows[0].password_hash))) {
       return response.status(401).json({ error: 'Email o contraseña incorrectos' });
     }
     const user = result.rows[0];
-    let membership = await pool.query('SELECT studio_id FROM studio_memberships WHERE user_id = $1 AND status = \'active\' LIMIT 1', [user.id]);
-    let studioId = membership.rows[0]?.studio_id || null;
-
-    if (!studioId) {
-      const defStudio = await pool.query("INSERT INTO studios (name, account_type, currency, timezone) VALUES ($1, 'independent', 'CLP', 'America/Santiago') RETURNING id", [`Estudio de ${user.full_name || 'Artista'}`]);
-      studioId = defStudio.rows[0].id;
-      await pool.query("INSERT INTO studio_memberships (user_id, studio_id, role) VALUES ($1, $2, 'owner')", [user.id, studioId]);
-      await seedDefaultCategories(pool, studioId, 'independent');
-    }
+    const membership = await pool.query('SELECT studio_id FROM studio_memberships WHERE user_id = $1 AND status = \'active\' LIMIT 1', [user.id]);
+    const studioId = membership.rows[0]?.studio_id || null;
 
     const sessionId = crypto.randomBytes(32).toString('hex');
     await pool.query('INSERT INTO sessions (id, user_id, active_studio_id, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL \'14 days\')', [sessionId, user.id, studioId]);
     setSessionCookie(response, sessionId);
     return response.json({ user: { id: user.id, email: user.email, fullName: user.full_name } });
   } catch (error) { return response.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/auth/seed-demo', async (_request, response) => {
-  if (!pool) return response.status(503).json({ error: 'Database not configured' });
-  try {
-    console.log('[DB] Ejecutando siembra de datos demo bajo demanda...');
-    await seedStudioData(pool);
-    return response.json({
-      ok: true,
-      message: 'Datos de prueba sembrados exitosamente',
-      accounts: [
-        { role: 'Administrador / Dueño', email: 'estudio@tatudin.com', password: 'password123' },
-        { role: 'Artista Residente', email: 'matias@tatudin.com', password: 'password123' },
-        { role: 'Artista Nómade', email: 'diego.nomad@tatudin.com', password: 'password123' }
-      ]
-    });
-  } catch (error) {
-    console.error('[DB] Error sembrando datos demo:', error);
-    return response.status(500).json({ error: error.message });
-  }
 });
 
 app.post('/api/auth/logout', async (request, response) => {
@@ -1191,8 +1462,52 @@ async function ensureAuthSchema() {
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     full_name TEXT NOT NULL,
+    is_superadmin BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT FALSE');
+
+  // Ensure Master Superadmin soyelroot@tatudin.cl exists
+  try {
+    const rootEmail = 'soyelroot@tatudin.cl';
+    const rootHash = await hashPassword('password123');
+    let rootRes = await pool.query('SELECT id FROM users WHERE email = $1', [rootEmail]);
+    let rootUserId;
+    if (!rootRes.rowCount) {
+      const insRoot = await pool.query(
+        'INSERT INTO users (email, password_hash, full_name, is_superadmin) VALUES ($1, $2, $3, TRUE) RETURNING id',
+        [rootEmail, rootHash, 'Administrador General Tatudin']
+      );
+      rootUserId = insRoot.rows[0].id;
+    } else {
+      rootUserId = rootRes.rows[0].id;
+      await pool.query(
+        'UPDATE users SET password_hash = $1, full_name = $2, is_superadmin = TRUE WHERE id = $3',
+        [rootHash, 'Administrador General Tatudin', rootUserId]
+      );
+    }
+
+    // Ensure Root user has a studio membership
+    let rootStudioRes = await pool.query(`
+      SELECT s.id FROM studios s
+      JOIN studio_memberships sm ON sm.studio_id = s.id
+      WHERE sm.user_id = $1 LIMIT 1
+    `, [rootUserId]);
+
+    if (!rootStudioRes.rowCount) {
+      const insSt = await pool.query(
+        "INSERT INTO studios (name, account_type, currency, timezone) VALUES ('Tatudin Master Studio', 'studio', 'CLP', 'America/Santiago') RETURNING id"
+      );
+      const rootStudioId = insSt.rows[0].id;
+      await pool.query(
+        "INSERT INTO studio_memberships (user_id, studio_id, role, commission_percent) VALUES ($1, $2, 'owner', 100.00)",
+        [rootUserId, rootStudioId]
+      );
+      await seedDefaultCategories(pool, rootStudioId, 'studio');
+    }
+  } catch (rootErr) {
+    console.warn('[DB] Root user initialization warning:', rootErr.message);
+  }
 
   // 3. Sessions
   await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
@@ -1354,12 +1669,15 @@ async function ensureAuthSchema() {
     console.warn('Warning seeding categories:', seedErr.message);
   }
 
-  // Ensure sample studio data and demo accounts are always synced with valid passwords
+  // Auto-seed sample studio data on fresh databases
   try {
-    console.log('[DB] Sincronizando datos de estudio y cuentas demo (estudio@tatudin.com / password123)...');
-    await seedStudioData(pool);
+    const ownerCheck = await pool.query("SELECT id FROM users WHERE email = 'estudio@tatudin.com'");
+    if (!ownerCheck.rowCount) {
+      console.log('[DB] Base de datos limpia detectada: Sembrando automáticamente estudio demo, artistas, boxes y agenda...');
+      await seedStudioData(pool);
+    }
   } catch (demoSeedErr) {
-    console.warn('[DB] Demo seeding notice:', demoSeedErr.message);
+    console.warn('[DB] Demo auto-seeding warning:', demoSeedErr.message);
   }
 }
 
@@ -1368,8 +1686,15 @@ app.use((_request, response) => {
 });
 
 // Start web server immediately on 0.0.0.0 to satisfy Railway healthchecks
-app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Tatudin listening on port ${port} (http://0.0.0.0:${port})`);
+});
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`[HTTP] Port ${port} is already in use, reusing active server instance.`);
+  } else {
+    console.error('[HTTP] Server error:', err);
+  }
 });
 
 // Run schema migration asynchronously in the background
