@@ -29,6 +29,20 @@ let pool = databaseUrl
 const scrypt = promisify(crypto.scrypt);
 const sessionDuration = 1000 * 60 * 60 * 24 * 14;
 
+// In-memory debug logs buffer for real-time diagnostics
+const serverLogs = [];
+function addLog(level, message, details = null) {
+  const entry = {
+    time: new Date().toISOString().slice(11, 19),
+    level,
+    message,
+    details: details ? (typeof details === 'object' ? JSON.stringify(details) : String(details)) : null
+  };
+  serverLogs.unshift(entry);
+  if (serverLogs.length > 80) serverLogs.pop();
+  console.log(`[${level.toUpperCase()}] ${message}`, details || '');
+}
+
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -572,6 +586,137 @@ app.post('/api/auth/logout', async (request, response) => {
   if (pool) await pool.query('DELETE FROM sessions WHERE id = $1', [parseCookies(request).tatudin_session]);
   response.setHeader('Set-Cookie', 'tatudin_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
   return response.json({ ok: true });
+});
+
+// ---------------- LIVE DEBUG & DIAGNOSTICS ----------------
+app.get('/api/debug/info', async (_request, response) => {
+  const envHasDbUrl = Boolean(process.env.DATABASE_URL);
+  const rawUrl = process.env.DATABASE_URL || '';
+  const sanitizedUrl = rawUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
+  
+  let dbStatus = {
+    configured: envHasDbUrl,
+    urlSanitized: sanitizedUrl,
+    connected: false,
+    error: null,
+    dbName: null,
+    dbUser: null,
+    dbTime: null,
+    tables: [],
+    usersCount: 0,
+    rootUser: null
+  };
+
+  if (pool) {
+    try {
+      const testRes = await pool.query('SELECT current_database() AS db, current_user AS usr, NOW() AS time');
+      dbStatus.connected = true;
+      dbStatus.dbName = testRes.rows[0]?.db;
+      dbStatus.dbUser = testRes.rows[0]?.usr;
+      dbStatus.dbTime = testRes.rows[0]?.time;
+
+      const tablesRes = await pool.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public'
+        ORDER BY table_name ASC
+      `);
+      dbStatus.tables = tablesRes.rows.map((r) => r.table_name);
+
+      if (dbStatus.tables.includes('users')) {
+        const uCount = await pool.query('SELECT COUNT(*) FROM users');
+        dbStatus.usersCount = parseInt(uCount.rows[0]?.count || '0', 10);
+        
+        const rootCheck = await pool.query('SELECT id, email, full_name, is_superadmin, created_at FROM users WHERE email = $1', ['soyelroot@tatudin.cl']);
+        dbStatus.rootUser = rootCheck.rows[0] || null;
+      }
+    } catch (err) {
+      dbStatus.error = err.message || String(err);
+    }
+  } else {
+    dbStatus.error = 'No DATABASE_URL environment variable is set in process.env';
+  }
+
+  return response.json({
+    timestamp: new Date().toISOString(),
+    nodeVersion: process.version,
+    port,
+    database: dbStatus,
+    recentLogs: serverLogs
+  });
+});
+
+app.post('/api/debug/init-db', async (_request, response) => {
+  try {
+    addLog('info', 'Ejecutando reinicialización de esquema bajo demanda vía Debug Mode...');
+    await ensureAuthSchema();
+    return response.json({ ok: true, message: 'Esquema de base de datos verificado e inicializado exitosamente' });
+  } catch (err) {
+    addLog('error', 'Error en reinicialización manual de BD: ' + err.message);
+    return response.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/debug/reset-root', async (_request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Base de datos no disponible' });
+  try {
+    const rootEmail = 'soyelroot@tatudin.cl';
+    const rootHash = await hashPassword('password123');
+    
+    await pool.query(`CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      full_name TEXT NOT NULL,
+      is_superadmin BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`).catch(() => {});
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT FALSE').catch(() => {});
+
+    let rootRes = await pool.query('SELECT id FROM users WHERE email = $1', [rootEmail]);
+    let rootUserId;
+    if (!rootRes.rowCount) {
+      const ins = await pool.query(
+        'INSERT INTO users (email, password_hash, full_name, is_superadmin) VALUES ($1, $2, $3, TRUE) RETURNING id',
+        [rootEmail, rootHash, 'Administrador General Tatudin']
+      );
+      rootUserId = ins.rows[0].id;
+    } else {
+      rootUserId = rootRes.rows[0].id;
+      await pool.query(
+        'UPDATE users SET password_hash = $1, full_name = $2, is_superadmin = TRUE WHERE id = $3',
+        [rootHash, 'Administrador General Tatudin', rootUserId]
+      );
+    }
+
+    // Ensure Master Studio & membership
+    let studioRes = await pool.query(`
+      SELECT s.id FROM studios s 
+      JOIN studio_memberships sm ON sm.studio_id = s.id 
+      WHERE sm.user_id = $1 LIMIT 1
+    `, [rootUserId]).catch(() => ({ rowCount: 0, rows: [] }));
+    
+    let studioId;
+    if (!studioRes.rowCount) {
+      const st = await pool.query("INSERT INTO studios (name, account_type, currency, timezone) VALUES ('Tatudin Master Studio', 'studio', 'CLP', 'America/Santiago') RETURNING id");
+      studioId = st.rows[0].id;
+      await pool.query("INSERT INTO studio_memberships (user_id, studio_id, role, commission_percent, status) VALUES ($1, $2, 'owner', 100.00, 'active') ON CONFLICT (user_id, studio_id) DO UPDATE SET status = 'active', role = 'owner'", [rootUserId, studioId]);
+    } else {
+      studioId = studioRes.rows[0].id;
+    }
+
+    await seedDefaultCategories(pool, studioId, 'studio').catch(() => {});
+    addLog('info', 'Usuario soyelroot@tatudin.cl restablecido exitosamente vía Debug Mode');
+    return response.json({
+      ok: true,
+      message: 'Superadmin soyelroot@tatudin.cl listo con clave password123',
+      userId: rootUserId,
+      studioId
+    });
+  } catch (err) {
+    addLog('error', 'Error restableciendo root user: ' + err.message);
+    return response.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 app.get('/api/auth/me', requireAuth, async (request, response) => response.json({ user: request.user }));
