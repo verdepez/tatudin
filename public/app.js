@@ -56,13 +56,13 @@ const ROLE_MAP = {
   nomad: { label: 'Nómade', class: 'role-nomad' }
 };
 
-// API Fetch wrapper
 const api = (url, options) => fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options }).then(async (response) => {
   let data = {};
+  const text = await response.text();
   try {
-    data = await response.json();
+    data = text ? JSON.parse(text) : {};
   } catch (err) {
-    throw new Error('Respuesta del servidor inválida');
+    throw new Error(text || `Error ${response.status}: No se pudo procesar la solicitud`);
   }
   if (!response.ok) throw new Error(data.error || 'No se pudo completar la operación');
   return data;

@@ -435,36 +435,78 @@ app.post('/api/backoffice/purge-production', requireSuperAdmin, async (request, 
 
 // ---------------- AUTH & MULTI-STUDIO ----------------
 app.post('/api/auth/register', async (request, response) => {
-  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  if (!pool) return response.status(503).json({ error: 'Base de datos no disponible' });
   const { fullName, email, password, studioName, accountType = 'independent' } = request.body;
-  if (!fullName?.trim() || !email?.trim() || !password || !studioName?.trim()) {
-    return response.status(400).json({ error: 'Nombre, email, contraseña y estudio son obligatorios' });
+  if (!fullName?.trim() || !email?.trim() || !password) {
+    return response.status(400).json({ error: 'Nombre, email y contraseña son obligatorios' });
   }
   if (password.length < 8) return response.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+  
+  const cleanEmail = email.trim().toLowerCase();
+  const validStudioName = (studioName && studioName.trim()) || `Estudio de ${fullName.trim()}`;
+  const validAccountType = accountType === 'studio' ? 'studio' : 'independent';
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const user = await client.query('INSERT INTO users (email, password_hash, full_name) VALUES (LOWER($1), $2, $3) RETURNING id, email, full_name', [email.trim(), await hashPassword(password), fullName.trim()]);
-    const validAccountType = accountType === 'studio' ? 'studio' : 'independent';
-    const studio = await client.query('INSERT INTO studios (name, account_type) VALUES ($1, $2) RETURNING id, name, account_type', [studioName.trim(), validAccountType]);
-    await client.query('INSERT INTO studio_memberships (user_id, studio_id, role) VALUES ($1, $2, $3)', [user.rows[0].id, studio.rows[0].id, 'owner']);
+    const existing = await client.query('SELECT id FROM users WHERE email = $1', [cleanEmail]);
+    if (existing.rowCount) {
+      await client.query('ROLLBACK');
+      return response.status(409).json({ error: 'Ese email ya está registrado' });
+    }
+
+    const hashed = await hashPassword(password);
+    const userRes = await client.query(
+      'INSERT INTO users (email, password_hash, full_name, is_superadmin) VALUES ($1, $2, $3, FALSE) RETURNING id, email, full_name',
+      [cleanEmail, hashed, fullName.trim()]
+    );
+    const user = userRes.rows[0];
+
+    const studioRes = await client.query(
+      'INSERT INTO studios (name, account_type) VALUES ($1, $2) RETURNING id, name, account_type',
+      [validStudioName, validAccountType]
+    );
+    const studio = studioRes.rows[0];
+
+    await client.query(
+      "INSERT INTO studio_memberships (user_id, studio_id, role, commission_percent, status) VALUES ($1, $2, 'owner', 100.00, 'active')",
+      [user.id, studio.id]
+    );
     
     // Seed default space
-    await client.query('INSERT INTO spaces (studio_id, name, description, price_per_day, price_per_hour) VALUES ($1, $2, $3, $4, $5)', [studio.rows[0].id, 'Box Principal', 'Puesto de trabajo completamente equipado', 45000, 10000]);
+    await client.query(
+      'INSERT INTO spaces (studio_id, name, description, price_per_day, price_per_hour) VALUES ($1, $2, $3, $4, $5)',
+      [studio.id, 'Box Principal', 'Puesto de trabajo completamente equipado', 45000, 10000]
+    ).catch(() => {});
 
     // Seed default categories
-    await seedDefaultCategories(client, studio.rows[0].id, validAccountType);
+    await seedDefaultCategories(client, studio.id, validAccountType).catch(() => {});
 
     const sessionId = crypto.randomBytes(32).toString('hex');
-    await client.query('INSERT INTO sessions (id, user_id, active_studio_id, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL \'14 days\')', [sessionId, user.rows[0].id, studio.rows[0].id]);
+    await client.query(
+      "INSERT INTO sessions (id, user_id, active_studio_id, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '14 days')",
+      [sessionId, user.id, studio.id]
+    ).catch(async () => {
+      await client.query(
+        "INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL '14 days')",
+        [sessionId, user.id]
+      );
+    });
+
     await client.query('COMMIT');
     setSessionCookie(response, sessionId);
-    return response.status(201).json({ user: { ...user.rows[0], studio_id: studio.rows[0].id }, studio: studio.rows[0] });
+    return response.status(201).json({
+      user: { ...user, studio_id: studio.id, isSuperAdmin: false },
+      studio
+    });
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[AUTH] Register error:', error);
     if (error.code === '23505') return response.status(409).json({ error: 'Ese email ya está registrado' });
-    return response.status(500).json({ error: error.message });
-  } finally { client.release(); }
+    return response.status(500).json({ error: error.message || 'Error al registrar el usuario' });
+  } finally {
+    client.release();
+  }
 });
 
 app.post('/api/auth/login', async (request, response) => {
@@ -1499,11 +1541,37 @@ app.post('/api/transactions', requireAuth, async (request, response) => {
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
+// Endpoint de diagnóstico y salud
+app.get('/api/health', async (_request, response) => {
+  if (!pool) return response.status(503).json({ ok: false, status: 'error', message: 'No DATABASE_URL configured' });
+  try {
+    const dbTest = await pool.query('SELECT NOW() as now, current_database() as db');
+    return response.json({
+      ok: true,
+      status: 'healthy',
+      database: dbTest.rows[0]?.db,
+      timestamp: dbTest.rows[0]?.now,
+      nodeVersion: process.version
+    });
+  } catch (err) {
+    return response.status(500).json({ ok: false, status: 'db_error', error: err.message });
+  }
+});
+
 async function ensureAuthSchema() {
   if (!pool) {
     console.warn('[DB] DATABASE_URL is not set in environment variables.');
     return;
   }
+
+  const safeExec = async (label, query, params = []) => {
+    try {
+      await pool.query(query, params);
+      console.log(`[DB Migration] ✓ ${label}`);
+    } catch (err) {
+      console.warn(`[DB Migration] ⚠ ${label}:`, err.message);
+    }
+  };
 
   try {
     const rawUrl = process.env.DATABASE_URL || '';
@@ -1528,16 +1596,17 @@ async function ensureAuthSchema() {
         pool = new Pool({ connectionString: databaseUrl, ssl: false });
       }
       
-      await new Promise((r) => setTimeout(r, 2500));
+      await new Promise((r) => setTimeout(r, 2000));
     }
   }
 
   if (!connected) {
-    throw new Error('Could not establish connection to PostgreSQL after 12 attempts. Please verify DATABASE_URL in Railway Variables.');
+    console.error('[DB] Could not establish connection to PostgreSQL after 12 attempts.');
+    return;
   }
 
   // 1. Studios
-  await pool.query(`CREATE TABLE IF NOT EXISTS studios (
+  await safeExec('CREATE TABLE studios', `CREATE TABLE IF NOT EXISTS studios (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     account_type TEXT NOT NULL DEFAULT 'independent' CHECK (account_type IN ('independent', 'studio')),
@@ -1545,10 +1614,10 @@ async function ensureAuthSchema() {
     timezone TEXT NOT NULL DEFAULT 'America/Santiago',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
-  await pool.query(`ALTER TABLE studios ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'independent' CHECK (account_type IN ('independent', 'studio'))`);
+  await safeExec('ALTER TABLE studios account_type', `ALTER TABLE studios ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'independent' CHECK (account_type IN ('independent', 'studio'))`);
 
   // 2. Users
-  await pool.query(`CREATE TABLE IF NOT EXISTS users (
+  await safeExec('CREATE TABLE users', `CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
@@ -1556,20 +1625,20 @@ async function ensureAuthSchema() {
     is_superadmin BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT FALSE');
+  await safeExec('ALTER TABLE users is_superadmin', `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT FALSE`);
 
   // 3. Sessions
-  await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
+  await safeExec('CREATE TABLE sessions', `CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     active_studio_id INTEGER REFERENCES studios(id) ON DELETE SET NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
-  await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS active_studio_id INTEGER REFERENCES studios(id) ON DELETE SET NULL`);
+  await safeExec('ALTER TABLE sessions active_studio_id', `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS active_studio_id INTEGER REFERENCES studios(id) ON DELETE SET NULL`);
 
   // 4. Studio Memberships
-  await pool.query(`CREATE TABLE IF NOT EXISTS studio_memberships (
+  await safeExec('CREATE TABLE studio_memberships', `CREATE TABLE IF NOT EXISTS studio_memberships (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
@@ -1579,11 +1648,11 @@ async function ensureAuthSchema() {
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, studio_id)
   )`);
-  await pool.query(`ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-  await pool.query(`ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS commission_percent NUMERIC(5, 2) NOT NULL DEFAULT 70.00`);
+  await safeExec('ALTER TABLE studio_memberships created_at', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await safeExec('ALTER TABLE studio_memberships commission_percent', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS commission_percent NUMERIC(5, 2) NOT NULL DEFAULT 70.00`);
 
   // 5. Spaces / Boxes
-  await pool.query(`CREATE TABLE IF NOT EXISTS spaces (
+  await safeExec('CREATE TABLE spaces', `CREATE TABLE IF NOT EXISTS spaces (
     id SERIAL PRIMARY KEY,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -1595,7 +1664,7 @@ async function ensureAuthSchema() {
   )`);
 
   // 6. Guest Spots
-  await pool.query(`CREATE TABLE IF NOT EXISTS guest_spot_requests (
+  await safeExec('CREATE TABLE guest_spot_requests', `CREATE TABLE IF NOT EXISTS guest_spot_requests (
     id SERIAL PRIMARY KEY,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
     artist_name TEXT NOT NULL,
@@ -1610,7 +1679,7 @@ async function ensureAuthSchema() {
   )`);
 
   // 7. Commitment Categories
-  await pool.query(`CREATE TABLE IF NOT EXISTS commitment_categories (
+  await safeExec('CREATE TABLE commitment_categories', `CREATE TABLE IF NOT EXISTS commitment_categories (
     id SERIAL PRIMARY KEY,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -1624,7 +1693,7 @@ async function ensureAuthSchema() {
   )`);
 
   // 8. Clients
-  await pool.query(`CREATE TABLE IF NOT EXISTS clients (
+  await safeExec('CREATE TABLE clients', `CREATE TABLE IF NOT EXISTS clients (
     id SERIAL PRIMARY KEY,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -1635,7 +1704,7 @@ async function ensureAuthSchema() {
   )`);
 
   // 9. Appointments
-  await pool.query(`CREATE TABLE IF NOT EXISTS appointments (
+  await safeExec('CREATE TABLE appointments', `CREATE TABLE IF NOT EXISTS appointments (
     id SERIAL PRIMARY KEY,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
     category_id INTEGER REFERENCES commitment_categories(id) ON DELETE SET NULL,
@@ -1651,14 +1720,14 @@ async function ensureAuthSchema() {
     deposit NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (deposit >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
-  await pool.query(`ALTER TABLE appointments ALTER COLUMN client_id DROP NOT NULL`);
-  await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES commitment_categories(id) ON DELETE SET NULL`);
-  await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''`);
-  await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS artist_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
-  await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS space_id INTEGER REFERENCES spaces(id) ON DELETE SET NULL`);
+  await safeExec('ALTER TABLE appointments client_id DROP NOT NULL', `ALTER TABLE appointments ALTER COLUMN client_id DROP NOT NULL`);
+  await safeExec('ALTER TABLE appointments category_id', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES commitment_categories(id) ON DELETE SET NULL`);
+  await safeExec('ALTER TABLE appointments notes', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''`);
+  await safeExec('ALTER TABLE appointments artist_id', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS artist_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+  await safeExec('ALTER TABLE appointments space_id', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS space_id INTEGER REFERENCES spaces(id) ON DELETE SET NULL`);
 
   // 10. Transactions
-  await pool.query(`CREATE TABLE IF NOT EXISTS transactions (
+  await safeExec('CREATE TABLE transactions', `CREATE TABLE IF NOT EXISTS transactions (
     id SERIAL PRIMARY KEY,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
     kind TEXT NOT NULL CHECK (kind IN ('income', 'expense')),
@@ -1668,10 +1737,10 @@ async function ensureAuthSchema() {
     artist_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
-  await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS artist_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+  await safeExec('ALTER TABLE transactions artist_id', `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS artist_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
 
   // 11. User Portfolios
-  await pool.query(`CREATE TABLE IF NOT EXISTS user_portfolios (
+  await safeExec('CREATE TABLE user_portfolios', `CREATE TABLE IF NOT EXISTS user_portfolios (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     handle TEXT NOT NULL UNIQUE,
@@ -1692,7 +1761,7 @@ async function ensureAuthSchema() {
   )`);
 
   // 12. Portfolio Gallery Items
-  await pool.query(`CREATE TABLE IF NOT EXISTS portfolio_gallery_items (
+  await safeExec('CREATE TABLE portfolio_gallery_items', `CREATE TABLE IF NOT EXISTS portfolio_gallery_items (
     id SERIAL PRIMARY KEY,
     portfolio_id INTEGER NOT NULL REFERENCES user_portfolios(id) ON DELETE CASCADE,
     image_url TEXT NOT NULL,
@@ -1778,6 +1847,12 @@ async function ensureAuthSchema() {
 
 app.use((_request, response) => {
   response.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+
+// Global error handler middleware
+app.use((err, _request, response, _next) => {
+  console.error('[SERVER UNCAUGHT ERROR]', err);
+  response.status(err.status || 500).json({ error: err.message || 'Error interno del servidor' });
 });
 
 // Start web server immediately on 0.0.0.0 to satisfy Railway healthchecks
