@@ -1311,6 +1311,7 @@ async function ensureAuthSchema() {
   } catch (seedErr) {
     console.warn('Warning seeding categories:', seedErr.message);
   }
+}
 
 app.use((_request, response) => {
   response.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
