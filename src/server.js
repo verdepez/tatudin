@@ -11,7 +11,14 @@ const port = Number(process.env.PORT || 3000);
 const databaseUrl = process.env.DATABASE_URL;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const pool = databaseUrl ? new Pool({ connectionString: databaseUrl, options: '-c timezone=America/Santiago' }) : null;
+const isLocalDb = !databaseUrl || databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1') || databaseUrl.includes('@db:') || databaseUrl.includes('@postgres:');
+const pool = databaseUrl
+  ? new Pool({
+      connectionString: databaseUrl,
+      options: '-c timezone=America/Santiago',
+      ssl: isLocalDb ? false : { rejectUnauthorized: false }
+    })
+  : null;
 const scrypt = promisify(crypto.scrypt);
 const sessionDuration = 1000 * 60 * 60 * 24 * 14;
 
