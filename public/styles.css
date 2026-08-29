@@ -3652,4 +3652,344 @@ textarea {
   }
 }
 
+/* ==========================================================================
+   Términos y Condiciones / Política de Privacidad (Legal Landing)
+   ========================================================================== */
+
+.terms-page-container {
+  width: min(100%, 820px);
+  margin: 0 auto;
+  padding: 16px 0 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: authFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.terms-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--ink);
+  color: #ffffff;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px rgba(9, 4, 28, 0.15);
+}
+
+.terms-back-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.terms-back-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateX(-2px);
+}
+
+.terms-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.terms-brand strong {
+  font-size: 18px;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+}
+
+.terms-pill {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(255, 53, 82, 0.2);
+  color: #ffdad9;
+  border: 1px solid rgba(255, 53, 82, 0.4);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.terms-card-content {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-xl);
+  padding: clamp(20px, 3vw, 36px);
+  box-shadow: 0 4px 20px rgba(34, 28, 53, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.terms-title-block {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 20px;
+}
+
+.terms-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--red);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.terms-title-block h1 {
+  font-size: clamp(22px, 2.5vw, 30px);
+  line-height: 1.2;
+  margin: 0 0 8px 0;
+  color: var(--ink);
+  letter-spacing: -0.03em;
+}
+
+.terms-subtitle {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 14px 0;
+}
+
+.terms-meta-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface-low);
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line-soft);
+}
+
+.terms-intro-box {
+  background: var(--soft-purple);
+  border-left: 4px solid var(--ink);
+  padding: 14px 18px;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.terms-intro-box p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.terms-grid-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.terms-section-card {
+  display: flex;
+  gap: 16px;
+  padding: 16px 18px;
+  background: var(--surface-low);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.terms-section-card:hover {
+  border-color: var(--line);
+}
+
+.terms-section-card.highlight-card {
+  background: #ffffff;
+  border: 1.5px solid var(--ink);
+  box-shadow: 0 4px 16px rgba(9, 4, 28, 0.05);
+}
+
+.terms-num {
+  width: 32px;
+  height: 32px;
+  background: var(--ink);
+  color: #ffffff;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.terms-body {
+  flex: 1;
+}
+
+.terms-body h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.terms-body p, .terms-body li {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-surface);
+  margin: 0 0 6px 0;
+}
+
+.terms-body ul {
+  margin: 8px 0 0 0;
+  padding-left: 18px;
+}
+
+.terms-points {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.terms-point-item {
+  display: flex;
+  gap: 12px;
+  background: var(--surface-low);
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line-soft);
+}
+
+.point-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.terms-point-item strong {
+  display: block;
+  font-size: 13.5px;
+  color: var(--ink);
+  margin-bottom: 3px;
+}
+
+.terms-point-item p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.arco-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin: 12px 0 10px 0;
+}
+
+.arco-pill {
+  background: var(--surface-low);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line-soft);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.arco-contact {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 8px;
+}
+
+.arco-contact a, .terms-body a {
+  color: var(--red);
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+.terms-footer-action {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+/* Legal summary card in Settings */
+.legal-summary-card {
+  padding: 16px;
+  background: var(--surface-low);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.legal-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.legal-badge {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.legal-lead {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin: 0;
+}
+
+.sidebar-legal-footer {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-legal-link {
+  background: transparent;
+  border: none;
+  color: var(--muted-light);
+  font-size: 11.5px;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-legal-link:hover {
+  color: #ffffff;
+}
+
+.text-link-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  font-size: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.text-link-btn:hover {
+  color: var(--red);
+}
+
+
 

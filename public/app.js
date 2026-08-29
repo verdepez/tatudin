@@ -182,7 +182,7 @@ function renderOnboarding(step = 0, authMode = 'register') {
           <button class="primary" data-onboarding-step="1" data-auth-mode="register">Crear cuenta con email</button>
           <button class="secondary" data-onboarding-step="1" data-auth-mode="login">Iniciar sesión con tu cuenta</button>
         </div>
-        <p class="terms">Al continuar aceptas los Términos y la Política de Privacidad.</p>
+        <p class="terms">Al continuar aceptas los <button type="button" class="text-link-btn" data-action="open-terms" data-from-step="0" data-auth-mode="${authMode}">Términos y la Política de Privacidad</button>.</p>
       </section>
     `;
     return;
@@ -220,6 +220,7 @@ function renderOnboarding(step = 0, authMode = 'register') {
             </div>
           </form>
         `}
+        <p class="terms" style="margin-top: 14px; text-align: center;">Plataforma profesional regulada por la <button type="button" class="text-link-btn" data-action="open-terms" data-from-step="1" data-auth-mode="${authMode}">Ley N° 19.628 de Protección de la Vida Privada</button>.</p>
       </section>
     `;
     return;
@@ -458,7 +459,10 @@ function emptyState(title, text) {
   return `<div class="empty"><h3>${title}</h3><p>${text}</p></div>`;
 }
 
+let currentAppView = 'dashboard';
+
 async function render(view = 'dashboard') {
+  currentAppView = view;
   document.querySelectorAll('[data-view]').forEach((link) => {
     link.classList.toggle('active', link.dataset.view === view);
   });
@@ -469,6 +473,7 @@ async function render(view = 'dashboard') {
     if (view === 'finanzas') return await renderFinances();
     if (view === 'ajustes') return await renderSettings();
     if (view === 'portafolio') return await renderPortfolio();
+    if (view === 'terminos') return renderTermsAndConditions(false);
 
     const data = await api('/api/dashboard');
     activeStudio = data.studio || activeStudio;
@@ -1166,7 +1171,211 @@ async function renderSettings() {
           <p class="form-error"></p>
         </form>
       </section>
+
+      <!-- Legal & Privacy Policy Panel for Platform Users -->
+      <section class="panel legal-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">MARCO LEGAL & PRIVACIDAD</p>
+            <h2>Términos de Uso y Tratamiento de Datos</h2>
+          </div>
+          <button class="secondary small-btn" data-action="open-terms">
+            ${icon('eye')} <span>Ver Documento Completo</span>
+          </button>
+        </div>
+        <div class="legal-summary-card">
+          <div class="legal-badges">
+            <span class="legal-badge">🇨🇱 Ley N° 19.628 Chile</span>
+            <span class="legal-badge">🔒 Cero Remarketing</span>
+            <span class="legal-badge">🛡️ Derechos ARCO Garantizados</span>
+            <span class="legal-badge">✉️ soyelroot@tatudin.cl</span>
+          </div>
+          <p class="legal-lead">Tatudin protege estrictamente la confidencialidad de los profesionales y sus agendas. Los datos jamás son comercializados ni usados con fines publicitarios.</p>
+          <button type="button" class="text-button" data-action="open-terms" style="color: var(--red); font-weight: 700; align-self: flex-start; margin-top: 4px;">
+            Leer Términos y Condiciones y Política de Privacidad →
+          </button>
+        </div>
+      </section>
     </div>
+  `;
+}
+
+// ---------------- TERMS & CONDITIONS LEGAL LANDING ----------------
+let termsReturnState = { fromOnboarding: false, step: 0, authMode: 'login', prevView: 'dashboard' };
+
+function renderTermsAndConditions(fromOnboarding = false, step = 0, authMode = 'login') {
+  termsReturnState = {
+    fromOnboarding,
+    step,
+    authMode,
+    prevView: currentAppView || 'dashboard'
+  };
+
+  closeModal();
+  document.body.classList.toggle('onboarding-mode', fromOnboarding);
+  const ws = document.querySelector('#workspace');
+  if (ws) ws.style.display = 'flex';
+  hideSplash();
+
+  app.innerHTML = `
+    <section class="terms-page-container">
+      <div class="terms-header-bar">
+        <button type="button" class="terms-back-btn" data-action="${fromOnboarding ? 'terms-back-onboarding' : 'terms-back-dashboard'}">
+          ← ${fromOnboarding ? 'Volver al acceso' : 'Volver a mi espacio'}
+        </button>
+        <div class="terms-brand">
+          <span class="brand-mark small">t</span>
+          <strong>tatudin</strong>
+        </div>
+        <span class="terms-pill">Ley N° 19.628 Chile</span>
+      </div>
+
+      <article class="terms-card-content">
+        <div class="terms-title-block">
+          <span class="terms-kicker">DOCUMENTO LEGAL Y DE PRIVACIDAD</span>
+          <h1>Términos y Condiciones de Uso y Política de Privacidad</h1>
+          <p class="terms-subtitle">Aplicación "Tatudin" · Gestión, organización y agendamiento de citas y consultas</p>
+          <div class="terms-meta-strip">
+            <span>📅 Última actualización: Agosto de 2026</span>
+            <span>⚖️ Jurisdicción: República de Chile</span>
+            <span>📬 Contacto: <a href="mailto:soyelroot@tatudin.cl">soyelroot@tatudin.cl</a></span>
+          </div>
+        </div>
+
+        <div class="terms-intro-box">
+          <p>El presente documento establece los Términos y Condiciones de Uso y las Políticas de Privacidad de la aplicación <strong>Tatudin</strong> (en adelante, la "Aplicación" o "Tatudin"). Al descargar, instalar, acceder o utilizar la Aplicación, usted (en adelante, el "Usuario") acepta de manera expresa, informada e inequívoca todos los términos aquí contenidos. Si no está de acuerdo con estas condiciones, deberá abstenerse de utilizar la Aplicación. El tratamiento de datos personales realizado por Tatudin se rige estrictamente por la <strong>Ley N° 19.628 sobre Protección de la Vida Privada</strong> de la República de Chile.</p>
+        </div>
+
+        <div class="terms-grid-sections">
+          <!-- 1 -->
+          <div class="terms-section-card">
+            <div class="terms-num">1</div>
+            <div class="terms-body">
+              <h3>1. Información General y Contacto</h3>
+              <ul>
+                <li><strong>Nombre de la plataforma:</strong> Tatudin</li>
+                <li><strong>Finalidad:</strong> Gestión, organización y agendamiento de citas y consultas.</li>
+                <li><strong>Administrador del sitio:</strong> Administrador General Tatudin</li>
+                <li><strong>Correo electrónico de contacto y ejercicio de derechos:</strong> <a href="mailto:soyelroot@tatudin.cl">soyelroot@tatudin.cl</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 2 -->
+          <div class="terms-section-card">
+            <div class="terms-num">2</div>
+            <div class="terms-body">
+              <h3>2. Objeto del Servicio</h3>
+              <p>Tatudin es una herramienta tecnológica cuyo objeto exclusivo es <strong>facilitar la gestión de agendas, la programación de citas y la administración operativa de consultas</strong> entre proveedores de servicios/profesionales y sus respectivos clientes. La Aplicación actúa únicamente como un facilitador de la organización del tiempo y canales de comunicación operativa.</p>
+            </div>
+          </div>
+
+          <!-- 3 -->
+          <div class="terms-section-card highlight-card">
+            <div class="terms-num">3</div>
+            <div class="terms-body">
+              <h3>3. Principio de Finalidad y Limitación en el Tratamiento de Datos</h3>
+              <p>En estricto cumplimiento de la legislación chilena, Tatudin adopta un compromiso de máxima transparencia respecto al uso de la información:</p>
+              <div class="terms-points">
+                <div class="terms-point-item">
+                  <span class="point-icon">🛡️</span>
+                  <div>
+                    <strong>Exclusividad Operativa</strong>
+                    <p>Los datos personales proporcionados por los Usuarios (como nombres, correos electrónicos, números de teléfono y registros de agenda) se utilizarán <strong>únicamente para la correcta prestación del servicio solicitado</strong> (envío de confirmaciones, recordatorios de citas, soporte técnico y gestión de la agenda).</p>
+                  </div>
+                </div>
+                <div class="terms-point-item">
+                  <span class="point-icon">🚫</span>
+                  <div>
+                    <strong>Prohibición Absoluta de Publicidad y Remarketing</strong>
+                    <p>Tatudin <strong>no utilizará</strong> los datos personales de sus Usuarios para el envío de comunicaciones comerciales ajenas, ni campañas de marketing publicitario. Queda estrictamente prohibida la venta, cesión, transferencia o comunicación de datos a terceras empresas con fines de reorientación publicitaria (<em>remarketing</em>), perfiles comerciales o explotación publicitaria.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4 -->
+          <div class="terms-section-card">
+            <div class="terms-num">4</div>
+            <div class="terms-body">
+              <h3>4. Información Inferida, Datos Agregados y Mejora Continua</h3>
+              <p>El Usuario autoriza expresamente a Tatudin para recopilar y procesar <strong>información inferida, datos estadísticos y metadatos agregados</strong> derivados del uso de la Aplicación (tasas de uso del sistema, horarios de mayor concurrencia, tiempos de respuesta de la interfaz o reportes de errores técnicos):</p>
+              <ul>
+                <li><strong>Anonimización estricta:</strong> Dicha información técnica se procesará siempre de forma <strong>disociada y anónima</strong>, de manera que no sea posible vincularla a un Usuario identificado o identificable.</li>
+                <li><strong>Propósito:</strong> El tratamiento de estos datos inferidos tiene como único fin la <strong>mejora continua del desarrollo técnico, optimización de la experiencia de usuario (UX), estabilidad del sistema y diseño de nuevas funcionalidades</strong>.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 5 -->
+          <div class="terms-section-card highlight-card">
+            <div class="terms-num">5</div>
+            <div class="terms-body">
+              <h3>5. Derechos ARCO (Acceso, Rectificación, Cancelación y Oposición)</h3>
+              <p>De acuerdo con la Ley N° 19.628, el Usuario conserva en todo momento la propiedad de sus datos personales y puede ejercer de forma gratuita sus derechos <strong>ARCO</strong>:</p>
+              <div class="arco-grid">
+                <div class="arco-pill"><strong>🔍 Acceso:</strong> Solicitar información sobre qué datos personales se mantienen en los registros.</div>
+                <div class="arco-pill"><strong>✏️ Rectificación:</strong> Modificar o corregir datos que sean erróneos, inexactos, equívocos o incompletos.</div>
+                <div class="arco-pill"><strong>🗑️ Cancelación:</strong> Solicitar la eliminación de sus datos cuando su almacenamiento carezca de fundamento legal o hayan caducado.</div>
+                <div class="arco-pill"><strong>✋ Oposición:</strong> Oponerse al uso de sus datos para fines específicos que no sean los estrictamente necesarios.</div>
+              </div>
+              <p class="arco-contact">Para ejercer cualquiera de estos derechos, el Usuario debe enviar una solicitud formal por escrito al correo: <a href="mailto:soyelroot@tatudin.cl">soyelroot@tatudin.cl</a></p>
+            </div>
+          </div>
+
+          <!-- 6 -->
+          <div class="terms-section-card">
+            <div class="terms-num">6</div>
+            <div class="terms-body">
+              <h3>6. Medidas de Seguridad y Resguardos para su Publicación</h3>
+              <p>Tatudin adopta las medidas técnicas, organizativas y de seguridad necesarias para garantizar la integridad, disponibilidad y confidencialidad de los datos personales, evitando su alteración, pérdida o acceso no autorizado.</p>
+              <ul>
+                <li>Los datos se transmiten mediante canales cifrados con TLS/HTTPS y se almacenan en entornos servidores seguros.</li>
+                <li><strong>Nota de Responsabilidad:</strong> El Usuario es el único responsable de mantener la estricta confidencialidad de sus credenciales de acceso (usuario y contraseña), eximiendo a Tatudin de responsabilidades por accesos indebidos causados por negligencia del propio Usuario.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 7 -->
+          <div class="terms-section-card">
+            <div class="terms-num">7</div>
+            <div class="terms-body">
+              <h3>7. Limitación de Responsabilidad</h3>
+              <p>Tatudin provee la plataforma "tal como está" y no se responsabiliza por:</p>
+              <ul>
+                <li>Interrupciones temporales del servicio derivadas de labores de mantenimiento técnico, fallas de conectividad externas o casos de fuerza mayor.</li>
+                <li>Los acuerdos, transacciones, cancelaciones, contenidos de las consultas o cualquier tipo de relación contractual o extracontractual que ocurra entre los profesionales y sus clientes finales.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 8 -->
+          <div class="terms-section-card">
+            <div class="terms-num">8</div>
+            <div class="terms-body">
+              <h3>8. Modificaciones a los Términos</h3>
+              <p>El administrador de Tatudin se reserva el derecho de actualizar o modificar estos Términos y Condiciones cuando sea necesario por cambios legales o técnicos. Cualquier modificación sustancial será informada oportunamente a los Usuarios mediante la Aplicación o al correo registrado. El uso de la Aplicación posterior a la notificación se entenderá como aceptación de las modificaciones.</p>
+            </div>
+          </div>
+
+          <!-- 9 -->
+          <div class="terms-section-card">
+            <div class="terms-num">9</div>
+            <div class="terms-body">
+              <h3>9. Legislación Aplicable y Jurisdicción</h3>
+              <p>Estos Términos y Condiciones se rigen e interpretan en su totalidad por las <strong>leyes de la República de Chile</strong>. Cualquier controversia derivada del uso de la Aplicación o de la interpretación de este documento será sometida a la jurisdicción de los Tribunales Ordinarios de Justicia de Santiago de Chile.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="terms-footer-action">
+          <button type="button" class="primary" data-action="${fromOnboarding ? 'terms-back-onboarding' : 'terms-back-dashboard'}">
+            ← ${fromOnboarding ? 'Volver al acceso' : 'Regresar a mi espacio'}
+          </button>
+        </div>
+      </article>
+    </section>
   `;
 }
 
@@ -2240,6 +2449,26 @@ document.addEventListener('click', async (event) => {
   if (event.target.closest('[data-action="open-user-profile"]') || event.target.closest('[data-action="user-profile"]')) {
     if (userMenu) userMenu.hidden = true;
     return userProfileModal();
+  }
+
+  // Open Terms & Conditions Legal Landing
+  const termsBtn = event.target.closest('[data-action="open-terms"]');
+  if (termsBtn) {
+    if (userMenu) userMenu.hidden = true;
+    const isOb = document.body.classList.contains('onboarding-mode');
+    const step = Number(termsBtn.dataset.fromStep || 0);
+    const authMode = termsBtn.dataset.authMode || 'login';
+    return renderTermsAndConditions(isOb, step, authMode);
+  }
+
+  // Back from terms in onboarding mode
+  if (event.target.closest('[data-action="terms-back-onboarding"]')) {
+    return renderOnboarding(termsReturnState.step || 0, termsReturnState.authMode || 'login');
+  }
+
+  // Back from terms in workspace mode
+  if (event.target.closest('[data-action="terms-back-dashboard"]')) {
+    return render(termsReturnState.prevView || 'ajustes');
   }
 
   // Close user dropdown if clicking outside
