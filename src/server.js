@@ -435,78 +435,36 @@ app.post('/api/backoffice/purge-production', requireSuperAdmin, async (request, 
 
 // ---------------- AUTH & MULTI-STUDIO ----------------
 app.post('/api/auth/register', async (request, response) => {
-  if (!pool) return response.status(503).json({ error: 'Base de datos no disponible' });
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
   const { fullName, email, password, studioName, accountType = 'independent' } = request.body;
-  if (!fullName?.trim() || !email?.trim() || !password) {
-    return response.status(400).json({ error: 'Nombre, email y contraseña son obligatorios' });
+  if (!fullName?.trim() || !email?.trim() || !password || !studioName?.trim()) {
+    return response.status(400).json({ error: 'Nombre, email, contraseña y estudio son obligatorios' });
   }
   if (password.length < 8) return response.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
-  
-  const cleanEmail = email.trim().toLowerCase();
-  const validStudioName = (studioName && studioName.trim()) || `Estudio de ${fullName.trim()}`;
-  const validAccountType = accountType === 'studio' ? 'studio' : 'independent';
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const existing = await client.query('SELECT id FROM users WHERE email = $1', [cleanEmail]);
-    if (existing.rowCount) {
-      await client.query('ROLLBACK');
-      return response.status(409).json({ error: 'Ese email ya está registrado' });
-    }
-
-    const hashed = await hashPassword(password);
-    const userRes = await client.query(
-      'INSERT INTO users (email, password_hash, full_name, is_superadmin) VALUES ($1, $2, $3, FALSE) RETURNING id, email, full_name',
-      [cleanEmail, hashed, fullName.trim()]
-    );
-    const user = userRes.rows[0];
-
-    const studioRes = await client.query(
-      'INSERT INTO studios (name, account_type) VALUES ($1, $2) RETURNING id, name, account_type',
-      [validStudioName, validAccountType]
-    );
-    const studio = studioRes.rows[0];
-
-    await client.query(
-      "INSERT INTO studio_memberships (user_id, studio_id, role, commission_percent, status) VALUES ($1, $2, 'owner', 100.00, 'active')",
-      [user.id, studio.id]
-    );
+    const user = await client.query('INSERT INTO users (email, password_hash, full_name) VALUES (LOWER($1), $2, $3) RETURNING id, email, full_name', [email.trim(), await hashPassword(password), fullName.trim()]);
+    const validAccountType = accountType === 'studio' ? 'studio' : 'independent';
+    const studio = await client.query('INSERT INTO studios (name, account_type) VALUES ($1, $2) RETURNING id, name, account_type', [studioName.trim(), validAccountType]);
+    await client.query('INSERT INTO studio_memberships (user_id, studio_id, role) VALUES ($1, $2, $3)', [user.rows[0].id, studio.rows[0].id, 'owner']);
     
     // Seed default space
-    await client.query(
-      'INSERT INTO spaces (studio_id, name, description, price_per_day, price_per_hour) VALUES ($1, $2, $3, $4, $5)',
-      [studio.id, 'Box Principal', 'Puesto de trabajo completamente equipado', 45000, 10000]
-    ).catch(() => {});
+    await client.query('INSERT INTO spaces (studio_id, name, description, price_per_day, price_per_hour) VALUES ($1, $2, $3, $4, $5)', [studio.rows[0].id, 'Box Principal', 'Puesto de trabajo completamente equipado', 45000, 10000]);
 
     // Seed default categories
-    await seedDefaultCategories(client, studio.id, validAccountType).catch(() => {});
+    await seedDefaultCategories(client, studio.rows[0].id, validAccountType);
 
     const sessionId = crypto.randomBytes(32).toString('hex');
-    await client.query(
-      "INSERT INTO sessions (id, user_id, active_studio_id, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '14 days')",
-      [sessionId, user.id, studio.id]
-    ).catch(async () => {
-      await client.query(
-        "INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL '14 days')",
-        [sessionId, user.id]
-      );
-    });
-
+    await client.query('INSERT INTO sessions (id, user_id, active_studio_id, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL \'14 days\')', [sessionId, user.rows[0].id, studio.rows[0].id]);
     await client.query('COMMIT');
     setSessionCookie(response, sessionId);
-    return response.status(201).json({
-      user: { ...user, studio_id: studio.id, isSuperAdmin: false },
-      studio
-    });
+    return response.status(201).json({ user: { ...user.rows[0], studio_id: studio.rows[0].id }, studio: studio.rows[0] });
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    console.error('[AUTH] Register error:', error);
+    await client.query('ROLLBACK');
     if (error.code === '23505') return response.status(409).json({ error: 'Ese email ya está registrado' });
-    return response.status(500).json({ error: error.message || 'Error al registrar el usuario' });
-  } finally {
-    client.release();
-  }
+    return response.status(500).json({ error: error.message });
+  } finally { client.release(); }
 });
 
 app.post('/api/auth/login', async (request, response) => {
@@ -1589,7 +1547,6 @@ async function ensureAuthSchema() {
       const errStr = String(connErr?.message || connErr?.code || connErr);
       console.log(`[DB] Waiting for database (attempt ${attempt}/12): ${errStr}`);
       
-      // If error is related to SSL protocol or unsupported SSL, switch pool to non-SSL
       if (errStr.toLowerCase().includes('ssl') || errStr.toLowerCase().includes('protocol') || errStr.toLowerCase().includes('handshake')) {
         console.log('[DB] Switching connection to non-SSL mode...');
         try { await pool.end(); } catch {}
@@ -1773,18 +1730,14 @@ async function ensureAuthSchema() {
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
 
-  // Seed default categories for existing studios
+  // Seed default categories
   try {
     const allStudios = await pool.query('SELECT id, account_type FROM studios');
     for (const st of allStudios.rows) {
       await seedDefaultCategories(pool, st.id, st.account_type || 'independent');
-      const defCat = await pool.query(`SELECT id FROM commitment_categories WHERE studio_id = $1 AND kind = 'tattoo' LIMIT 1`, [st.id]);
-      if (defCat.rowCount) {
-        await pool.query(`UPDATE appointments SET category_id = $1 WHERE studio_id = $2 AND category_id IS NULL`, [defCat.rows[0].id, st.id]);
-      }
     }
   } catch (seedErr) {
-    console.warn('Warning seeding categories:', seedErr.message);
+    console.warn('[DB Migration] Categories seed warning:', seedErr.message);
   }
 
   // Ensure Master Superadmin soyelroot@tatudin.cl exists with active studio
