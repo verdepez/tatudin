@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { seedStudioData } from './seed_studio.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const { Pool } = pg;
 const app = express();
 const port = Number(process.env.PORT || 3000);
