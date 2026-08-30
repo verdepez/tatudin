@@ -824,8 +824,41 @@ app.get('/api/onboarding', async (_request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
     const result = await pool.query('SELECT * FROM onboarding_profiles WHERE id = 1');
+    if (!result.rowCount) {
+      const init = await pool.query('INSERT INTO onboarding_profiles (id) VALUES (1) ON CONFLICT (id) DO UPDATE SET updated_at = NOW() RETURNING *');
+      return response.json(init.rows[0] || {});
+    }
     return response.json(result.rows[0]);
-  } catch (error) { return response.status(500).json({ error: error.message }); }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      try {
+        await pool.query(`CREATE TABLE IF NOT EXISTS onboarding_profiles (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          role TEXT CHECK (role IN ('independent', 'studio_owner', 'apprentice')),
+          full_name TEXT NOT NULL DEFAULT '',
+          email TEXT NOT NULL DEFAULT '',
+          professional_name TEXT NOT NULL DEFAULT '',
+          specialization TEXT NOT NULL DEFAULT '',
+          bio TEXT NOT NULL DEFAULT '',
+          studio_name TEXT NOT NULL DEFAULT '',
+          artist_count INTEGER,
+          business_type TEXT,
+          has_manager BOOLEAN NOT NULL DEFAULT FALSE,
+          manager_name TEXT NOT NULL DEFAULT '',
+          studio_location TEXT NOT NULL DEFAULT '',
+          acquisition_source TEXT NOT NULL DEFAULT '',
+          goals JSONB NOT NULL DEFAULT '[]'::jsonb,
+          completed BOOLEAN NOT NULL DEFAULT FALSE,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        const init = await pool.query('INSERT INTO onboarding_profiles (id) VALUES (1) ON CONFLICT (id) DO UPDATE SET updated_at = NOW() RETURNING *');
+        return response.json(init.rows[0] || {});
+      } catch (innerErr) {
+        return response.status(500).json({ error: innerErr.message });
+      }
+    }
+    return response.status(500).json({ error: error.message });
+  }
 });
 
 app.put('/api/onboarding', async (request, response) => {
@@ -833,15 +866,62 @@ app.put('/api/onboarding', async (request, response) => {
   const fields = ['role', 'fullName', 'email', 'professionalName', 'specialization', 'bio', 'studioName', 'artistCount', 'businessType', 'hasManager', 'managerName', 'studioLocation', 'acquisitionSource', 'goals', 'completed'];
   const values = fields.map((field) => request.body[field] ?? null);
   try {
-    const result = await pool.query(`UPDATE onboarding_profiles SET
+    let result = await pool.query(`UPDATE onboarding_profiles SET
       role = COALESCE($1, role), full_name = COALESCE($2, full_name), email = COALESCE($3, email),
       professional_name = COALESCE($4, professional_name), specialization = COALESCE($5, specialization), bio = COALESCE($6, bio),
       studio_name = COALESCE($7, studio_name), artist_count = COALESCE($8, artist_count), business_type = COALESCE($9, business_type),
       has_manager = COALESCE($10, has_manager), manager_name = COALESCE($11, manager_name), studio_location = COALESCE($12, studio_location),
       acquisition_source = COALESCE($13, acquisition_source), goals = COALESCE($14::jsonb, goals), completed = COALESCE($15, completed), updated_at = NOW()
       WHERE id = 1 RETURNING *`, [values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7] ? Number(values[7]) : null, values[8], values[9], values[10], values[11], values[12], values[13] ? JSON.stringify(values[13]) : null, values[14]]);
-    return response.json(result.rows[0]);
-  } catch (error) { return response.status(500).json({ error: error.message }); }
+    
+    if (!result.rowCount) {
+      await pool.query('INSERT INTO onboarding_profiles (id) VALUES (1) ON CONFLICT (id) DO NOTHING');
+      result = await pool.query(`UPDATE onboarding_profiles SET
+        role = COALESCE($1, role), full_name = COALESCE($2, full_name), email = COALESCE($3, email),
+        professional_name = COALESCE($4, professional_name), specialization = COALESCE($5, specialization), bio = COALESCE($6, bio),
+        studio_name = COALESCE($7, studio_name), artist_count = COALESCE($8, artist_count), business_type = COALESCE($9, business_type),
+        has_manager = COALESCE($10, has_manager), manager_name = COALESCE($11, manager_name), studio_location = COALESCE($12, studio_location),
+        acquisition_source = COALESCE($13, acquisition_source), goals = COALESCE($14::jsonb, goals), completed = COALESCE($15, completed), updated_at = NOW()
+        WHERE id = 1 RETURNING *`, [values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7] ? Number(values[7]) : null, values[8], values[9], values[10], values[11], values[12], values[13] ? JSON.stringify(values[13]) : null, values[14]]);
+    }
+    return response.json(result.rows[0] || {});
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      try {
+        await pool.query(`CREATE TABLE IF NOT EXISTS onboarding_profiles (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          role TEXT CHECK (role IN ('independent', 'studio_owner', 'apprentice')),
+          full_name TEXT NOT NULL DEFAULT '',
+          email TEXT NOT NULL DEFAULT '',
+          professional_name TEXT NOT NULL DEFAULT '',
+          specialization TEXT NOT NULL DEFAULT '',
+          bio TEXT NOT NULL DEFAULT '',
+          studio_name TEXT NOT NULL DEFAULT '',
+          artist_count INTEGER,
+          business_type TEXT,
+          has_manager BOOLEAN NOT NULL DEFAULT FALSE,
+          manager_name TEXT NOT NULL DEFAULT '',
+          studio_location TEXT NOT NULL DEFAULT '',
+          acquisition_source TEXT NOT NULL DEFAULT '',
+          goals JSONB NOT NULL DEFAULT '[]'::jsonb,
+          completed BOOLEAN NOT NULL DEFAULT FALSE,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        await pool.query('INSERT INTO onboarding_profiles (id) VALUES (1) ON CONFLICT (id) DO NOTHING');
+        const retryResult = await pool.query(`UPDATE onboarding_profiles SET
+          role = COALESCE($1, role), full_name = COALESCE($2, full_name), email = COALESCE($3, email),
+          professional_name = COALESCE($4, professional_name), specialization = COALESCE($5, specialization), bio = COALESCE($6, bio),
+          studio_name = COALESCE($7, studio_name), artist_count = COALESCE($8, artist_count), business_type = COALESCE($9, business_type),
+          has_manager = COALESCE($10, has_manager), manager_name = COALESCE($11, manager_name), studio_location = COALESCE($12, studio_location),
+          acquisition_source = COALESCE($13, acquisition_source), goals = COALESCE($14::jsonb, goals), completed = COALESCE($15, completed), updated_at = NOW()
+          WHERE id = 1 RETURNING *`, [values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7] ? Number(values[7]) : null, values[8], values[9], values[10], values[11], values[12], values[13] ? JSON.stringify(values[13]) : null, values[14]]);
+        return response.json(retryResult.rows[0] || {});
+      } catch (innerErr) {
+        return response.status(500).json({ error: innerErr.message });
+      }
+    }
+    return response.status(500).json({ error: error.message });
+  }
 });
 
 async function checkAppointmentConflict(studioId, startsAt, durationMinutes, artistId, spaceId, excludeAppointmentId = null) {
@@ -2306,6 +2386,28 @@ async function ensureAuthSchema() {
     notes TEXT DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+
+  // 15. Onboarding Profiles
+  await safeExec('CREATE TABLE onboarding_profiles', `CREATE TABLE IF NOT EXISTS onboarding_profiles (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    role TEXT CHECK (role IN ('independent', 'studio_owner', 'apprentice')),
+    full_name TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    professional_name TEXT NOT NULL DEFAULT '',
+    specialization TEXT NOT NULL DEFAULT '',
+    bio TEXT NOT NULL DEFAULT '',
+    studio_name TEXT NOT NULL DEFAULT '',
+    artist_count INTEGER,
+    business_type TEXT,
+    has_manager BOOLEAN NOT NULL DEFAULT FALSE,
+    manager_name TEXT NOT NULL DEFAULT '',
+    studio_location TEXT NOT NULL DEFAULT '',
+    acquisition_source TEXT NOT NULL DEFAULT '',
+    goals JSONB NOT NULL DEFAULT '[]'::jsonb,
+    completed BOOLEAN NOT NULL DEFAULT FALSE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  await safeExec('INSERT onboarding_profiles default', `INSERT INTO onboarding_profiles (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
 
   // Seed default categories
   try {

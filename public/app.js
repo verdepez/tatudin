@@ -112,7 +112,9 @@ function saveOnboarding(values) {
   const safeOnboarding = { ...onboarding };
   delete safeOnboarding.password;
   localStorage.setItem('tatudin_onboarding', JSON.stringify(safeOnboarding));
-  return api('/api/onboarding', { method: 'PUT', body: JSON.stringify(safeOnboarding) });
+  return api('/api/onboarding', { method: 'PUT', body: JSON.stringify(safeOnboarding) }).catch((err) => {
+    console.warn('[ONBOARDING SYNC]', err.message || err);
+  });
 }
 
 function onboardingHeader(step, title, description, isLogin = false) {
