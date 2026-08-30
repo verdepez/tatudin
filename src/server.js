@@ -1675,6 +1675,361 @@ app.post('/api/transactions', requireAuth, async (request, response) => {
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
+// ---------------- INVENTORY API ENDPOINTS ----------------
+app.get('/api/inventory', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const studioId = request.studioId;
+  const userId = request.user.id;
+
+  try {
+    // 1. Studio Items (Shared stock owned by studio)
+    const studioItemsRes = await pool.query(`
+      SELECT * FROM inventory_items 
+      WHERE studio_id = $1 AND owner_user_id IS NULL AND is_active = TRUE 
+      ORDER BY category ASC, name ASC
+    `, [studioId]);
+
+    // 2. Personal Items (Stock owned by the current user/artist)
+    const personalItemsRes = await pool.query(`
+      SELECT * FROM inventory_items 
+      WHERE (studio_id = $1 OR studio_id IS NULL) AND owner_user_id = $2 AND is_active = TRUE 
+      ORDER BY category ASC, name ASC
+    `, [studioId, userId]);
+
+    // 3. Studio Members (for transferring or selling items internally)
+    const membersRes = await pool.query(`
+      SELECT u.id, u.full_name, u.email, sm.role, sm.status 
+      FROM studio_memberships sm 
+      JOIN users u ON u.id = sm.user_id 
+      WHERE sm.studio_id = $1 AND sm.status = 'active'
+      ORDER BY u.full_name ASC
+    `, [studioId]);
+
+    // 4. Low stock alerts (items where quantity <= min_stock_alert)
+    const lowStockStudio = studioItemsRes.rows.filter(i => Number(i.quantity) <= Number(i.min_stock_alert));
+    const lowStockPersonal = personalItemsRes.rows.filter(i => Number(i.quantity) <= Number(i.min_stock_alert));
+
+    return response.json({
+      studioItems: studioItemsRes.rows,
+      personalItems: personalItemsRes.rows,
+      members: membersRes.rows,
+      stats: {
+        totalStudioItems: studioItemsRes.rowCount,
+        totalPersonalItems: personalItemsRes.rowCount,
+        lowStockCount: lowStockStudio.length + lowStockPersonal.length,
+        studioValuation: studioItemsRes.rows.reduce((acc, i) => acc + (Number(i.quantity) * Number(i.cost_price || 0)), 0),
+        personalValuation: personalItemsRes.rows.reduce((acc, i) => acc + (Number(i.quantity) * Number(i.cost_price || 0)), 0)
+      }
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/inventory/items', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const {
+    id,
+    name,
+    category = 'needles',
+    unit = 'units',
+    quantity = 0,
+    minStockAlert = 5,
+    costPrice = 0,
+    salePrice = 0,
+    sku = '',
+    isPersonal = false
+  } = request.body;
+
+  if (!name?.trim()) {
+    return response.status(400).json({ error: 'El nombre del insumo es obligatorio' });
+  }
+
+  const studioId = request.studioId;
+  const ownerUserId = isPersonal ? request.user.id : null;
+
+  try {
+    if (id) {
+      // Update existing item
+      const updateRes = await pool.query(`
+        UPDATE inventory_items SET
+          name = $1,
+          category = $2,
+          unit = $3,
+          quantity = $4,
+          min_stock_alert = $5,
+          cost_price = $6,
+          sale_price = $7,
+          sku = $8,
+          updated_at = NOW()
+        WHERE id = $9 AND studio_id = $10 RETURNING *
+      `, [
+        name.trim(),
+        category,
+        unit,
+        Math.max(0, Number(quantity) || 0),
+        Math.max(0, Number(minStockAlert) || 0),
+        Math.max(0, Number(costPrice) || 0),
+        Math.max(0, Number(salePrice) || 0),
+        (sku || '').trim(),
+        id,
+        studioId
+      ]);
+
+      if (!updateRes.rowCount) {
+        return response.status(404).json({ error: 'Insumo no encontrado' });
+      }
+
+      return response.json({ ok: true, item: updateRes.rows[0] });
+    }
+
+    // Insert new item
+    const insRes = await pool.query(`
+      INSERT INTO inventory_items (
+        studio_id, owner_user_id, name, category, unit, quantity, min_stock_alert, cost_price, sale_price, sku
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *
+    `, [
+      studioId,
+      ownerUserId,
+      name.trim(),
+      category,
+      unit,
+      Math.max(0, Number(quantity) || 0),
+      Math.max(0, Number(minStockAlert) || 0),
+      Math.max(0, Number(costPrice) || 0),
+      Math.max(0, Number(salePrice) || 0),
+      (sku || '').trim()
+    ]);
+
+    // Register initial stock movement if quantity > 0
+    if (Number(quantity) > 0) {
+      await pool.query(`
+        INSERT INTO inventory_movements (
+          item_id, studio_id, movement_type, quantity, unit_price, total_amount, from_user_id, notes
+        ) VALUES ($1, $2, 'adjustment', $3, $4, $5, $6, 'Stock inicial registrado')
+      `, [
+        insRes.rows[0].id,
+        studioId,
+        Number(quantity),
+        Number(costPrice) || 0,
+        (Number(quantity) * Number(costPrice || 0)),
+        request.user.id
+      ]);
+    }
+
+    return response.status(201).json({ ok: true, item: insRes.rows[0] });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/inventory/items/:id', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const deleted = await pool.query(`
+      UPDATE inventory_items SET is_active = FALSE, updated_at = NOW() 
+      WHERE id = $1 AND studio_id = $2 RETURNING id
+    `, [request.params.id, request.studioId]);
+
+    if (!deleted.rowCount) return response.status(404).json({ error: 'Insumo no encontrado' });
+    return response.json({ ok: true, id: Number(request.params.id) });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/inventory/movements', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const studioId = request.studioId;
+
+  try {
+    const res = await pool.query(`
+      SELECT 
+        m.*,
+        i.name AS item_name,
+        i.category AS item_category,
+        i.unit AS item_unit,
+        u_from.full_name AS from_user_name,
+        u_to.full_name AS to_user_name,
+        a.title AS appointment_title
+      FROM inventory_movements m
+      JOIN inventory_items i ON i.id = m.item_id
+      LEFT JOIN users u_from ON u_from.id = m.from_user_id
+      LEFT JOIN users u_to ON u_to.id = m.to_user_id
+      LEFT JOIN appointments a ON a.id = m.appointment_id
+      WHERE m.studio_id = $1
+      ORDER BY m.created_at DESC
+      LIMIT 100
+    `, [studioId]);
+
+    return response.json({ movements: res.rows });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/inventory/movements', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const {
+    itemId,
+    movementType,
+    quantity,
+    unitPrice = 0,
+    totalAmount = 0,
+    toUserId = null,
+    appointmentId = null,
+    receiptImageUrl = '',
+    notes = '',
+    createFinancialRecord = false
+  } = request.body;
+
+  const validTypes = ['purchase', 'consumption', 'sale_external', 'transfer_internal', 'sale_internal', 'adjustment'];
+  if (!validTypes.includes(movementType)) {
+    return response.status(400).json({ error: 'Tipo de movimiento inválido' });
+  }
+
+  const qty = Number(quantity);
+  if (!qty || qty <= 0) {
+    return response.status(400).json({ error: 'La cantidad debe ser mayor a 0' });
+  }
+
+  const studioId = request.studioId;
+  const currentUserId = request.user.id;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Fetch source item
+    const itemRes = await client.query('SELECT * FROM inventory_items WHERE id = $1 AND studio_id = $2 FOR UPDATE', [itemId, studioId]);
+    if (!itemRes.rowCount) {
+      await client.query('ROLLBACK');
+      return response.status(404).json({ error: 'Insumo no encontrado' });
+    }
+    const sourceItem = itemRes.rows[0];
+
+    let newSourceQty = Number(sourceItem.quantity);
+    let calculatedTotal = Number(totalAmount) || (qty * (Number(unitPrice) || Number(sourceItem.cost_price || 0)));
+    let transactionId = null;
+
+    if (movementType === 'purchase') {
+      newSourceQty += qty;
+      if (createFinancialRecord && calculatedTotal > 0) {
+        const transRes = await client.query(`
+          INSERT INTO transactions (studio_id, kind, description, amount, occurred_on, artist_id)
+          VALUES ($1, 'expense', $2, $3, NOW()::date, $4) RETURNING id
+        `, [studioId, `Compra de insumo: ${sourceItem.name} (${qty} ${sourceItem.unit})`, calculatedTotal, currentUserId]);
+        transactionId = transRes.rows[0].id;
+      }
+    } else if (movementType === 'consumption') {
+      if (newSourceQty < qty) {
+        await client.query('ROLLBACK');
+        return response.status(400).json({ error: `Stock insuficiente. Disponible: ${newSourceQty} ${sourceItem.unit}` });
+      }
+      newSourceQty -= qty;
+    } else if (movementType === 'sale_external') {
+      if (newSourceQty < qty) {
+        await client.query('ROLLBACK');
+        return response.status(400).json({ error: `Stock insuficiente para venta. Disponible: ${newSourceQty} ${sourceItem.unit}` });
+      }
+      newSourceQty -= qty;
+      calculatedTotal = Number(totalAmount) || (qty * (Number(unitPrice) || Number(sourceItem.sale_price || 0)));
+      if (createFinancialRecord && calculatedTotal > 0) {
+        const transRes = await client.query(`
+          INSERT INTO transactions (studio_id, kind, description, amount, occurred_on, artist_id)
+          VALUES ($1, 'income', $2, $3, NOW()::date, $4) RETURNING id
+        `, [studioId, `Venta de insumo a cliente: ${sourceItem.name} (${qty} ${sourceItem.unit})`, calculatedTotal, currentUserId]);
+        transactionId = transRes.rows[0].id;
+      }
+    } else if (movementType === 'transfer_internal' || movementType === 'sale_internal') {
+      if (!toUserId) {
+        await client.query('ROLLBACK');
+        return response.status(400).json({ error: 'Debes seleccionar el artista receptor' });
+      }
+      if (newSourceQty < qty) {
+        await client.query('ROLLBACK');
+        return response.status(400).json({ error: `Stock insuficiente para transferir. Disponible: ${newSourceQty} ${sourceItem.unit}` });
+      }
+      newSourceQty -= qty;
+
+      // Transfer/Sale to target user's personal inventory
+      const targetItemRes = await client.query(`
+        SELECT * FROM inventory_items 
+        WHERE studio_id = $1 AND owner_user_id = $2 AND name = $3 AND is_active = TRUE
+      `, [studioId, toUserId, sourceItem.name]);
+
+      if (targetItemRes.rowCount) {
+        await client.query(`
+          UPDATE inventory_items SET quantity = quantity + $1, updated_at = NOW() WHERE id = $2
+        `, [qty, targetItemRes.rows[0].id]);
+      } else {
+        await client.query(`
+          INSERT INTO inventory_items (
+            studio_id, owner_user_id, name, category, unit, quantity, min_stock_alert, cost_price, sale_price, sku
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `, [
+          studioId,
+          toUserId,
+          sourceItem.name,
+          sourceItem.category,
+          sourceItem.unit,
+          qty,
+          sourceItem.min_stock_alert,
+          Number(unitPrice) || Number(sourceItem.cost_price),
+          sourceItem.sale_price,
+          sourceItem.sku
+        ]);
+      }
+
+      if (movementType === 'sale_internal' && createFinancialRecord && calculatedTotal > 0) {
+        const transRes = await client.query(`
+          INSERT INTO transactions (studio_id, kind, description, amount, occurred_on, artist_id)
+          VALUES ($1, 'income', $2, $3, NOW()::date, $4) RETURNING id
+        `, [studioId, `Venta interna de insumo: ${sourceItem.name} (${qty} ${sourceItem.unit})`, calculatedTotal, currentUserId]);
+        transactionId = transRes.rows[0].id;
+      }
+    } else if (movementType === 'adjustment') {
+      newSourceQty = Math.max(0, qty);
+    }
+
+    // 2. Update source item stock
+    await client.query('UPDATE inventory_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [newSourceQty, itemId]);
+
+    // 3. Record movement
+    const movRes = await client.query(`
+      INSERT INTO inventory_movements (
+        item_id, studio_id, movement_type, quantity, unit_price, total_amount,
+        from_user_id, to_user_id, appointment_id, transaction_id, receipt_image_url, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *
+    `, [
+      itemId,
+      studioId,
+      movementType,
+      qty,
+      Number(unitPrice) || 0,
+      calculatedTotal,
+      currentUserId,
+      toUserId ? Number(toUserId) : null,
+      appointmentId ? Number(appointmentId) : null,
+      transactionId,
+      receiptImageUrl || '',
+      notes || ''
+    ]);
+
+    await client.query('COMMIT');
+    return response.status(201).json({
+      ok: true,
+      movement: movRes.rows[0],
+      updatedItem: { ...sourceItem, quantity: newSourceQty }
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    return response.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 // Endpoint de diagnóstico y salud
 app.get('/api/health', async (_request, response) => {
   if (!pool) return response.status(503).json({ ok: false, status: 'error', message: 'No DATABASE_URL configured' });
@@ -1911,6 +2266,44 @@ async function ensureAuthSchema() {
     style_tag TEXT NOT NULL DEFAULT '',
     source TEXT NOT NULL DEFAULT 'upload' CHECK (source IN ('upload', 'instagram')),
     position INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+
+  // 13. Inventory Items (Studio & Personal Stock)
+  await safeExec('CREATE TABLE inventory_items', `CREATE TABLE IF NOT EXISTS inventory_items (
+    id SERIAL PRIMARY KEY,
+    studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+    owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'needles' CHECK (category IN ('needles', 'inks', 'hygiene', 'aftercare', 'equipment', 'merch', 'other')),
+    unit TEXT NOT NULL DEFAULT 'units' CHECK (unit IN ('units', 'boxes', 'bottles', 'packs', 'ml', 'rolls')),
+    quantity NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+    min_stock_alert NUMERIC(12, 2) NOT NULL DEFAULT 5,
+    cost_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    sale_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    sku TEXT DEFAULT '',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  await safeExec('ALTER TABLE inventory_items owner_user_id', `ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE`);
+  await safeExec('ALTER TABLE inventory_items min_stock_alert', `ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS min_stock_alert NUMERIC(12, 2) NOT NULL DEFAULT 5`);
+
+  // 14. Inventory Movements (Purchases, Consumptions, Sales, Transfers)
+  await safeExec('CREATE TABLE inventory_movements', `CREATE TABLE IF NOT EXISTS inventory_movements (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+    studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+    movement_type TEXT NOT NULL CHECK (movement_type IN ('purchase', 'consumption', 'sale_external', 'transfer_internal', 'sale_internal', 'adjustment')),
+    quantity NUMERIC(12, 2) NOT NULL,
+    unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    from_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    to_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    appointment_id INTEGER REFERENCES appointments(id) ON DELETE SET NULL,
+    transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+    receipt_image_url TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
 

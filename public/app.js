@@ -406,7 +406,16 @@ async function startApp() {
   if (ws) ws.style.display = 'flex';
   hideSplash();
 
-  if (currentUser.email === 'soyelroot@tatudin.cl' || currentUser.is_superadmin) {
+  const path = window.location.pathname;
+  const search = new URLSearchParams(window.location.search);
+  const source = search.get('source');
+
+  if (path === '/capture-receipt' || search.has('capture-receipt') || (source === 'shortcut' && (path.includes('receipt') || window.location.href.includes('receipt')))) {
+    await render('inventario');
+    openReceiptScannerModal('studio');
+  } else if (path === '/inventory' || path === '/inventario' || search.has('inventory') || (source === 'shortcut' && (path.includes('inventory') || window.location.href.includes('inventory')))) {
+    await render('inventario');
+  } else if (currentUser.email === 'soyelroot@tatudin.cl' || currentUser.is_superadmin) {
     await render('backoffice');
   } else {
     await render('dashboard');
@@ -484,6 +493,7 @@ async function render(view = 'dashboard') {
   try {
     if (view === 'agenda') return await renderAgenda();
     if (view === 'clientes') return await renderClients();
+    if (view === 'inventario' || view === 'inventory') return await renderInventory();
     if (view === 'finanzas') return await renderFinances();
     if (view === 'ajustes') return await renderSettings();
     if (view === 'portafolio') return await renderPortfolio();
@@ -2421,12 +2431,863 @@ function openPublicPortfolioLanding(customData = null) {
   `);
 }
 
+// ==========================================
+// INVENTORY & RECEIPT OCR CAMERA MODULE
+// ==========================================
+
+const INVENTORY_CATEGORIES = {
+  needles: { label: 'Agujas & Cartuchos', icon: '💉', color: '#7C3AED' },
+  inks: { label: 'Tintas & Pigmentos', icon: '🎨', color: '#0284C7' },
+  hygiene: { label: 'Higiene & Bioseguridad', icon: '🧼', color: '#059669' },
+  aftercare: { label: 'Cuidado & Aftercare', icon: '🧴', color: '#E11D48' },
+  equipment: { label: 'Máquinas & Equipamiento', icon: '⚡', color: '#D97706' },
+  merch: { label: 'Merchandising & Arte', icon: '👕', color: '#6366F1' },
+  other: { label: 'Otros Insumos', icon: '📦', color: '#64748B' }
+};
+
+const INVENTORY_UNITS = {
+  units: 'Unidades (u)',
+  boxes: 'Cajas',
+  bottles: 'Botellas / Frascos',
+  packs: 'Paquetes',
+  rolls: 'Rollos',
+  ml: 'Mililitros (ml)'
+};
+
+const MOVEMENT_TYPES = {
+  purchase: { label: 'Compra de Stock', icon: '🛒', class: 'mov-purchase', badge: 'Entrada / Compra' },
+  consumption: { label: 'Consumo en Sesión', icon: '💉', class: 'mov-consumption', badge: 'Salida / Consumo' },
+  sale_external: { label: 'Venta a Cliente', icon: '🛍️', class: 'mov-sale', badge: 'Salida / Venta Cliente' },
+  transfer_internal: { label: 'Facilitación a Artista', icon: '🔄', class: 'mov-transfer', badge: 'Transferencia Interna' },
+  sale_internal: { label: 'Venta a Artista', icon: '🏷️', class: 'mov-sale-internal', badge: 'Venta Interna' },
+  adjustment: { label: 'Ajuste de Inventario', icon: '⚖️', class: 'mov-adjustment', badge: 'Ajuste / Conteo' }
+};
+
+let inventoryData = null;
+let inventoryMovements = [];
+let inventoryCurrentTab = 'studio'; // 'studio' | 'personal' | 'movements' | 'alerts'
+let inventoryCategoryFilter = 'all';
+let scannerMediaStream = null;
+let scannerCurrentFacingMode = 'environment';
+
+function stopCameraStream() {
+  if (scannerMediaStream) {
+    scannerMediaStream.getTracks().forEach((track) => track.stop());
+    scannerMediaStream = null;
+  }
+}
+
+async function renderInventory() {
+  try {
+    const [inv, movs] = await Promise.all([
+      api('/api/inventory').catch(() => ({ studioItems: [], personalItems: [], members: [], stats: {} })),
+      api('/api/inventory/movements').catch(() => ({ movements: [] }))
+    ]);
+    inventoryData = inv;
+    inventoryMovements = movs.movements || [];
+  } catch (err) {
+    console.error('Error loading inventory:', err);
+    inventoryData = { studioItems: [], personalItems: [], members: [], stats: {} };
+    inventoryMovements = [];
+  }
+
+  const { studioItems = [], personalItems = [], members = [], stats = {} } = inventoryData;
+  const lowStockItems = [...studioItems, ...personalItems].filter(i => Number(i.quantity) <= Number(i.min_stock_alert));
+
+  let itemsToDisplay = [];
+  if (inventoryCurrentTab === 'studio') {
+    itemsToDisplay = studioItems;
+  } else if (inventoryCurrentTab === 'personal') {
+    itemsToDisplay = personalItems;
+  } else if (inventoryCurrentTab === 'alerts') {
+    itemsToDisplay = lowStockItems;
+  }
+
+  if (inventoryCategoryFilter !== 'all') {
+    itemsToDisplay = itemsToDisplay.filter(i => i.category === inventoryCategoryFilter);
+  }
+
+  app.innerHTML = `
+    <section class="intro">
+      <div class="intro-header-row">
+        <div>
+          <p class="eyebrow">CONTROL DE INSUMOS & STOCK</p>
+          <h1>Inventario & Insumos<span class="dot">.</span></h1>
+          <p class="lead">Gestión de stock del estudio, insumos personales, transferencias entre artistas y compras con boleta OCR.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Top Action Bar -->
+    <section class="actions inventory-top-actions">
+      <button class="primary" data-action="open-receipt-scanner">
+        ${icon('camera')} <span>Tomar foto de boleta (OCR)</span>
+      </button>
+      <button class="secondary" data-action="open-new-item-modal">
+        ${icon('plus')} <span>Nuevo insumo</span>
+      </button>
+      <button class="secondary" data-action="open-new-movement-modal">
+        ${icon('sync')} <span>Registrar movimiento</span>
+      </button>
+    </section>
+
+    <!-- Metrics Cards -->
+    <section class="stats inventory-stats-grid">
+      <article class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-icon-bubble purple">${icon('package')}</span>
+          <p class="eyebrow">STOCK ESTUDIO</p>
+        </div>
+        <strong>${stats.totalStudioItems || studioItems.length}</strong>
+        <small>Insumos compartidos (${money(stats.studioValuation || 0)})</small>
+      </article>
+
+      <article class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-icon-bubble green">${icon('artist')}</span>
+          <p class="eyebrow">MI STOCK PERSONAL</p>
+        </div>
+        <strong>${stats.totalPersonalItems || personalItems.length}</strong>
+        <small>Tus insumos propios (${money(stats.personalValuation || 0)})</small>
+      </article>
+
+      <article class="stat-card ${lowStockItems.length > 0 ? 'alert-card' : ''}">
+        <div class="stat-card-header">
+          <span class="stat-icon-bubble ${lowStockItems.length > 0 ? 'red' : 'green'}">${icon('alert')}</span>
+          <p class="eyebrow">STOCK BAJO</p>
+        </div>
+        <strong>${lowStockItems.length}</strong>
+        <small>${lowStockItems.length > 0 ? 'Insumos requieren reposición' : 'Todos los insumos con buen stock'}</small>
+      </article>
+    </section>
+
+    <!-- Inventory Context Tabs -->
+    <div class="inventory-tabs-container">
+      <div class="inventory-tabs-nav">
+        <button class="inv-tab-btn ${inventoryCurrentTab === 'studio' ? 'active' : ''}" data-inv-tab="studio">
+          🏢 Insumos del Estudio <span class="inv-tab-badge">${studioItems.length}</span>
+        </button>
+        <button class="inv-tab-btn ${inventoryCurrentTab === 'personal' ? 'active' : ''}" data-inv-tab="personal">
+          🎨 Mi Inventario Personal <span class="inv-tab-badge">${personalItems.length}</span>
+        </button>
+        <button class="inv-tab-btn ${inventoryCurrentTab === 'movements' ? 'active' : ''}" data-inv-tab="movements">
+          🔄 Movimientos & Ventas <span class="inv-tab-badge">${inventoryMovements.length}</span>
+        </button>
+        <button class="inv-tab-btn ${inventoryCurrentTab === 'alerts' ? 'active' : ''}" data-inv-tab="alerts">
+          ⚠️ Alertas Reposición <span class="inv-tab-badge ${lowStockItems.length > 0 ? 'badge-alert' : ''}">${lowStockItems.length}</span>
+        </button>
+      </div>
+
+      <!-- Category Filter Pills (Shown on stock tabs) -->
+      ${inventoryCurrentTab !== 'movements' ? `
+        <div class="inventory-category-filters">
+          <button class="cat-filter-btn ${inventoryCategoryFilter === 'all' ? 'active' : ''}" data-inv-cat-filter="all">
+            Todos (${inventoryCurrentTab === 'studio' ? studioItems.length : (inventoryCurrentTab === 'personal' ? personalItems.length : lowStockItems.length)})
+          </button>
+          ${Object.entries(INVENTORY_CATEGORIES).map(([catKey, catMeta]) => {
+            const count = (inventoryCurrentTab === 'studio' ? studioItems : (inventoryCurrentTab === 'personal' ? personalItems : lowStockItems)).filter(i => i.category === catKey).length;
+            if (count === 0 && inventoryCategoryFilter !== catKey) return '';
+            return `
+              <button class="cat-filter-btn ${inventoryCategoryFilter === catKey ? 'active' : ''}" data-inv-cat-filter="${catKey}">
+                ${catMeta.icon} ${catMeta.label} <span class="cat-filter-count">${count}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      ` : ''}
+    </div>
+
+    <!-- Tab Contents -->
+    <section class="inventory-content-section">
+      ${inventoryCurrentTab === 'movements' 
+        ? renderInventoryMovementsTab(inventoryMovements) 
+        : renderInventoryItemsGrid(itemsToDisplay, inventoryCurrentTab)}
+    </section>
+  `;
+}
+
+function renderInventoryItemsGrid(items, currentTab) {
+  if (!items || !items.length) {
+    return emptyState(
+      currentTab === 'alerts' ? '¡Excelente! Sin insumos con stock crítico' : 'No hay insumos registrados',
+      currentTab === 'alerts' 
+        ? 'Todos los insumos superan el umbral de alerta mínima.' 
+        : 'Agrega tu primer insumo o escanea una boleta de compra con la cámara.'
+    );
+  }
+
+  return `
+    <div class="inventory-items-grid">
+      ${items.map((item) => {
+        const cat = INVENTORY_CATEGORIES[item.category] || INVENTORY_CATEGORIES.other;
+        const unitLabel = INVENTORY_UNITS[item.unit] || item.unit;
+        const qty = Number(item.quantity);
+        const minAlert = Number(item.min_stock_alert || 5);
+        const isLow = qty <= minAlert;
+        const isOutOfStock = qty <= 0;
+
+        const stockStatusClass = isOutOfStock ? 'stock-empty' : (isLow ? 'stock-warning' : 'stock-ok');
+        const stockStatusLabel = isOutOfStock ? 'AGOTADO' : (isLow ? 'STOCK BAJO' : 'STOCK ÓPTIMO');
+
+        return `
+          <article class="inventory-card ${stockStatusClass}" data-item-id="${item.id}">
+            <div class="inv-card-header">
+              <div class="inv-card-category" style="--c-color: ${cat.color}">
+                <span class="inv-cat-icon">${cat.icon}</span>
+                <span class="inv-cat-name">${cat.label}</span>
+              </div>
+              <span class="inv-status-pill ${stockStatusClass}">${stockStatusLabel}</span>
+            </div>
+
+            <div class="inv-card-body">
+              <h3 class="inv-item-name">${item.name}</h3>
+              ${item.sku ? `<p class="inv-item-sku">SKU: <code>${item.sku}</code></p>` : ''}
+
+              <div class="inv-stock-level-box">
+                <div class="inv-stock-numbers">
+                  <span class="inv-current-qty">${qty}</span>
+                  <span class="inv-unit-name">${unitLabel}</span>
+                </div>
+                <small class="inv-min-alert-text">Mínimo sugerido: ${minAlert} ${unitLabel}</small>
+              </div>
+
+              <div class="inv-prices-row">
+                <div class="inv-price-col">
+                  <span class="price-label">Costo unitario:</span>
+                  <strong class="price-val">${money(item.cost_price || 0)}</strong>
+                </div>
+                ${Number(item.sale_price) > 0 ? `
+                  <div class="inv-price-col">
+                    <span class="price-label">Precio venta:</span>
+                    <strong class="price-val sale">${money(item.sale_price)}</strong>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+
+            <div class="inv-card-actions">
+              <button type="button" class="inv-action-btn primary" data-action="consume-item" data-id="${item.id}" data-name="${item.name}" title="Registrar consumo en sesión">
+                💉 Consumir
+              </button>
+              ${currentTab === 'studio' ? `
+                <button type="button" class="inv-action-btn secondary" data-action="transfer-item" data-id="${item.id}" data-name="${item.name}" title="Facilitar o vender a un artista residente/nómade">
+                  🔄 Transferir/Vender
+                </button>
+              ` : `
+                <button type="button" class="inv-action-btn secondary" data-action="sell-item" data-id="${item.id}" data-name="${item.name}" title="Vender a cliente final">
+                  🛍️ Venta
+                </button>
+              `}
+              <button type="button" class="inv-action-btn icon-only" data-action="edit-item" data-id="${item.id}" title="Editar insumo">
+                ✏️
+              </button>
+              <button type="button" class="inv-action-btn icon-only danger" data-action="delete-item" data-id="${item.id}" data-name="${item.name}" title="Eliminar insumo">
+                🗑️
+              </button>
+            </div>
+          </article>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderInventoryMovementsTab(movements) {
+  if (!movements || !movements.length) {
+    return emptyState('Sin movimientos registrados', 'Los consumos, compras con boleta OCR y transferencias aparecerán aquí.');
+  }
+
+  return `
+    <div class="inventory-movements-wrapper panel">
+      <div class="table-responsive">
+        <table class="inventory-movements-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Insumo</th>
+              <th>Cantidad</th>
+              <th>Emisor / Receptor</th>
+              <th>Monto ($)</th>
+              <th>Notas / Cita</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${movements.map((m) => {
+              const typeMeta = MOVEMENT_TYPES[m.movement_type] || { label: m.movement_type, icon: '📦', class: 'mov-default', badge: m.movement_type };
+              const dateFormatted = new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(m.created_at));
+              const unit = INVENTORY_UNITS[m.item_unit] || m.item_unit || 'u';
+
+              let partyDesc = '—';
+              if (m.from_user_name && m.to_user_name) {
+                partyDesc = `${m.from_user_name} ➔ ${m.to_user_name}`;
+              } else if (m.from_user_name) {
+                partyDesc = `Por: ${m.from_user_name}`;
+              } else if (m.to_user_name) {
+                partyDesc = `Para: ${m.to_user_name}`;
+              }
+
+              return `
+                <tr>
+                  <td class="cell-date">${dateFormatted}</td>
+                  <td>
+                    <span class="movement-pill ${typeMeta.class}">
+                      <span>${typeMeta.icon}</span>
+                      <span>${typeMeta.badge}</span>
+                    </span>
+                  </td>
+                  <td class="cell-item-name">
+                    <strong>${m.item_name}</strong>
+                    <small class="cat-sub">${INVENTORY_CATEGORIES[m.item_category]?.label || m.item_category}</small>
+                  </td>
+                  <td class="cell-qty">
+                    <strong>${m.quantity}</strong> <small>${unit}</small>
+                  </td>
+                  <td class="cell-party">${partyDesc}</td>
+                  <td class="cell-amount">${Number(m.total_amount) > 0 ? money(m.total_amount) : '—'}</td>
+                  <td class="cell-notes">
+                    ${m.appointment_title ? `<span class="appointment-tag">📅 ${m.appointment_title}</span>` : ''}
+                    ${m.notes ? `<span>${m.notes}</span>` : ''}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ---------------- INVENTORY MODALS ----------------
+
+function openItemModal(item = null, isPersonal = false) {
+  const isEdit = Boolean(item && item.id);
+  const selectedCat = item?.category || 'needles';
+  const selectedUnit = item?.unit || 'units';
+
+  openModal(`
+    <p class="eyebrow">${isEdit ? 'EDITAR INSUMO' : 'NUEVO INSUMO'}</p>
+    <h2 id="modal-title">${isEdit ? item.name : 'Crear Insumo de Inventario'}</h2>
+
+    <form data-form="inventory-item">
+      ${isEdit ? `<input type="hidden" name="id" value="${item.id}" />` : ''}
+
+      <label>Nombre del insumo / producto *
+        <input name="name" required placeholder="Ej. Cartuchos Kwadron 03RL, Crema Cicatrizante 50g..." value="${item?.name || ''}" />
+      </label>
+
+      <div class="grid two">
+        <label>Categoría
+          <select name="category">
+            ${Object.entries(INVENTORY_CATEGORIES).map(([key, cat]) => `
+              <option value="${key}" ${key === selectedCat ? 'selected' : ''}>${cat.icon} ${cat.label}</option>
+            `).join('')}
+          </select>
+        </label>
+
+        <label>Unidad de medida
+          <select name="unit">
+            ${Object.entries(INVENTORY_UNITS).map(([key, label]) => `
+              <option value="${key}" ${key === selectedUnit ? 'selected' : ''}>${label}</option>
+            `).join('')}
+          </select>
+        </label>
+      </div>
+
+      <div class="grid two">
+        <label>Stock actual disponible *
+          <input type="number" name="quantity" min="0" step="any" required placeholder="0" value="${item?.quantity !== undefined ? item.quantity : 1}" />
+        </label>
+
+        <label>Alerta de stock mínimo
+          <input type="number" name="minStockAlert" min="0" step="any" placeholder="5" value="${item?.min_stock_alert !== undefined ? item.min_stock_alert : 5}" />
+        </label>
+      </div>
+
+      <div class="grid two">
+        <label>Costo unitario de compra ($)
+          <input type="number" name="costPrice" min="0" step="any" placeholder="0" value="${item?.cost_price || 0}" />
+        </label>
+
+        <label>Precio de venta a clientes / artistas ($)
+          <input type="number" name="salePrice" min="0" step="any" placeholder="0 (opcional)" value="${item?.sale_price || 0}" />
+        </label>
+      </div>
+
+      <label>Código SKU / Referencia (opcional)
+        <input name="sku" placeholder="Ej. KW-03RL, DYN-BLK8..." value="${item?.sku || ''}" />
+      </label>
+
+      ${!isEdit ? `
+        <label class="form-checkbox-label">
+          <input type="checkbox" name="isPersonal" ${isPersonal ? 'checked' : ''} />
+          <span>Guardar en mi <strong>Inventario Personal</strong> (en lugar del inventario compartido del estudio)</span>
+        </label>
+      ` : ''}
+
+      <p class="form-error"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary" data-close-modal>Cancelar</button>
+        <button type="submit" class="primary">
+          ${isEdit ? 'Guardar Cambios' : 'Crear Insumo'}
+        </button>
+      </div>
+    </form>
+  `);
+}
+
+function openMovementModal(preselectedItemId = null, preselectedType = 'consumption') {
+  const allItems = [...(inventoryData?.studioItems || []), ...(inventoryData?.personalItems || [])];
+  const members = inventoryData?.members || [];
+
+  openModal(`
+    <p class="eyebrow">MOVIMIENTO DE INVENTARIO</p>
+    <h2 id="modal-title">Registrar Consumo, Venta o Transferencia</h2>
+
+    <form data-form="inventory-movement">
+      <label>Insumo *
+        <select name="itemId" id="mov-item-select" required>
+          <option value="">Selecciona un insumo...</option>
+          ${allItems.map((i) => `
+            <option value="${i.id}" data-qty="${i.quantity}" data-unit="${i.unit}" data-cost="${i.cost_price}" data-sale="${i.sale_price}" ${Number(preselectedItemId) === Number(i.id) ? 'selected' : ''}>
+              ${i.owner_user_id ? '🎨 [Personal] ' : '🏢 [Estudio] '} ${i.name} (Stock: ${i.quantity} ${INVENTORY_UNITS[i.unit] || i.unit})
+            </option>
+          `).join('')}
+        </select>
+      </label>
+
+      <label>Tipo de movimiento *
+        <select name="movementType" id="mov-type-select" required>
+          <option value="consumption" ${preselectedType === 'consumption' ? 'selected' : ''}>💉 Consumo en sesión / cita de tatuaje</option>
+          <option value="purchase" ${preselectedType === 'purchase' ? 'selected' : ''}>🛒 Compra externa (Ingreso de stock)</option>
+          <option value="sale_external" ${preselectedType === 'sale_external' ? 'selected' : ''}>🛍️ Venta a cliente final (Aftercare / Merch)</option>
+          <option value="transfer_internal" ${preselectedType === 'transfer_internal' ? 'selected' : ''}>🔄 Facilitación / Préstamo de estudio a residente o nómade</option>
+          <option value="sale_internal" ${preselectedType === 'sale_internal' ? 'selected' : ''}>🏷️ Venta interna a artista residente o nómade</option>
+          <option value="adjustment" ${preselectedType === 'adjustment' ? 'selected' : ''}>⚖️ Ajuste manual de stock / Conteo físico</option>
+        </select>
+      </label>
+
+      <div class="grid two">
+        <label>Cantidad *
+          <input type="number" name="quantity" min="0.01" step="any" required placeholder="1" value="1" />
+        </label>
+
+        <label id="mov-price-field">Precio / Monto total ($)
+          <input type="number" name="totalAmount" min="0" step="any" placeholder="0" value="0" />
+        </label>
+      </div>
+
+      <!-- Target Artist Selector (For transfer or internal sale) -->
+      <div id="mov-target-user-field" class="form-section ${['transfer_internal', 'sale_internal'].includes(preselectedType) ? '' : 'hidden'}">
+        <label>Artista receptor (Residente o Nómade) *
+          <select name="toUserId">
+            <option value="">Selecciona al artista...</option>
+            ${members.map((m) => `
+              <option value="${m.id}">${m.full_name} (${ROLE_MAP[m.role]?.label || m.role})</option>
+            `).join('')}
+          </select>
+        </label>
+      </div>
+
+      <label class="form-checkbox-label" id="mov-financial-record-wrap">
+        <input type="checkbox" name="createFinancialRecord" value="true" checked />
+        <span>Registrar automáticamente en el módulo de <strong>Finanzas</strong> (como Ingreso o Egreso)</span>
+      </label>
+
+      <label>Notas u observación
+        <input name="notes" placeholder="Ej. Sesión brazo completo, compra proveedor ChileTattoo..." />
+      </label>
+
+      <p class="form-error"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary" data-close-modal>Cancelar</button>
+        <button type="submit" class="primary">Registrar Movimiento</button>
+      </div>
+    </form>
+  `);
+
+  // Dynamically toggle target artist field on type change
+  setTimeout(() => {
+    const typeSelect = document.getElementById('mov-type-select');
+    const targetUserField = document.getElementById('mov-target-user-field');
+    const finWrap = document.getElementById('mov-financial-record-wrap');
+
+    if (typeSelect) {
+      typeSelect.onchange = () => {
+        const val = typeSelect.value;
+        if (targetUserField) {
+          targetUserField.classList.toggle('hidden', !['transfer_internal', 'sale_internal'].includes(val));
+        }
+        if (finWrap) {
+          finWrap.classList.toggle('hidden', ['consumption', 'transfer_internal'].includes(val));
+        }
+      };
+    }
+  }, 30);
+}
+
+// ---------------- CAMERA SCANNER & OCR MODULE ----------------
+
+async function openCamera(facingMode = 'environment') {
+  stopCameraStream();
+  scannerCurrentFacingMode = facingMode;
+  const videoEl = document.getElementById('scanner-camera-video');
+  const errorEl = document.getElementById('scanner-camera-error');
+  const overlayEl = document.getElementById('scanner-viewfinder-overlay');
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    if (errorEl) {
+      errorEl.innerHTML = `
+        <div class="camera-fallback-msg">
+          <p>⚠️ Tu navegador o dispositivo no soporta acceso directo a la cámara por WebRTC.</p>
+          <label class="primary camera-file-upload-btn">
+            📁 Seleccionar o tomar foto de boleta
+            <input type="file" accept="image/*" capture="environment" id="scanner-file-fallback" style="display:none;" />
+          </label>
+        </div>
+      `;
+      errorEl.hidden = false;
+    }
+    if (overlayEl) overlayEl.hidden = true;
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: facingMode },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      },
+      audio: false
+    });
+    scannerMediaStream = stream;
+    if (videoEl) {
+      videoEl.srcObject = stream;
+      videoEl.play();
+      if (overlayEl) overlayEl.hidden = false;
+      if (errorEl) errorEl.hidden = true;
+    }
+  } catch (err) {
+    console.warn('[CAMERA] getUserMedia error:', err);
+    if (errorEl) {
+      errorEl.innerHTML = `
+        <div class="camera-fallback-msg">
+          <p>⚠️ No se pudo acceder a la cámara (${err.message || 'Permiso denegado'}).</p>
+          <label class="primary camera-file-upload-btn">
+            📁 Cargar foto desde tu galería o cámara
+            <input type="file" accept="image/*" capture="environment" id="scanner-file-fallback" style="display:none;" />
+          </label>
+        </div>
+      `;
+      errorEl.hidden = false;
+    }
+    if (overlayEl) overlayEl.hidden = true;
+  }
+}
+
+function openReceiptScannerModal(defaultTarget = 'studio') {
+  openModal(`
+    <div class="receipt-scanner-container">
+      <div class="scanner-modal-header">
+        <div>
+          <p class="eyebrow">ESCÁNER OCR DE BOLETAS</p>
+          <h2 id="modal-title">Tomar foto de boleta</h2>
+        </div>
+        <button type="button" class="scanner-close-btn" data-close-modal>×</button>
+      </div>
+
+      <div class="scanner-viewport-box">
+        <video id="scanner-camera-video" playsinline autoplay muted></video>
+        <div class="scanner-viewfinder-overlay" id="scanner-viewfinder-overlay">
+          <div class="scanner-frame-corner top-left"></div>
+          <div class="scanner-frame-corner top-right"></div>
+          <div class="scanner-frame-corner bottom-left"></div>
+          <div class="scanner-frame-corner bottom-right"></div>
+          <div class="scanner-scan-line"></div>
+          <p class="scanner-guideline-text">Encuadra la boleta o ticket de compra aquí</p>
+        </div>
+        <div id="scanner-camera-error" class="scanner-error-overlay" hidden></div>
+        <canvas id="scanner-capture-canvas" style="display:none;"></canvas>
+      </div>
+
+      <!-- OCR Progress Bar Overlay -->
+      <div id="ocr-processing-overlay" class="ocr-processing-overlay" hidden>
+        <div class="ocr-progress-box">
+          <div class="ocr-spinner"></div>
+          <strong id="ocr-status-title">Analizando boleta con OCR...</strong>
+          <p id="ocr-status-subtitle">Extrayendo texto, montos y productos con Tesseract.js</p>
+          <div class="ocr-progress-bar-wrap">
+            <div id="ocr-progress-bar-fill" class="ocr-progress-bar-fill" style="width: 0%;"></div>
+          </div>
+          <span id="ocr-progress-percent">0%</span>
+        </div>
+      </div>
+
+      <div class="scanner-control-bar">
+        <label class="secondary scanner-btn-icon" title="Cargar desde galería">
+          📁 Archivo
+          <input type="file" accept="image/*" capture="environment" id="scanner-direct-file-input" style="display: none;" />
+        </label>
+        <button type="button" class="scanner-shutter-btn" id="btn-scanner-capture" title="Capturar Foto">
+          <span class="shutter-inner-circle"></span>
+        </button>
+        <button type="button" class="secondary scanner-btn-icon" id="btn-scanner-flip" title="Cambiar Cámara">
+          🔄 Voltear
+        </button>
+      </div>
+    </div>
+  `);
+
+  setTimeout(() => {
+    openCamera('environment');
+
+    const captureBtn = document.getElementById('btn-scanner-capture');
+    const flipBtn = document.getElementById('btn-scanner-flip');
+    const fileInput = document.getElementById('scanner-direct-file-input');
+    const fallbackInput = document.getElementById('scanner-file-fallback');
+
+    if (captureBtn) {
+      captureBtn.onclick = () => captureFrameAndProcess(defaultTarget);
+    }
+    if (flipBtn) {
+      flipBtn.onclick = () => {
+        const nextMode = scannerCurrentFacingMode === 'environment' ? 'user' : 'environment';
+        openCamera(nextMode);
+      };
+    }
+    if (fileInput) {
+      fileInput.onchange = (e) => handleFileInputOcr(e.target.files, defaultTarget);
+    }
+    if (fallbackInput) {
+      fallbackInput.onchange = (e) => handleFileInputOcr(e.target.files, defaultTarget);
+    }
+  }, 50);
+}
+
+function captureFrameAndProcess(defaultTarget) {
+  const videoEl = document.getElementById('scanner-camera-video');
+  const canvasEl = document.getElementById('scanner-capture-canvas');
+  if (!videoEl || !canvasEl) return;
+
+  canvasEl.width = videoEl.videoWidth || 1280;
+  canvasEl.height = videoEl.videoHeight || 720;
+  const ctx = canvasEl.getContext('2d');
+  ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+  const imageDataUrl = canvasEl.toDataURL('image/jpeg', 0.92);
+
+  stopCameraStream();
+  processReceiptWithOcr(imageDataUrl, defaultTarget);
+}
+
+function handleFileInputOcr(files, defaultTarget) {
+  if (!files || !files.length) return;
+  const file = files[0];
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    stopCameraStream();
+    processReceiptWithOcr(e.target.result, defaultTarget);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function processReceiptWithOcr(imageSource, defaultTarget) {
+  const ocrOverlay = document.getElementById('ocr-processing-overlay');
+  const progressFill = document.getElementById('ocr-progress-bar-fill');
+  const progressText = document.getElementById('ocr-progress-percent');
+  const statusTitle = document.getElementById('ocr-status-title');
+
+  if (ocrOverlay) ocrOverlay.hidden = false;
+
+  try {
+    if (typeof Tesseract === 'undefined') {
+      if (statusTitle) statusTitle.textContent = 'Cargando motor de OCR...';
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('No se pudo cargar la librería Tesseract.js'));
+        document.head.appendChild(script);
+      });
+    }
+
+    if (statusTitle) statusTitle.textContent = 'Escaneando texto y montos...';
+
+    const result = await Tesseract.recognize(imageSource, 'spa+eng', {
+      logger: (m) => {
+        if (m.status === 'recognizing text' && m.progress !== undefined) {
+          const pct = Math.round(m.progress * 100);
+          if (progressFill) progressFill.style.width = `${pct}%`;
+          if (progressText) progressText.textContent = `${pct}%`;
+        }
+      }
+    });
+
+    const extractedText = result.data.text || '';
+    console.log('[OCR RECEIPT RESULT TEXT]:\n', extractedText);
+
+    const parsedData = parseReceiptText(extractedText);
+    parsedData.imageSource = imageSource;
+    parsedData.defaultTarget = defaultTarget;
+
+    showReceiptConfirmationModal(parsedData);
+  } catch (err) {
+    console.error('[OCR ERROR]:', err);
+    alert('No se pudo extraer el texto de la boleta automáticamente (' + err.message + '). Podrás ingresar los datos manualmente.');
+    showReceiptConfirmationModal({
+      text: '',
+      detectedTotal: 0,
+      detectedVendor: 'Compra de Insumos',
+      detectedItems: [],
+      imageSource,
+      defaultTarget
+    });
+  }
+}
+
+function parseReceiptText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  
+  let detectedTotal = 0;
+  let detectedVendor = '';
+  const detectedItems = [];
+
+  if (lines.length > 0) {
+    detectedVendor = lines[0].replace(/[^a-zA-Z0-9\sÁÉÍÓÚáéíóúÑñ&.-]/g, '').slice(0, 40);
+  }
+
+  const totalRegexes = [
+    /total\s*[:$]?\s*([0-9.,]+)/i,
+    /total\s*venta\s*[:$]?\s*([0-9.,]+)/i,
+    /monto\s*total\s*[:$]?\s*([0-9.,]+)/i,
+    /pagado\s*[:$]?\s*([0-9.,]+)/i,
+    /\$\s*([0-9]{2,3}(?:\.[0-9]{3})+)/,
+    /\$\s*([0-9]{4,8})/
+  ];
+
+  for (const line of lines) {
+    for (const reg of totalRegexes) {
+      const match = line.match(reg);
+      if (match && match[1]) {
+        const rawNum = match[1].replace(/\./g, '').replace(/,/g, '.');
+        const num = parseFloat(rawNum);
+        if (num > 0 && num > detectedTotal && num < 100000000) {
+          detectedTotal = Math.round(num);
+        }
+      }
+    }
+  }
+
+  lines.forEach(l => {
+    if (l.length > 4 && !/total|subtotal|iva|rut|boleta|factura|fecha|hora|caja|vendedor/i.test(l)) {
+      if (detectedItems.length < 6) {
+        detectedItems.push(l.slice(0, 50));
+      }
+    }
+  });
+
+  return {
+    text,
+    detectedTotal,
+    detectedVendor: detectedVendor || 'Compra Insumos Tatuaje',
+    detectedItems
+  };
+}
+
+function showReceiptConfirmationModal(data) {
+  const existingItems = [...(inventoryData?.studioItems || []), ...(inventoryData?.personalItems || [])];
+
+  openModal(`
+    <p class="eyebrow">OCR COMPLETADO</p>
+    <h2 id="modal-title">Confirmar Compra de Insumos</h2>
+
+    <div class="receipt-preview-banner">
+      <div class="receipt-thumb-wrap">
+        <img src="${data.imageSource}" alt="Boleta escaneada" class="receipt-thumb-img" />
+      </div>
+      <div class="receipt-preview-summary">
+        <p class="summary-label">Monto detectado por OCR:</p>
+        <strong class="summary-total">${data.detectedTotal > 0 ? money(data.detectedTotal) : 'Ingresar monto'}</strong>
+        <small class="summary-vendor">${data.detectedVendor || 'Ticket de compra'}</small>
+      </div>
+    </div>
+
+    <form data-form="receipt-ocr-confirm">
+      <label>Destino del inventario *
+        <select name="targetInventory" id="ocr-target-inventory">
+          <option value="studio" ${data.defaultTarget === 'studio' ? 'selected' : ''}>🏢 Inventario del Estudio (Compartido)</option>
+          <option value="personal" ${data.defaultTarget === 'personal' ? 'selected' : ''}>🎨 Mi Inventario Personal</option>
+        </select>
+      </label>
+
+      <label>Vincular a insumo existente (o crear uno nuevo)
+        <select name="existingItemId" id="ocr-existing-item">
+          <option value="">➕ Crear nuevo insumo con esta compra</option>
+          ${existingItems.map(i => `
+            <option value="${i.id}" data-cat="${i.category}" data-unit="${i.unit}" data-cost="${i.cost_price}">
+              ${i.owner_user_id ? '🎨 [Personal] ' : '🏢 [Estudio] '} ${i.name} (Stock actual: ${i.quantity})
+            </option>
+          `).join('')}
+        </select>
+      </label>
+
+      <label>Nombre / Descripción de la compra *
+        <input name="itemName" required placeholder="Ej. Cartuchos Kwadron 03RL, Tintas Eternal..." value="${data.detectedItems[0] || data.detectedVendor || 'Compra de Insumos'}" />
+      </label>
+
+      <div class="grid two">
+        <label>Categoría
+          <select name="category">
+            ${Object.entries(INVENTORY_CATEGORIES).map(([key, cat]) => `
+              <option value="${key}">${cat.icon} ${cat.label}</option>
+            `).join('')}
+          </select>
+        </label>
+
+        <label>Unidad de medida
+          <select name="unit">
+            ${Object.entries(INVENTORY_UNITS).map(([key, label]) => `
+              <option value="${key}">${label}</option>
+            `).join('')}
+          </select>
+        </label>
+      </div>
+
+      <div class="grid two">
+        <label>Cantidad comprada *
+          <input type="number" name="quantity" min="0.01" step="any" required placeholder="1" value="1" />
+        </label>
+
+        <label>Monto total pagado ($) *
+          <input type="number" name="totalAmount" min="0" step="any" required placeholder="0" value="${data.detectedTotal || 0}" />
+        </label>
+      </div>
+
+      <label class="form-checkbox-label">
+        <input type="checkbox" name="createExpense" value="true" checked />
+        <span>Registrar automáticamente como <strong>Egreso en Finanzas</strong></span>
+      </label>
+
+      <p class="form-error"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary" data-close-modal>Descartar</button>
+        <button type="submit" class="primary">💾 Guardar en Inventario & Finanzas</button>
+      </div>
+    </form>
+  `);
+}
+
 function openModal(content) {
   modalContent.innerHTML = content;
   modal.hidden = false;
 }
 
 function closeModal() {
+  stopCameraStream();
   modal.hidden = true;
 }
 
@@ -3358,6 +4219,59 @@ document.addEventListener('click', async (event) => {
     const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'dashboard';
     return await render(currentActiveView);
   }
+  // Inventory action buttons
+  if (event.target.closest('[data-action="open-receipt-scanner"]')) {
+    return openReceiptScannerModal('studio');
+  }
+  if (event.target.closest('[data-action="open-new-item-modal"]')) {
+    return openItemModal(null, inventoryCurrentTab === 'personal');
+  }
+  if (event.target.closest('[data-action="open-new-movement-modal"]')) {
+    return openMovementModal(null, 'consumption');
+  }
+
+  // Inventory tab switcher
+  const invTabBtn = event.target.closest('[data-inv-tab]');
+  if (invTabBtn) {
+    inventoryCurrentTab = invTabBtn.dataset.invTab;
+    return renderInventory();
+  }
+
+  // Inventory category filter
+  const invCatBtn = event.target.closest('[data-inv-cat-filter]');
+  if (invCatBtn) {
+    inventoryCategoryFilter = invCatBtn.dataset.invCatFilter;
+    return renderInventory();
+  }
+
+  // Quick item action buttons
+  const consumeBtn = event.target.closest('[data-action="consume-item"]');
+  if (consumeBtn) {
+    return openMovementModal(consumeBtn.dataset.id, 'consumption');
+  }
+  const sellBtn = event.target.closest('[data-action="sell-item"]');
+  if (sellBtn) {
+    return openMovementModal(sellBtn.dataset.id, 'sale_external');
+  }
+  const transferBtn = event.target.closest('[data-action="transfer-item"]');
+  if (transferBtn) {
+    return openMovementModal(transferBtn.dataset.id, 'transfer_internal');
+  }
+  const editItemBtn = event.target.closest('[data-action="edit-item"]');
+  if (editItemBtn) {
+    const allItems = [...(inventoryData?.studioItems || []), ...(inventoryData?.personalItems || [])];
+    const targetItem = allItems.find((i) => Number(i.id) === Number(editItemBtn.dataset.id));
+    if (targetItem) return openItemModal(targetItem, Boolean(targetItem.owner_user_id));
+  }
+  const deleteItemBtn = event.target.closest('[data-action="delete-item"]');
+  if (deleteItemBtn) {
+    if (confirm(`¿Estás seguro de que deseas eliminar el insumo "${deleteItemBtn.dataset.name}"?`)) {
+      await api(`/api/inventory/items/${deleteItemBtn.dataset.id}`, { method: 'DELETE' });
+      return renderInventory();
+    }
+    return;
+  }
+
   if (event.target.closest('[data-retry]')) return await render();
 });
 
@@ -3590,6 +4504,85 @@ document.addEventListener('submit', async (event) => {
       });
       closeModal();
       return await render('finanzas');
+    }
+    if (form.dataset.form === 'inventory-item') {
+      const isPersonal = Boolean(form.querySelector('[name="isPersonal"]')?.checked);
+      await api('/api/inventory/items', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: body.id ? Number(body.id) : null,
+          name: body.name,
+          category: body.category,
+          unit: body.unit,
+          quantity: Number(body.quantity) || 0,
+          minStockAlert: Number(body.minStockAlert) || 0,
+          costPrice: Number(body.costPrice) || 0,
+          salePrice: Number(body.salePrice) || 0,
+          sku: body.sku,
+          isPersonal
+        })
+      });
+      closeModal();
+      return await renderInventory();
+    }
+    if (form.dataset.form === 'inventory-movement') {
+      const createFinancialRecord = Boolean(form.querySelector('[name="createFinancialRecord"]')?.checked);
+      await api('/api/inventory/movements', {
+        method: 'POST',
+        body: JSON.stringify({
+          itemId: Number(body.itemId),
+          movementType: body.movementType,
+          quantity: Number(body.quantity),
+          totalAmount: Number(body.totalAmount) || 0,
+          toUserId: body.toUserId ? Number(body.toUserId) : null,
+          notes: body.notes || '',
+          createFinancialRecord
+        })
+      });
+      closeModal();
+      return await renderInventory();
+    }
+    if (form.dataset.form === 'receipt-ocr-confirm') {
+      const existingItemId = body.existingItemId ? Number(body.existingItemId) : null;
+      let targetItemId = existingItemId;
+      const isPersonal = body.targetInventory === 'personal';
+      const qty = Number(body.quantity) || 1;
+      const totalAmount = Number(body.totalAmount) || 0;
+      const unitPrice = qty > 0 ? Math.round(totalAmount / qty) : totalAmount;
+
+      if (!targetItemId) {
+        const newItemRes = await api('/api/inventory/items', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: body.itemName,
+            category: body.category,
+            unit: body.unit,
+            quantity: 0,
+            costPrice: unitPrice,
+            salePrice: Math.round(unitPrice * 1.3),
+            isPersonal
+          })
+        });
+        targetItemId = newItemRes.item.id;
+      }
+
+      const createExpense = Boolean(form.querySelector('[name="createExpense"]')?.checked);
+      await api('/api/inventory/movements', {
+        method: 'POST',
+        body: JSON.stringify({
+          itemId: targetItemId,
+          movementType: 'purchase',
+          quantity: qty,
+          unitPrice: unitPrice,
+          totalAmount: totalAmount,
+          notes: 'Compra procesada con OCR de Boleta',
+          createFinancialRecord: createExpense
+        })
+      });
+
+      closeModal();
+      alert('¡Compra de insumo registrada con éxito en Inventario' + (createExpense ? ' y Finanzas!' : '!'));
+      return await render('inventario');
     }
   } catch (error) {
     const errorEl = form.querySelector('.form-error');

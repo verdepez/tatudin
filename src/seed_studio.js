@@ -710,6 +710,43 @@ export async function seedStudioData(passedPool = null) {
       `, [studioId, exp.desc, exp.amount, exp.date]);
     }
 
+    // E) Insumos de Inventario para el Estudio y Artistas
+    const sampleInventoryItems = [
+      { artist: null, name: 'Cartuchos Kwadron 03RL 0.25mm', cat: 'needles', unit: 'boxes', qty: 12, min: 4, cost: 24990, sale: 29990, sku: 'KW-03RL' },
+      { artist: null, name: 'Cartuchos Kwadron 07M1 Mag', cat: 'needles', unit: 'boxes', qty: 8, min: 3, cost: 26990, sale: 32000, sku: 'KW-07M1' },
+      { artist: null, name: 'Tinta Dynamic Triple Black 8oz', cat: 'inks', unit: 'bottles', qty: 6, min: 2, cost: 35000, sale: 42000, sku: 'DYN-BLK8' },
+      { artist: null, name: 'Guantes Nitrilo Negro Talla M (100u)', cat: 'hygiene', unit: 'boxes', qty: 25, min: 8, cost: 6990, sale: 8500, sku: 'GLV-M' },
+      { artist: null, name: 'Guantes Nitrilo Negro Talla S (100u)', cat: 'hygiene', unit: 'boxes', qty: 15, min: 5, cost: 6990, sale: 8500, sku: 'GLV-S' },
+      { artist: null, name: 'Parche Dermal Care Roll 15cm x 10m', cat: 'aftercare', unit: 'rolls', qty: 4, min: 2, cost: 28000, sale: 36000, sku: 'DERM-ROLL' },
+      { artist: null, name: 'Crema Aftercare Balm Tatudin 50g', cat: 'aftercare', unit: 'units', qty: 30, min: 10, cost: 4500, sale: 9990, sku: 'BALM-50G' },
+      { artist: null, name: 'Jabón Quirúrgico Green Soap 1L', cat: 'hygiene', unit: 'bottles', qty: 5, min: 2, cost: 12500, sale: 15000, sku: 'GRN-1L' },
+      { artist: residentMap['Camila Tattoo'], name: 'Set Pigmentos Neotrad Solid Ink (12 Colores)', cat: 'inks', unit: 'packs', qty: 2, min: 1, cost: 89000, sale: 0, sku: 'SLD-NEO12' },
+      { artist: residentMap['Camila Tattoo'], name: 'Papel Hectográfico Spirit Thermal (100 Hojas)', cat: 'hygiene', unit: 'boxes', qty: 3, min: 1, cost: 32000, sale: 0, sku: 'SPR-100' },
+      { artist: residentMap['Diego Blackwork'], name: 'Tinta Kuro Sumi Imperial Outlining 6oz', cat: 'inks', unit: 'bottles', qty: 4, min: 2, cost: 28000, sale: 0, sku: 'KUR-OUT6' }
+    ];
+
+    for (const it of sampleInventoryItems) {
+      if (!it.artist) {
+        const checkRes = await client.query('SELECT id FROM inventory_items WHERE studio_id = $1 AND name = $2 AND owner_user_id IS NULL', [studioId, it.name]);
+        if (!checkRes.rowCount) {
+          await client.query(`
+            INSERT INTO inventory_items (
+              studio_id, owner_user_id, name, category, unit, quantity, min_stock_alert, cost_price, sale_price, sku
+            ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9)
+          `, [studioId, it.name, it.cat, it.unit, it.qty, it.min, it.cost, it.sale, it.sku]);
+        }
+      } else {
+        const checkRes = await client.query('SELECT id FROM inventory_items WHERE studio_id = $1 AND name = $2 AND owner_user_id = $3', [studioId, it.name, it.artist]);
+        if (!checkRes.rowCount) {
+          await client.query(`
+            INSERT INTO inventory_items (
+              studio_id, owner_user_id, name, category, unit, quantity, min_stock_alert, cost_price, sale_price, sku
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          `, [studioId, it.artist, it.name, it.cat, it.unit, it.qty, it.min, it.cost, it.sale, it.sku]);
+        }
+      }
+    }
+
     await client.query('COMMIT');
     console.log('✅ Seeding completado exitosamente con todas las entidades y agenda poblada.');
     console.log(`🔑 Credenciales de Acceso Estudio:`);
