@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tatudin-shell-v13';
+const CACHE_NAME = 'tatudin-shell-v14';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
