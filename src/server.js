@@ -546,14 +546,26 @@ app.post('/api/auth/login', async (request, response) => {
       }
     }
 
-    // 2. Fetch or create active studio membership
+    // 2. Fetch active studio membership with valid app access
     let studioId = null;
     try {
-      const memRes = await pool.query(
-        "SELECT studio_id FROM studio_memberships WHERE user_id = $1 AND status = 'active' ORDER BY id ASC LIMIT 1",
+      const allowedMemRes = await pool.query(
+        "SELECT studio_id FROM studio_memberships WHERE user_id = $1 AND status = 'active' AND (has_app_access = TRUE OR role IN ('owner', 'admin')) ORDER BY id ASC LIMIT 1",
         [user.id]
       );
-      studioId = memRes.rows[0]?.studio_id || null;
+      studioId = allowedMemRes.rows[0]?.studio_id || null;
+
+      if (!studioId) {
+        const disabledGuestMem = await pool.query(
+          "SELECT sm.id, s.name AS studio_name FROM studio_memberships sm JOIN studios s ON s.id = sm.studio_id WHERE sm.user_id = $1 AND sm.status = 'active' AND sm.has_app_access = FALSE LIMIT 1",
+          [user.id]
+        );
+        if (disabledGuestMem.rowCount && !user.is_superadmin) {
+          return response.status(403).json({
+            error: `Tu registro como Guest en "${disabledGuestMem.rows[0].studio_name}" no tiene habilitado el acceso directo a la plataforma. Contacta al administrador del estudio para activar tu acceso.`
+          });
+        }
+      }
     } catch {}
 
     if (!studioId) {
@@ -1140,13 +1152,24 @@ app.get('/api/members', requireAuth, async (request, response) => {
       COALESCE(sm.agreement_type, 'commission') AS agreement_type,
       COALESCE(sm.fixed_amount, 0.00)::numeric AS fixed_amount,
       COALESCE(sm.commission_percent, 70.00)::numeric AS commission_percent,
+      COALESCE(sm.has_app_access, TRUE) AS has_app_access,
+      sm.responsible_user_id,
+      resp_u.full_name AS responsible_name,
+      resp_u.email AS responsible_email,
+      resp_sm.role AS responsible_role,
+      COALESCE(sm.supplies_included, '') AS supplies_included,
+      COALESCE(sm.payment_instructions, '') AS payment_instructions,
+      COALESCE(sm.arrival_instructions, '') AS arrival_instructions,
+      COALESCE(sm.access_instructions, '') AS access_instructions,
       sm.created_at, u.created_at AS user_created_at,
       COUNT(a.id)::integer AS appointment_count
       FROM studio_memberships sm
       JOIN users u ON u.id = sm.user_id
+      LEFT JOIN users resp_u ON resp_u.id = sm.responsible_user_id
+      LEFT JOIN studio_memberships resp_sm ON resp_sm.user_id = resp_u.id AND resp_sm.studio_id = sm.studio_id
       LEFT JOIN appointments a ON a.artist_id = u.id AND a.studio_id = sm.studio_id
       WHERE sm.studio_id = $1
-      GROUP BY u.id, u.email, u.full_name, sm.id, sm.role, sm.status, sm.agreement_type, sm.fixed_amount, sm.commission_percent, sm.created_at, u.created_at
+      GROUP BY u.id, u.email, u.full_name, sm.id, sm.role, sm.status, sm.agreement_type, sm.fixed_amount, sm.commission_percent, sm.has_app_access, sm.responsible_user_id, resp_u.full_name, resp_u.email, resp_sm.role, sm.supplies_included, sm.payment_instructions, sm.arrival_instructions, sm.access_instructions, sm.created_at, u.created_at
       ORDER BY sm.created_at DESC, sm.id DESC`, [request.studioId]);
     return response.json(result.rows);
   } catch (error) {
@@ -1157,12 +1180,29 @@ app.get('/api/members', requireAuth, async (request, response) => {
 
 app.post('/api/members', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
-  const { fullName, email, role = 'resident', agreementType = 'commission', commissionPercent = 70.0, fixedAmount = 0, password = 'tatudin123' } = request.body;
+  const {
+    fullName,
+    email,
+    role = 'resident',
+    agreementType = 'commission',
+    commissionPercent = 70.0,
+    fixedAmount = 0,
+    hasAppAccess,
+    responsibleUserId = null,
+    suppliesIncluded = '',
+    paymentInstructions = '',
+    arrivalInstructions = '',
+    accessInstructions = '',
+    password = 'tatudin123'
+  } = request.body;
+
   if (!fullName?.trim() || !email?.trim()) return response.status(400).json({ error: 'Nombre completo y email son requeridos' });
   if (!['admin', 'resident', 'nomad'].includes(role)) return response.status(400).json({ error: 'Rol inválido' });
 
   const validAgreementTypes = ['commission', 'fixed_daily', 'fixed_monthly'];
   const cleanAgreementType = validAgreementTypes.includes(agreementType) ? agreementType : 'commission';
+  // If role is nomad and hasAppAccess is not explicitly passed as true, default to false (safe Guest mode)
+  const cleanHasAppAccess = hasAppAccess !== undefined ? Boolean(hasAppAccess) : (role !== 'nomad');
 
   const client = await pool.connect();
   try {
@@ -1175,15 +1215,37 @@ app.post('/api/members', requireAuth, async (request, response) => {
       const newUser = await client.query('INSERT INTO users (email, password_hash, full_name) VALUES (LOWER($1), $2, $3) RETURNING id', [email.trim(), await hashPassword(password), fullName.trim()]);
       userId = newUser.rows[0].id;
     }
-    const membership = await client.query(`INSERT INTO studio_memberships (user_id, studio_id, role, status, agreement_type, commission_percent, fixed_amount)
-      VALUES ($1, $2, $3, 'active', $4, $5, $6)
+    const membership = await client.query(`INSERT INTO studio_memberships (
+        user_id, studio_id, role, status, agreement_type, commission_percent, fixed_amount,
+        has_app_access, responsible_user_id, supplies_included, payment_instructions, arrival_instructions, access_instructions
+      )
+      VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8, $9, $10, $11, $12)
       ON CONFLICT (user_id, studio_id) DO UPDATE SET
         role = EXCLUDED.role,
         status = 'active',
         agreement_type = EXCLUDED.agreement_type,
         commission_percent = EXCLUDED.commission_percent,
-        fixed_amount = EXCLUDED.fixed_amount
-      RETURNING *`, [userId, request.studioId, role, cleanAgreementType, Number(commissionPercent || 70), Number(fixedAmount || 0)]);
+        fixed_amount = EXCLUDED.fixed_amount,
+        has_app_access = EXCLUDED.has_app_access,
+        responsible_user_id = EXCLUDED.responsible_user_id,
+        supplies_included = EXCLUDED.supplies_included,
+        payment_instructions = EXCLUDED.payment_instructions,
+        arrival_instructions = EXCLUDED.arrival_instructions,
+        access_instructions = EXCLUDED.access_instructions
+      RETURNING *`, [
+        userId,
+        request.studioId,
+        role,
+        cleanAgreementType,
+        Number(commissionPercent || 70),
+        Number(fixedAmount || 0),
+        cleanHasAppAccess,
+        responsibleUserId ? Number(responsibleUserId) : null,
+        suppliesIncluded || '',
+        paymentInstructions || '',
+        arrivalInstructions || '',
+        accessInstructions || ''
+      ]);
     await client.query('COMMIT');
     return response.status(201).json({ ...membership.rows[0], id: userId, membership_id: membership.rows[0].id, ok: true, userId });
   } catch (error) {
@@ -1195,26 +1257,149 @@ app.post('/api/members', requireAuth, async (request, response) => {
 
 app.patch('/api/members/:id', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
-  const { role, status, agreementType, commissionPercent, fixedAmount } = request.body;
+  const {
+    role,
+    status,
+    agreementType,
+    commissionPercent,
+    fixedAmount,
+    hasAppAccess,
+    responsibleUserId,
+    suppliesIncluded,
+    paymentInstructions,
+    arrivalInstructions,
+    accessInstructions
+  } = request.body;
+
   try {
     const result = await pool.query(`UPDATE studio_memberships SET
       role = COALESCE($1, role),
       status = COALESCE($2, status),
       agreement_type = COALESCE($3, agreement_type),
       commission_percent = CASE WHEN $4::numeric IS NOT NULL THEN $4::numeric ELSE commission_percent END,
-      fixed_amount = CASE WHEN $5::numeric IS NOT NULL THEN $5::numeric ELSE fixed_amount END
-      WHERE id = $6 AND studio_id = $7 RETURNING *`, [
+      fixed_amount = CASE WHEN $5::numeric IS NOT NULL THEN $5::numeric ELSE fixed_amount END,
+      has_app_access = CASE WHEN $6::boolean IS NOT NULL THEN $6::boolean ELSE has_app_access END,
+      responsible_user_id = CASE WHEN $7::integer IS NOT NULL THEN $7::integer ELSE responsible_user_id END,
+      supplies_included = COALESCE($8, supplies_included),
+      payment_instructions = COALESCE($9, payment_instructions),
+      arrival_instructions = COALESCE($10, arrival_instructions),
+      access_instructions = COALESCE($11, access_instructions)
+      WHERE id = $12 AND studio_id = $13 RETURNING *`, [
         role || null,
         status || null,
         agreementType || null,
         commissionPercent !== undefined ? Number(commissionPercent) : null,
         fixedAmount !== undefined ? Number(fixedAmount) : null,
+        hasAppAccess !== undefined ? Boolean(hasAppAccess) : null,
+        responsibleUserId !== undefined ? (responsibleUserId ? Number(responsibleUserId) : null) : null,
+        suppliesIncluded !== undefined ? suppliesIncluded : null,
+        paymentInstructions !== undefined ? paymentInstructions : null,
+        arrivalInstructions !== undefined ? arrivalInstructions : null,
+        accessInstructions !== undefined ? accessInstructions : null,
         request.params.id,
         request.studioId
       ]);
     if (!result.rowCount) return response.status(404).json({ error: 'Miembro no encontrado' });
     return response.json(result.rows[0]);
   } catch (error) { return response.status(500).json({ error: error.message }); }
+});
+
+// Guest Guide Automation endpoint
+app.get('/api/members/:id/guest-guide', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const memRes = await pool.query(`
+      SELECT sm.*, u.full_name AS artist_name, u.email AS artist_email,
+             resp_u.full_name AS responsible_name, resp_u.email AS responsible_email,
+             resp_sm.role AS responsible_role,
+             s.name AS studio_name, s.currency,
+             s.guest_arrival_info, s.guest_payment_info, s.guest_supplies_info, s.guest_access_info
+      FROM studio_memberships sm
+      JOIN users u ON u.id = sm.user_id
+      JOIN studios s ON s.id = sm.studio_id
+      LEFT JOIN users resp_u ON resp_u.id = sm.responsible_user_id
+      LEFT JOIN studio_memberships resp_sm ON resp_sm.user_id = resp_u.id AND resp_sm.studio_id = sm.studio_id
+      WHERE sm.id = $1 AND sm.studio_id = $2
+    `, [request.params.id, request.studioId]);
+
+    if (!memRes.rowCount) return response.status(404).json({ error: 'Miembro no encontrado' });
+    const row = memRes.rows[0];
+
+    // Build agreement text
+    let agreementText = '';
+    if (row.agreement_type === 'commission') {
+      agreementText = `Comisión del ${row.commission_percent || 70}% para el artista (${100 - (row.commission_percent || 70)}% para el estudio)`;
+    } else if (row.agreement_type === 'fixed_daily') {
+      agreementText = `Pago fijo diario de $${Number(row.fixed_amount || 0).toLocaleString('es-CL')} CLP por arriendo de puesto`;
+    } else if (row.agreement_type === 'fixed_monthly') {
+      agreementText = `Pago fijo mensual de $${Number(row.fixed_amount || 0).toLocaleString('es-CL')} CLP por arriendo de puesto`;
+    }
+
+    const arrivalInfo = row.arrival_instructions?.trim() || row.guest_arrival_info?.trim() || 'Coordinar con la administración la dirección exacta y referencias de llegada.';
+    const paymentInfo = row.payment_instructions?.trim() || row.guest_payment_info?.trim() || `Modalidad acordada: ${agreementText}. Transferir o liquidar según lo coordinado con el estudio.`;
+    const suppliesInfo = row.supplies_included?.trim() || row.guest_supplies_info?.trim() || 'Camilla hidráulica, apoyabrazos, toallas desechables, papel film, jabón quirúrgico y contenedor biológico.';
+    const accessInfo = row.access_instructions?.trim() || row.guest_access_info?.trim() || 'Horario de acceso: 10:00 a 20:00 hrs. Entrega de llaves y clave de alarma con el encargado.';
+    const responsibleName = row.responsible_name || 'Administración / Dueño del Estudio';
+    const responsibleRole = row.responsible_role === 'owner' ? 'Propietario' : row.responsible_role === 'admin' ? 'Administrador / Manager' : 'Responsable a cargo';
+    const responsibleContact = row.responsible_email || '';
+
+    const whatsappMessage = `👋 *¡Hola ${row.artist_name.split(' ')[0]}! Bienvenido/a a ${row.studio_name}* 🖤\n\n` +
+      `Te compartimos tu *Ficha & Guía de Onboarding para Guest*:\n\n` +
+      `📍 *1. CÓMO LLEGAR AL ESTUDIO:*\n${arrivalInfo}\n\n` +
+      `💼 *2. MODALIDAD Y FORMA DE PAGO:*\n• ${agreementText}\n• ${paymentInfo}\n\n` +
+      `🧴 *3. INSUMOS INCLUIDOS EN EL ARRIENDO:*\n${suppliesInfo}\n\n` +
+      `🔐 *4. APERTURA Y CIERRE DEL ESTUDIO:*\n${accessInfo}\n\n` +
+      `👤 *5. PERSONA A CARGO / CONTACTO:*\n• Responsable: ${responsibleName} (${responsibleRole})\n• Contacto: ${responsibleContact}\n\n` +
+      `¡Mucho éxito en tus sesiones en el estudio! ✨`;
+
+    return response.json({
+      artist_name: row.artist_name,
+      artist_email: row.artist_email,
+      studio_name: row.studio_name,
+      role: row.role,
+      has_app_access: row.has_app_access,
+      agreement_type: row.agreement_type,
+      commission_percent: row.commission_percent,
+      fixed_amount: row.fixed_amount,
+      agreement_text: agreementText,
+      arrival_info: arrivalInfo,
+      payment_info: paymentInfo,
+      supplies_info: suppliesInfo,
+      access_info: accessInfo,
+      responsible_name: responsibleName,
+      responsible_role: responsibleRole,
+      responsible_contact: responsibleContact,
+      responsible_user_id: row.responsible_user_id,
+      whatsapp_message: whatsappMessage,
+      whatsapp_url: `https://wa.me/?text=${encodeURIComponent(whatsappMessage)}`
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+// My guest agreements endpoint (for subscribed artists viewing their terms with studios)
+app.get('/api/my-guest-agreements', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const result = await pool.query(`
+      SELECT sm.id AS membership_id, sm.role, sm.status,
+             sm.agreement_type, sm.commission_percent, sm.fixed_amount,
+             sm.has_app_access, sm.supplies_included, sm.payment_instructions,
+             sm.arrival_instructions, sm.access_instructions, sm.created_at,
+             s.id AS studio_id, s.name AS studio_name, s.currency,
+             s.guest_arrival_info, s.guest_payment_info, s.guest_supplies_info, s.guest_access_info,
+             resp_u.full_name AS responsible_name, resp_u.email AS responsible_email
+      FROM studio_memberships sm
+      JOIN studios s ON s.id = sm.studio_id
+      LEFT JOIN users resp_u ON resp_u.id = sm.responsible_user_id
+      WHERE sm.user_id = $1 AND sm.status = 'active'
+      ORDER BY sm.created_at DESC
+    `, [request.user.id]);
+    return response.json(result.rows);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
 });
 
 // ---------------- SPACES & BOXES ----------------
@@ -2281,6 +2466,12 @@ async function ensureAuthSchema() {
     agreement_type TEXT NOT NULL DEFAULT 'commission' CHECK (agreement_type IN ('commission', 'fixed_daily', 'fixed_monthly')),
     fixed_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     commission_percent NUMERIC(5, 2) NOT NULL DEFAULT 70.00,
+    has_app_access BOOLEAN NOT NULL DEFAULT TRUE,
+    responsible_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    supplies_included TEXT NOT NULL DEFAULT '',
+    payment_instructions TEXT NOT NULL DEFAULT '',
+    arrival_instructions TEXT NOT NULL DEFAULT '',
+    access_instructions TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, studio_id)
   )`);
@@ -2288,6 +2479,17 @@ async function ensureAuthSchema() {
   await safeExec('ALTER TABLE studio_memberships commission_percent', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS commission_percent NUMERIC(5, 2) NOT NULL DEFAULT 70.00`);
   await safeExec('ALTER TABLE studio_memberships agreement_type', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS agreement_type TEXT NOT NULL DEFAULT 'commission'`);
   await safeExec('ALTER TABLE studio_memberships fixed_amount', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS fixed_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00`);
+  await safeExec('ALTER TABLE studio_memberships has_app_access', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS has_app_access BOOLEAN NOT NULL DEFAULT TRUE`);
+  await safeExec('ALTER TABLE studio_memberships responsible_user_id', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS responsible_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+  await safeExec('ALTER TABLE studio_memberships supplies_included', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS supplies_included TEXT NOT NULL DEFAULT ''`);
+  await safeExec('ALTER TABLE studio_memberships payment_instructions', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS payment_instructions TEXT NOT NULL DEFAULT ''`);
+  await safeExec('ALTER TABLE studio_memberships arrival_instructions', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS arrival_instructions TEXT NOT NULL DEFAULT ''`);
+  await safeExec('ALTER TABLE studio_memberships access_instructions', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS access_instructions TEXT NOT NULL DEFAULT ''`);
+
+  await safeExec('ALTER TABLE studios guest_arrival_info', `ALTER TABLE studios ADD COLUMN IF NOT EXISTS guest_arrival_info TEXT NOT NULL DEFAULT ''`);
+  await safeExec('ALTER TABLE studios guest_payment_info', `ALTER TABLE studios ADD COLUMN IF NOT EXISTS guest_payment_info TEXT NOT NULL DEFAULT ''`);
+  await safeExec('ALTER TABLE studios guest_supplies_info', `ALTER TABLE studios ADD COLUMN IF NOT EXISTS guest_supplies_info TEXT NOT NULL DEFAULT ''`);
+  await safeExec('ALTER TABLE studios guest_access_info', `ALTER TABLE studios ADD COLUMN IF NOT EXISTS guest_access_info TEXT NOT NULL DEFAULT ''`);
 
   // 5. Spaces / Boxes
   await safeExec('CREATE TABLE spaces', `CREATE TABLE IF NOT EXISTS spaces (

@@ -1634,12 +1634,18 @@ async function renderSettings() {
                 <div class="setting-item-icon initials">${initials}</div>
                 <div class="setting-item-body">
                   <div class="setting-item-top">
-                    <div class="setting-item-title">
+                    <div class="setting-item-title" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                       <h3>${m.full_name}</h3>
                       <span class="artist-chip ${rInfo.class}">${rInfo.label}</span>
                       <span class="member-status ${m.status}">${m.status === 'active' ? 'Activo' : 'Inactivo'}</span>
+                      ${m.has_app_access ? '<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 11px; font-weight: 700;">📱 Acceso App</span>' : '<span class="badge" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; font-size: 11px; font-weight: 700;">🔒 Sin acceso app</span>'}
                     </div>
-                    <div class="setting-item-action">
+                    <div class="setting-item-action" style="display: flex; gap: 6px; align-items: center;">
+                      ${m.role === 'nomad' ? `
+                        <button type="button" class="secondary small-btn" data-action="open-guest-guide" data-membership-id="${m.membership_id}" title="Ver y enviar guía de onboarding por WhatsApp" style="padding: 4px 9px; font-size: 11.5px; border-color: #25D366; color: #059669; background: rgba(37, 211, 102, 0.08);">
+                          ${icon('whatsapp')} Guía Guest
+                        </button>
+                      ` : ''}
                       ${!isOwner ? `
                         <button class="member-toggle-btn" data-toggle-member-id="${m.membership_id}" data-current-status="${m.status}">
                           ${m.status === 'active' ? 'Desactivar' : 'Activar'}
@@ -1647,10 +1653,11 @@ async function renderSettings() {
                       ` : '<span class="tag-owner">Principal</span>'}
                     </div>
                   </div>
-                  <div class="setting-item-sub">
-                    <button class="edit-commission-tag" data-action="edit-agreement" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-agreement-type="${agreeType}" data-commission="${m.commission_percent || 70}" data-fixed-amount="${m.fixed_amount || 0}" title="Editar modalidad de acuerdo">
+                  <div class="setting-item-sub" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <button class="edit-commission-tag" data-action="edit-agreement" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-agreement-type="${agreeType}" data-commission="${m.commission_percent || 70}" data-fixed-amount="${m.fixed_amount || 0}" data-has-app-access="${m.has_app_access !== false}" data-responsible-id="${m.responsible_user_id || ''}" title="Editar modalidad de acuerdo y permisos">
                       ${agreementIcon} ${agreementLabel}
                     </button>
+                    ${m.responsible_name ? `<span class="member-meta" style="color: var(--ink); font-size: 11.5px;">👤 A cargo: <strong>${m.responsible_name}</strong></span>` : ''}
                     <span class="member-meta">${m.email} · ${m.appointment_count || 0} citas</span>
                   </div>
                 </div>
@@ -2186,12 +2193,18 @@ async function renderManagers() {
                 <div class="setting-item-icon initials">${initials}</div>
                 <div class="setting-item-body">
                   <div class="setting-item-top">
-                    <div class="setting-item-title">
+                    <div class="setting-item-title" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                       <h3>${m.full_name}</h3>
                       <span class="artist-chip ${rInfo.class}">${rInfo.label}</span>
                       <span class="member-status ${m.status}">${m.status === 'active' ? 'Activo' : 'Inactivo'}</span>
+                      ${m.has_app_access ? '<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 11px; font-weight: 700;">📱 Acceso App</span>' : '<span class="badge" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; font-size: 11px; font-weight: 700;">🔒 Sin acceso app</span>'}
                     </div>
-                    <div class="setting-item-action">
+                    <div class="setting-item-action" style="display: flex; gap: 6px; align-items: center;">
+                      ${m.role === 'nomad' ? `
+                        <button type="button" class="secondary small-btn" data-action="open-guest-guide" data-membership-id="${m.membership_id}" title="Ver y enviar guía de onboarding por WhatsApp" style="padding: 4px 9px; font-size: 11.5px; border-color: #25D366; color: #059669; background: rgba(37, 211, 102, 0.08);">
+                          ${icon('whatsapp')} Guía Guest
+                        </button>
+                      ` : ''}
                       ${!isOwner ? `
                         <button class="member-toggle-btn" data-toggle-member-id="${m.membership_id}" data-current-status="${m.status}">
                           ${m.status === 'active' ? 'Desactivar' : 'Activar'}
@@ -2199,10 +2212,11 @@ async function renderManagers() {
                       ` : '<span class="tag-owner">Principal</span>'}
                     </div>
                   </div>
-                  <div class="setting-item-sub">
-                    <button class="edit-commission-tag" data-action="edit-agreement" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-agreement-type="${agreeType}" data-commission="${m.commission_percent || 70}" data-fixed-amount="${m.fixed_amount || 0}" title="Editar modalidad de acuerdo">
+                  <div class="setting-item-sub" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <button class="edit-commission-tag" data-action="edit-agreement" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-agreement-type="${agreeType}" data-commission="${m.commission_percent || 70}" data-fixed-amount="${m.fixed_amount || 0}" data-has-app-access="${m.has_app_access !== false}" data-responsible-id="${m.responsible_user_id || ''}" title="Editar modalidad de acuerdo y permisos">
                       ${agreementIcon} ${agreementLabel}
                     </button>
+                    ${m.responsible_name ? `<span class="member-meta" style="color: var(--ink); font-size: 11.5px;">👤 A cargo: <strong>${m.responsible_name}</strong></span>` : ''}
                     <span class="member-meta">${m.email} · ${m.appointment_count || 0} citas registradas</span>
                   </div>
                 </div>
@@ -4476,53 +4490,116 @@ function newClientModal() {
 }
 
 function newMemberModal() {
+  const eligibleManagers = (members || []).filter((m) => m.role === 'owner' || m.role === 'admin' || m.role === 'resident');
+
   openModal(`
     <p class="eyebrow">EQUIPO & ARTISTAS</p>
     <h2 id="modal-title">Agregar artista o Guest</h2>
     <form data-form="member">
       <label>Nombre completo<input name="fullName" required placeholder="Ej. Alex Rivera" /></label>
       <label>Email<input name="email" type="email" required placeholder="alex@studio.com" /></label>
+      
       <div class="form-grid">
         <label>Tipo de relación / Rol
-          <select name="role">
+          <select name="role" id="new-member-role">
             <option value="resident">Residente (permanente)</option>
-            <option value="nomad">Nómade / Guest (visitante)</option>
+            <option value="nomad" selected>Nómade / Guest (visitante)</option>
             <option value="admin">Administrador del estudio</option>
           </select>
         </label>
         <label>Modalidad de acuerdo
           <select name="agreementType" id="new-member-agreement-type">
             <option value="commission">Comisión por cita (%)</option>
-            <option value="fixed_daily">Pago fijo por día ($ / día)</option>
+            <option value="fixed_daily" selected>Pago fijo por día ($ / día)</option>
             <option value="fixed_monthly">Pago fijo mensual ($ / mes)</option>
           </select>
         </label>
       </div>
 
-      <div id="new-member-commission-field">
+      <div class="form-grid">
+        <label>Persona a cargo del Guest / Artista
+          <select name="responsibleUserId">
+            <option value="">Dueño / General del estudio</option>
+            ${eligibleManagers.map((m) => `<option value="${m.id}">${m.full_name} (${ROLE_MAP[m.role]?.label || m.role})</option>`).join('')}
+          </select>
+        </label>
+        <div style="display: flex; flex-direction: column; justify-content: center; padding-top: 6px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; margin: 0;">
+            <input type="checkbox" name="hasAppAccess" id="new-member-has-access" style="width: 18px; height: 18px; cursor: pointer;" />
+            <span>Habilitar acceso a la plataforma (App)</span>
+          </label>
+          <span id="access-note" style="font-size: 11px; color: var(--muted); margin-top: 4px;">
+            🔒 Desactivado para Guests por defecto. Queda registrado en el sistema sin acceso a la interfaz.
+          </span>
+        </div>
+      </div>
+
+      <div id="new-member-commission-field" style="display: none;">
         <label>Porcentaje para el artista (%)
           <input name="commissionPercent" type="number" min="0" max="100" step="0.5" value="70" />
           <span class="field-hint" style="font-size: 11.5px; color: var(--muted); margin-top: 4px; display: block;">El artista recibe el 70% del valor de la cita y el estudio el 30%.</span>
         </label>
       </div>
 
-      <div id="new-member-fixed-field" style="display: none;">
-        <label id="new-member-fixed-label">Monto fijo (CLP)
+      <div id="new-member-fixed-field">
+        <label id="new-member-fixed-label">Monto fijo por día (CLP)
           <input name="fixedAmount" type="number" min="0" step="1000" value="25000" />
-          <span id="new-member-fixed-hint" class="field-hint" style="font-size: 11.5px; color: var(--muted); margin-top: 4px; display: block;">Costo diario fijo por arriendo de puesto/box. El artista conserva el 100% del valor de sus citas.</span>
+          <span id="new-member-fixed-hint" class="field-hint" style="font-size: 11.5px; color: var(--muted); margin-top: 4px; display: block;">Tarifa diaria fija de arriendo de box. El artista conserva el 100% del valor de sus citas.</span>
         </label>
       </div>
 
-      <button class="primary" type="submit" style="margin-top: 12px;">${icon('userCheck')} Incorporar al equipo</button>
+      <details style="background: var(--surface-high); border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 10px 14px; margin-top: 10px;">
+        <summary style="font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--ink);">
+          ⚙️ Automatizaciones & Guía de Onboarding para el Guest (Opcional)
+        </summary>
+        <div style="display: grid; gap: 10px; margin-top: 10px;">
+          <label style="font-size: 12px;">Insumos incluidos en el arriendo
+            <input name="suppliesIncluded" placeholder="Camilla, apoyabrazos, toallas, papel film, jabón, biológico..." />
+          </label>
+          <label style="font-size: 12px;">Instrucciones de pago / datos de transferencia
+            <input name="paymentInstructions" placeholder="Transferir a Cta Cte Banco Estado..." />
+          </label>
+          <label style="font-size: 12px;">Cómo llegar al estudio (dirección, metro, referencias)
+            <input name="arrivalInstructions" placeholder="Metro Los Leones, Salida B, Edificio Panorámico..." />
+          </label>
+          <label style="font-size: 12px;">Apertura, cierre y normas del estudio
+            <input name="accessInstructions" placeholder="Horario 10:00 a 20:00 hrs. Retirar llave en recepción..." />
+          </label>
+        </div>
+      </details>
+
+      <button class="primary" type="submit" style="margin-top: 14px;">${icon('userCheck')} Incorporar al equipo</button>
       <p class="form-error"></p>
     </form>
   `);
 
+  const roleSelect = document.querySelector('#new-member-role');
+  const accessCheck = document.querySelector('#new-member-has-access');
+  const accessNote = document.querySelector('#access-note');
   const agreeSelect = document.querySelector('#new-member-agreement-type');
   const commField = document.querySelector('#new-member-commission-field');
   const fixedField = document.querySelector('#new-member-fixed-field');
   const fixedLabel = document.querySelector('#new-member-fixed-label');
   const fixedHint = document.querySelector('#new-member-fixed-hint');
+
+  roleSelect?.addEventListener('change', (e) => {
+    if (e.target.value === 'nomad') {
+      accessCheck.checked = false;
+      accessNote.textContent = '🔒 Desactivado para Guests por defecto. Queda registrado en el sistema sin acceso a la interfaz.';
+      agreeSelect.value = 'fixed_daily';
+      commField.style.display = 'none';
+      fixedField.style.display = 'block';
+      if (fixedLabel?.firstChild) fixedLabel.firstChild.textContent = 'Monto fijo por día (CLP)';
+    } else {
+      accessCheck.checked = true;
+      accessNote.textContent = '📱 Acceso completo a la plataforma Tatudin habilitado.';
+      if (e.target.value === 'resident') {
+        agreeSelect.value = 'commission';
+        commField.style.display = 'block';
+        fixedField.style.display = 'none';
+      }
+    }
+  });
 
   agreeSelect?.addEventListener('change', (e) => {
     const type = e.target.value;
@@ -4547,148 +4624,83 @@ function newMemberModal() {
   });
 }
 
-function newSpaceModal() {
-  openModal(`
-    <p class="eyebrow">INFRAESTRUCTURA</p>
-    <h2 id="modal-title">Nuevo Box / Espacio</h2>
-    <form data-form="space">
-      <label>Nombre del espacio<input name="name" required placeholder="Ej. Box 3 · Acústico" /></label>
-      <label>Descripción / Equipamiento<input name="description" placeholder="Camilla hidráulica, luz neutra..." /></label>
-      <div class="form-grid">
-        <label>Tarifa por día (CLP)<input name="pricePerDay" type="number" value="45000" min="0" step="5000" /></label>
-        <label>Tarifa por hora (CLP)<input name="pricePerHour" type="number" value="10000" min="0" step="1000" /></label>
-      </div>
-      <button class="primary" type="submit">${icon('box')} Crear espacio</button>
-      <p class="form-error"></p>
-    </form>
-  `);
-}
+function editAgreementModal(membershipId, artistName, currentAgreementType = 'commission', currentCommission = 70, currentFixed = 0, currentHasAppAccess = true, currentResponsibleId = '') {
+  const m = (members || []).find((mem) => String(mem.membership_id) === String(membershipId)) || {};
+  const agreeType = currentAgreementType || m.agreement_type || 'commission';
+  const comm = currentCommission !== undefined ? currentCommission : (m.commission_percent || 70);
+  const fixed = currentFixed !== undefined ? currentFixed : (m.fixed_amount || 0);
+  const hasAccess = currentHasAppAccess !== undefined ? Boolean(currentHasAppAccess) : (m.has_app_access !== false);
+  const respId = currentResponsibleId || m.responsible_user_id || '';
+  const eligibleManagers = (members || []).filter((mem) => mem.role === 'owner' || mem.role === 'admin' || mem.role === 'resident');
 
-function newTransactionModal() {
-  openModal(`
-    <p class="eyebrow">FINANZAS</p>
-    <h2 id="modal-title">Registrar movimiento</h2>
-    <form data-form="transaction">
-      <label>Tipo de movimiento
-        <select name="kind">
-          <option value="income">Ingreso (+)</option>
-          <option value="expense">Gasto (−)</option>
-        </select>
-      </label>
-      <label>Descripción<input name="description" required placeholder="Ej. Depósito seña o insumos" /></label>
-      <div class="form-grid">
-        <label>Monto (CLP)<input name="amount" type="number" min="0" required placeholder="50000" /></label>
-        <label>Artista asociado (opcional)
-          <select name="artistId">
-            <option value="">General del estudio</option>
-            ${(members || []).map((m) => `<option value="${m.id}">${m.full_name}</option>`).join('')}
-          </select>
-        </label>
-      </div>
-      <button class="primary" type="submit">${icon('plus')} Guardar movimiento</button>
-      <p class="form-error"></p>
-    </form>
-  `);
-}
-
-function userProfileModal() {
-  const initials = ((currentUser?.full_name || currentUser?.fullName || 'TU').split(' ').map((p) => p[0]).slice(0, 2).join('')).toUpperCase();
-  openModal(`
-    <div class="client-detail-header">
-      <div class="initials large">${initials}</div>
-      <div>
-        <p class="eyebrow">MI CUENTA</p>
-        <h2 id="modal-title">${currentUser?.full_name || currentUser?.fullName || 'Perfil de Usuario'}</h2>
-        <p class="client-contact-lead">${currentUser?.email || ''} · ${ROLE_MAP[currentUser?.role]?.label || currentUser?.role || 'Miembro'}</p>
-      </div>
-    </div>
-
-    <form data-form="user-profile" style="margin-top: 10px;">
-      <label>Nombre completo
-        <input name="fullName" value="${currentUser?.full_name || currentUser?.fullName || ''}" required />
-      </label>
-      <label>Email
-        <input name="email" type="email" value="${currentUser?.email || ''}" required />
-      </label>
-
-      <div style="border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px;">
-        <p class="eyebrow">CAMBIAR CONTRASEÑA (OPCIONAL)</p>
-        <div class="form-grid">
-          <label>Contraseña actual
-            <input name="currentPassword" type="password" placeholder="Tu contraseña actual" />
-          </label>
-          <label>Nueva contraseña
-            <input name="newPassword" type="password" placeholder="Mínimo 8 caracteres" minlength="8" />
-          </label>
-        </div>
-      </div>
-
-      <button class="primary" type="submit" style="margin-top: 6px;">${icon('check')} Guardar datos de usuario</button>
-      <p class="form-error"></p>
-    </form>
-
-    <div style="border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; display: flex; justify-content: space-between; align-items: center;">
-      <div>
-        <strong style="font-size: 13px; display: block;">Sesión de cuenta</strong>
-        <span style="font-size: 11px; color: var(--muted);">Cerrar sesión en este dispositivo</span>
-      </div>
-      <button class="secondary" data-action="logout" style="color: var(--red); border-color: var(--red-soft);">
-        Cerrar sesión
-      </button>
-    </div>
-  `);
-}
-
-function settleArtistModal(artistId, artistName, pendingAmount) {
-  openModal(`
-    <p class="eyebrow">FINANZAS & LIQUIDACIÓN</p>
-    <h2 id="modal-title">Liquidar a ${artistName}</h2>
-    <p class="lead" style="margin-bottom: 16px;">Registra el pago de comisiones pendientes como egreso contable del estudio.</p>
-    <form data-form="settle-artist">
-      <input type="hidden" name="artistId" value="${artistId}" />
-      <label>Monto a transferir / liquidar (CLP)
-        <input name="amount" type="number" value="${pendingAmount}" min="1" required />
-      </label>
-      <label>Nota o comprobante (opcional)
-        <input name="notes" placeholder="Ej. Transf. Banco Estado #83910" />
-      </label>
-      <button class="primary" type="submit">${icon('check')} Registrar pago de liquidación</button>
-      <p class="form-error"></p>
-    </form>
-  `);
-}
-
-function editAgreementModal(membershipId, artistName, currentAgreementType = 'commission', currentCommission = 70, currentFixed = 0) {
   openModal(`
     <p class="eyebrow">EQUIPO & ACUERDOS</p>
     <h2 id="modal-title">Acuerdo comercial con ${artistName}</h2>
-    <p class="lead" style="margin-bottom: 16px;">Selecciona la modalidad de arriendo o repartición:</p>
+    <p class="lead" style="margin-bottom: 16px;">Configura la modalidad de arriendo, persona a cargo y permisos de acceso:</p>
     <form data-form="edit-agreement" data-id="${membershipId}">
-      <label>Modalidad de acuerdo
-        <select name="agreementType" id="edit-agreement-type">
-          <option value="commission" ${currentAgreementType === 'commission' ? 'selected' : ''}>Comisión por cita (%)</option>
-          <option value="fixed_daily" ${currentAgreementType === 'fixed_daily' ? 'selected' : ''}>Pago fijo por día ($ / día)</option>
-          <option value="fixed_monthly" ${currentAgreementType === 'fixed_monthly' ? 'selected' : ''}>Pago fijo mensual ($ / mes)</option>
-        </select>
-      </label>
-
-      <div id="edit-commission-field" style="${currentAgreementType === 'commission' ? 'display: block;' : 'display: none;'}">
-        <label>Porcentaje para el artista (%)
-          <input name="commissionPercent" type="number" min="0" max="100" step="0.5" value="${currentCommission || 70}" />
-          <span class="field-hint" style="font-size: 11.5px; color: var(--muted); margin-top: 4px; display: block;">El artista recibe el ${currentCommission || 70}% de cada cita y el estudio el resto.</span>
+      <div class="form-grid">
+        <label>Modalidad de acuerdo
+          <select name="agreementType" id="edit-agreement-type">
+            <option value="commission" ${agreeType === 'commission' ? 'selected' : ''}>Comisión por cita (%)</option>
+            <option value="fixed_daily" ${agreeType === 'fixed_daily' ? 'selected' : ''}>Pago fijo por día ($ / día)</option>
+            <option value="fixed_monthly" ${agreeType === 'fixed_monthly' ? 'selected' : ''}>Pago fijo mensual ($ / mes)</option>
+          </select>
+        </label>
+        <label>Persona a cargo (Responsable)
+          <select name="responsibleUserId">
+            <option value="">Dueño / General del estudio</option>
+            ${eligibleManagers.map((mgr) => `<option value="${mgr.id}" ${String(mgr.id) === String(respId) ? 'selected' : ''}>${mgr.full_name} (${ROLE_MAP[mgr.role]?.label || mgr.role})</option>`).join('')}
+          </select>
         </label>
       </div>
 
-      <div id="edit-fixed-field" style="${currentAgreementType !== 'commission' ? 'display: block;' : 'display: none;'}">
+      <div style="background: var(--surface-high); border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 12px;">
+        <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; margin: 0;">
+          <input type="checkbox" name="hasAppAccess" ${hasAccess ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;" />
+          <span>Habilitar acceso a la plataforma (App / Login)</span>
+        </label>
+        <span style="font-size: 11px; color: var(--muted); display: block; margin-top: 4px;">
+          Si está desactivado, el artista queda registrado en el sistema pero no puede iniciar sesión en la interfaz.
+        </span>
+      </div>
+
+      <div id="edit-commission-field" style="${agreeType === 'commission' ? 'display: block;' : 'display: none;'}">
+        <label>Porcentaje para el artista (%)
+          <input name="commissionPercent" type="number" min="0" max="100" step="0.5" value="${comm}" />
+          <span class="field-hint" style="font-size: 11.5px; color: var(--muted); margin-top: 4px; display: block;">El artista recibe el ${comm}% de cada cita y el estudio el resto.</span>
+        </label>
+      </div>
+
+      <div id="edit-fixed-field" style="${agreeType !== 'commission' ? 'display: block;' : 'display: none;'}">
         <label id="edit-fixed-label">Monto fijo (CLP)
-          <input name="fixedAmount" type="number" min="0" step="1000" value="${currentFixed || (currentAgreementType === 'fixed_monthly' ? 250000 : 25000)}" />
+          <input name="fixedAmount" type="number" min="0" step="1000" value="${fixed || (agreeType === 'fixed_monthly' ? 250000 : 25000)}" />
           <span id="edit-fixed-hint" class="field-hint" style="font-size: 11.5px; color: var(--muted); margin-top: 4px; display: block;">
-            ${currentAgreementType === 'fixed_monthly' ? 'Tarifa mensual fija de arriendo.' : 'Tarifa diaria fija de arriendo.'}
+            ${agreeType === 'fixed_monthly' ? 'Tarifa mensual fija de arriendo.' : 'Tarifa diaria fija de arriendo.'}
           </span>
         </label>
       </div>
 
-      <button class="primary" type="submit" style="margin-top: 12px;">${icon('check')} Guardar acuerdo</button>
+      <details style="background: var(--surface-high); border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 10px 14px; margin-top: 10px;">
+        <summary style="font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--ink);">
+          📋 Instrucciones de Onboarding y Guía de Guest
+        </summary>
+        <div style="display: grid; gap: 10px; margin-top: 10px;">
+          <label style="font-size: 12px;">Insumos incluidos en el arriendo
+            <input name="suppliesIncluded" value="${m.supplies_included || ''}" placeholder="Camilla, apoyabrazos, toallas, papel film..." />
+          </label>
+          <label style="font-size: 12px;">Instrucciones de pago / datos de transferencia
+            <input name="paymentInstructions" value="${m.payment_instructions || ''}" placeholder="Transferir a Cta Cte..." />
+          </label>
+          <label style="font-size: 12px;">Cómo llegar al estudio (dirección, metro, referencias)
+            <input name="arrivalInstructions" value="${m.arrival_instructions || ''}" placeholder="Dirección y referencias..." />
+          </label>
+          <label style="font-size: 12px;">Apertura, cierre y normas del estudio
+            <input name="accessInstructions" value="${m.access_instructions || ''}" placeholder="Horarios de apertura y llaves..." />
+          </label>
+        </div>
+      </details>
+
+      <button class="primary" type="submit" style="margin-top: 14px;">${icon('check')} Guardar acuerdo y permisos</button>
       <p class="form-error"></p>
     </form>
   `);
@@ -4716,6 +4728,91 @@ function editAgreementModal(membershipId, artistName, currentAgreementType = 'co
       if (fixedHint) fixedHint.textContent = 'Tarifa mensual fija de arriendo para el residente.';
     }
   });
+}
+
+async function openGuestGuideModal(membershipId) {
+  openModal(`
+    <p class="eyebrow">AUTOMATIZACIÓN & ONBOARDING</p>
+    <h2 id="modal-title">Cargando guía de Guest...</h2>
+    <p class="lead">Obteniendo información del estudio y acuerdo...</p>
+  `);
+
+  try {
+    const guide = await api(`/api/members/${membershipId}/guest-guide`);
+    openModal(`
+      <p class="eyebrow">AUTOMATIZACIÓN & ONBOARDING DE GUEST</p>
+      <h2 id="modal-title">Guía para ${guide.artist_name}</h2>
+      <div style="background: var(--surface-high); border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 16px; margin: 12px 0 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <strong style="font-size: 14px; color: var(--ink); display: block;">${guide.artist_name} (${guide.artist_email})</strong>
+            <span style="font-size: 12px; color: var(--muted);">${guide.studio_name} · ${guide.agreement_text}</span>
+          </div>
+          <span class="badge" style="background: ${guide.has_app_access ? '#d1fae5' : '#f3f4f6'}; color: ${guide.has_app_access ? '#065f46' : '#4b5563'}; font-size: 11px;">
+            ${guide.has_app_access ? '📱 Acceso App Habilitado' : '🔒 Sin acceso app (Solo registro)'}
+          </span>
+        </div>
+      </div>
+
+      <div class="guest-guide-sections" style="display: grid; gap: 12px; margin-bottom: 18px;">
+        <div class="guide-item" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
+          <strong style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); margin-bottom: 4px;">
+            📍 1. Cómo llegar al estudio
+          </strong>
+          <p style="font-size: 12px; color: var(--muted); margin: 0; line-height: 1.45;">${guide.arrival_info}</p>
+        </div>
+
+        <div class="guide-item" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
+          <strong style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); margin-bottom: 4px;">
+            💼 2. Modalidad y forma de pago
+          </strong>
+          <p style="font-size: 12px; color: var(--muted); margin: 0; line-height: 1.45;">${guide.payment_info}</p>
+        </div>
+
+        <div class="guide-item" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
+          <strong style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); margin-bottom: 4px;">
+            🧴 3. Insumos incluidos en el arriendo
+          </strong>
+          <p style="font-size: 12px; color: var(--muted); margin: 0; line-height: 1.45;">${guide.supplies_info}</p>
+        </div>
+
+        <div class="guide-item" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
+          <strong style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); margin-bottom: 4px;">
+            🔐 4. Apertura y cierre del estudio
+          </strong>
+          <p style="font-size: 12px; color: var(--muted); margin: 0; line-height: 1.45;">${guide.access_info}</p>
+        </div>
+
+        <div class="guide-item" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
+          <strong style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); margin-bottom: 4px;">
+            👤 5. Persona responsable del Guest
+          </strong>
+          <p style="font-size: 12px; color: var(--muted); margin: 0; line-height: 1.45;">
+            <strong>${guide.responsible_name}</strong> (${guide.responsible_role}) ${guide.responsible_contact ? `· ${guide.responsible_contact}` : ''}
+          </p>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <button type="button" class="secondary" data-action="copy-guest-guide-text" data-text="${encodeURIComponent(guide.whatsapp_message)}">
+          📋 Copiar Guía completa
+        </button>
+        <div style="display: flex; gap: 8px;">
+          <a href="${guide.whatsapp_url}" target="_blank" rel="noopener noreferrer" class="primary" style="background: #25D366; color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-md); font-weight: 700; font-size: 13px;">
+            ${icon('whatsapp')} Enviar por WhatsApp
+          </a>
+          <button type="button" class="secondary" data-close-modal>Cerrar</button>
+        </div>
+      </div>
+    `);
+  } catch (err) {
+    openModal(`
+      <p class="eyebrow">ERROR</p>
+      <h2>No se pudo cargar la guía</h2>
+      <p class="lead">${err.message}</p>
+      <button class="secondary" data-close-modal>Cerrar</button>
+    `);
+  }
 }
 
 function editCommissionModal(membershipId, artistName, currentPercent) {
@@ -4816,6 +4913,97 @@ function exportFinancesCSV(artistSummary, transactions, overview = {}) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+async function userProfileModal() {
+  const initials = ((currentUser?.full_name || currentUser?.fullName || 'TU').split(' ').map((p) => p[0]).slice(0, 2).join('')).toUpperCase();
+  
+  // Fetch active studio agreements for this artist account (if subscribed/guest in studios)
+  const guestAgreements = await api('/api/my-guest-agreements').catch(() => []);
+
+  openModal(`
+    <div class="client-detail-header">
+      <div class="initials large">${initials}</div>
+      <div>
+        <p class="eyebrow">MI CUENTA</p>
+        <h2 id="modal-title">${currentUser?.full_name || currentUser?.fullName || 'Perfil de Usuario'}</h2>
+        <p class="client-contact-lead">${currentUser?.email || ''} · ${ROLE_MAP[currentUser?.role]?.label || currentUser?.role || 'Miembro'}</p>
+      </div>
+    </div>
+
+    <!-- Active Guest Agreements section if subscribed/registered -->
+    ${guestAgreements.length > 0 ? `
+      <div style="background: var(--surface-high); border: 1.5px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; margin: 12px 0 16px;">
+        <p class="eyebrow" style="margin-bottom: 6px; color: var(--ink);">💼 MIS PACTOS Y ACUERDOS CON ESTUDIOS</p>
+        <div style="display: grid; gap: 10px;">
+          ${guestAgreements.map((ag) => {
+            let agreeBadge = '';
+            if (ag.agreement_type === 'commission') {
+              agreeBadge = `${ag.commission_percent}% Comisión (${100 - ag.commission_percent}% estudio)`;
+            } else if (ag.agreement_type === 'fixed_daily') {
+              agreeBadge = `Pago Fijo: ${money(ag.fixed_amount)} / día`;
+            } else if (ag.agreement_type === 'fixed_monthly') {
+              agreeBadge = `Pago Fijo: ${money(ag.fixed_amount)} / mes`;
+            }
+
+            return `
+              <div style="background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 10px 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap;">
+                  <strong style="font-size: 13px; color: var(--ink);">${ag.studio_name}</strong>
+                  <span class="badge" style="background: #dbeafe; color: #1e40af; font-size: 11px; font-weight: 700;">
+                    ${agreeBadge}
+                  </span>
+                </div>
+                <div style="font-size: 11.5px; color: var(--muted); margin-top: 4px;">
+                  Rol: <strong>${ROLE_MAP[ag.role]?.label || ag.role}</strong>
+                  ${ag.responsible_name ? ` · Persona a cargo: <strong>${ag.responsible_name}</strong>` : ''}
+                </div>
+                ${ag.supplies_included ? `
+                  <div style="font-size: 11px; color: var(--muted); margin-top: 4px; border-top: 1px dashed var(--line-soft); padding-top: 4px;">
+                    🧴 Insumos incluidos: ${ag.supplies_included}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : ''}
+
+    <form data-form="user-profile" style="margin-top: 10px;">
+      <label>Nombre completo
+        <input name="fullName" value="${currentUser?.full_name || currentUser?.fullName || ''}" required />
+      </label>
+      <label>Email
+        <input name="email" type="email" value="${currentUser?.email || ''}" required />
+      </label>
+
+      <div style="border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px;">
+        <p class="eyebrow">CAMBIAR CONTRASEÑA (OPCIONAL)</p>
+        <div class="form-grid">
+          <label>Contraseña actual
+            <input name="currentPassword" type="password" placeholder="Tu contraseña actual" />
+          </label>
+          <label>Nueva contraseña
+            <input name="newPassword" type="password" placeholder="Mínimo 8 caracteres" minlength="8" />
+          </label>
+        </div>
+      </div>
+
+      <button class="primary" type="submit" style="margin-top: 6px;">${icon('check')} Guardar datos de usuario</button>
+      <p class="form-error"></p>
+    </form>
+
+    <div style="border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <strong style="font-size: 13px; display: block;">Sesión de cuenta</strong>
+        <span style="font-size: 11px; color: var(--muted);">Cerrar sesión en este dispositivo</span>
+      </div>
+      <button class="secondary" data-action="logout" style="color: var(--red); border-color: var(--red-soft);">
+        Cerrar sesión
+      </button>
+    </div>
+  `);
 }
 
 // Global Event Listeners
@@ -5013,11 +5201,36 @@ document.addEventListener('click', async (event) => {
     return settleArtistModal(artistId, artistName, pending);
   }
 
+  // Open Guest Guide Modal
+  const guestGuideBtn = event.target.closest('[data-action="open-guest-guide"]');
+  if (guestGuideBtn) {
+    return openGuestGuideModal(guestGuideBtn.dataset.membershipId);
+  }
+
+  // Copy Guest Guide Text
+  const copyGuideBtn = event.target.closest('[data-action="copy-guest-guide-text"]');
+  if (copyGuideBtn) {
+    const text = decodeURIComponent(copyGuideBtn.dataset.text || '');
+    navigator.clipboard?.writeText(text);
+    const orig = copyGuideBtn.innerHTML;
+    copyGuideBtn.innerHTML = '✓ ¡Copiado!';
+    setTimeout(() => { copyGuideBtn.innerHTML = orig; }, 2000);
+    return;
+  }
+
   // Edit agreement & commission
   const editAgreeBtn = event.target.closest('[data-action="edit-agreement"], [data-action="edit-commission"]');
   if (editAgreeBtn) {
-    const { membershipId, artistName, agreementType, commission, fixedAmount } = editAgreeBtn.dataset;
-    return editAgreementModal(membershipId, artistName, agreementType || 'commission', Number(commission || 70), Number(fixedAmount || 0));
+    const { membershipId, artistName, agreementType, commission, fixedAmount, hasAppAccess, responsibleId } = editAgreeBtn.dataset;
+    return editAgreementModal(
+      membershipId,
+      artistName,
+      agreementType || 'commission',
+      Number(commission || 70),
+      Number(fixedAmount || 0),
+      hasAppAccess !== 'false',
+      responsibleId || ''
+    );
   }
 
   // Export CSV
@@ -5613,6 +5826,7 @@ document.addEventListener('submit', async (event) => {
       return await clientDetailModal(form.dataset.id);
     }
     if (form.dataset.form === 'member') {
+      const hasAppAccess = Boolean(form.querySelector('[name="hasAppAccess"]')?.checked);
       await api('/api/members', {
         method: 'POST',
         body: JSON.stringify({
@@ -5621,7 +5835,13 @@ document.addEventListener('submit', async (event) => {
           role: body.role,
           agreementType: body.agreementType || 'commission',
           commissionPercent: Number(body.commissionPercent || 70),
-          fixedAmount: Number(body.fixedAmount || 0)
+          fixedAmount: Number(body.fixedAmount || 0),
+          hasAppAccess,
+          responsibleUserId: body.responsibleUserId ? Number(body.responsibleUserId) : null,
+          suppliesIncluded: body.suppliesIncluded || '',
+          paymentInstructions: body.paymentInstructions || '',
+          arrivalInstructions: body.arrivalInstructions || '',
+          accessInstructions: body.accessInstructions || ''
         })
       });
       members = await api('/api/members').catch(() => []);
@@ -5630,12 +5850,19 @@ document.addEventListener('submit', async (event) => {
       return await render(currentActiveView);
     }
     if (form.dataset.form === 'edit-agreement' || form.dataset.form === 'edit-commission') {
+      const hasAppAccess = Boolean(form.querySelector('[name="hasAppAccess"]')?.checked);
       await api(`/api/members/${form.dataset.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           agreementType: body.agreementType || 'commission',
           commissionPercent: Number(body.commissionPercent || 70),
-          fixedAmount: Number(body.fixedAmount || 0)
+          fixedAmount: Number(body.fixedAmount || 0),
+          hasAppAccess,
+          responsibleUserId: body.responsibleUserId ? Number(body.responsibleUserId) : null,
+          suppliesIncluded: body.suppliesIncluded !== undefined ? body.suppliesIncluded : '',
+          paymentInstructions: body.paymentInstructions !== undefined ? body.paymentInstructions : '',
+          arrivalInstructions: body.arrivalInstructions !== undefined ? body.arrivalInstructions : '',
+          accessInstructions: body.accessInstructions !== undefined ? body.accessInstructions : ''
         })
       });
       members = await api('/api/members').catch(() => []);

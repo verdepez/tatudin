@@ -961,6 +961,26 @@ svg {
   margin: 0;
 }
 
+/* Guest Guide & Onboarding Automations */
+.guest-guide-sections {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.guest-guide-sections .guide-item {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  background: var(--surface);
+  transition: all var(--transition-fast);
+}
+
+.guest-guide-sections .guide-item:hover {
+  border-color: var(--ink);
+  background: var(--surface-high);
+}
+
 /* Stats Cards */
 .stats {
   display: grid;
