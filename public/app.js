@@ -99,7 +99,15 @@ let categories = [];
 let userStudios = [];
 let activeStudio = null;
 let currentUser = null;
-let agendaFilter = { date: null, artistId: 'all', spaceId: 'all', categoryId: 'all' };
+let agendaFilter = {
+  viewMode: 'week', // 'week' | 'month'
+  currentDate: new Date(),
+  date: null,
+  artistId: 'all',
+  spaceId: 'all',
+  categoryId: 'all',
+  status: 'all'
+};
 let onboarding = JSON.parse(localStorage.getItem('tatudin_onboarding') || '{}');
 
 function formatTime(isoString) {
@@ -117,6 +125,67 @@ function formatDateISO(date) {
   const month = (d.getMonth() + 1).toString().padStart(2, '0');
   const day = d.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function getWeekRange(baseDate = new Date()) {
+  const d = new Date(baseDate);
+  const day = d.getDay(); // 0 is Sunday
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+  const monday = new Date(d.getFullYear(), d.getMonth(), diff);
+  monday.setHours(0, 0, 0, 0);
+
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const cur = new Date(monday);
+    cur.setDate(monday.getDate() + i);
+    days.push(cur);
+  }
+  const sunday = days[6];
+  const startMonth = monday.toLocaleDateString('es-CL', { month: 'short' });
+  const endMonth = sunday.toLocaleDateString('es-CL', { month: 'short', year: 'numeric' });
+  const label = startMonth === sunday.toLocaleDateString('es-CL', { month: 'short' })
+    ? `${monday.getDate()} – ${sunday.getDate()} de ${endMonth}`
+    : `${monday.getDate()} ${startMonth} – ${sunday.getDate()} ${endMonth}`;
+
+  return {
+    days,
+    startDateISO: formatDateISO(monday),
+    endDateISO: formatDateISO(sunday),
+    label
+  };
+}
+
+function getMonthMatrix(baseDate = new Date()) {
+  const year = baseDate.getFullYear();
+  const month = baseDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+
+  const startDayOfWeek = firstDay.getDay(); // 0 is Sunday
+  const startOffset = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; // days back to Monday
+
+  const startDate = new Date(year, month, 1 - startOffset);
+  const matrix = [];
+  let cur = new Date(startDate);
+
+  while (matrix.length < 35 || cur <= lastDay || cur.getDay() !== 1) {
+    matrix.push(new Date(cur));
+    cur.setDate(cur.getDate() + 1);
+    if (matrix.length >= 42) break;
+  }
+
+  const endDay = new Date(cur);
+  endDay.setDate(endDay.getDate() - 1);
+  const monthName = firstDay.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+
+  return {
+    matrix,
+    year,
+    month,
+    startDateISO: formatDateISO(startDate),
+    endDateISO: formatDateISO(endDay),
+    label: monthName.charAt(0).toUpperCase() + monthName.slice(1)
+  };
 }
 
 function getNextDefaultDateTime() {
@@ -763,14 +832,29 @@ async function render(view = 'dashboard') {
 }
 
 async function renderAgenda() {
-  const queryParams = new URLSearchParams();
-  if (agendaFilter.artistId !== 'all') queryParams.append('artistId', agendaFilter.artistId);
-  if (agendaFilter.spaceId !== 'all') queryParams.append('spaceId', agendaFilter.spaceId);
-  if (agendaFilter.categoryId !== 'all') queryParams.append('categoryId', agendaFilter.categoryId);
-  if (agendaFilter.date) queryParams.append('date', agendaFilter.date);
+  const isWeekView = agendaFilter.viewMode !== 'month';
+  const rangeInfo = isWeekView ? getWeekRange(agendaFilter.currentDate) : getMonthMatrix(agendaFilter.currentDate);
 
-  const [appointmentsList, membersList, spacesList, categoriesList] = await Promise.all([
-    api(`/api/appointments?${queryParams.toString()}`).catch(() => []),
+  // Range parameters to get all appointments within the visible calendar period for date badges
+  const rangeParams = new URLSearchParams();
+  rangeParams.append('startDate', rangeInfo.startDateISO);
+  rangeParams.append('endDate', rangeInfo.endDateISO);
+  if (agendaFilter.artistId !== 'all') rangeParams.append('artistId', agendaFilter.artistId);
+  if (agendaFilter.spaceId !== 'all') rangeParams.append('spaceId', agendaFilter.spaceId);
+  if (agendaFilter.categoryId !== 'all') rangeParams.append('categoryId', agendaFilter.categoryId);
+  if (agendaFilter.status !== 'all') rangeParams.append('status', agendaFilter.status);
+
+  // Active list parameters (if a specific day is selected, filter by that day)
+  const listParams = new URLSearchParams(rangeParams.toString());
+  if (agendaFilter.date) {
+    listParams.delete('startDate');
+    listParams.delete('endDate');
+    listParams.append('date', agendaFilter.date);
+  }
+
+  const [rangeAppointments, appointmentsList, membersList, spacesList, categoriesList] = await Promise.all([
+    api(`/api/appointments?${rangeParams.toString()}`).catch(() => []),
+    api(`/api/appointments?${listParams.toString()}`).catch(() => []),
     api('/api/members').catch(() => []),
     api('/api/spaces').catch(() => []),
     api('/api/categories').catch(() => [])
@@ -779,93 +863,188 @@ async function renderAgenda() {
   spaces = spacesList;
   categories = categoriesList;
 
-  const daysOfWeek = [0, 1, 2, 3, 4, 5, 6].map((offset) => {
-    const date = new Date();
-    date.setDate(date.getDate() + offset);
-    const dateISO = formatDateISO(date);
-    return {
-      weekday: date.toLocaleDateString('es-CL', { weekday: 'short' }),
-      day: date.getDate(),
-      dateISO,
-      isSelected: agendaFilter.date === dateISO
-    };
+  // Build appointments count map per day for dots/badges
+  const apptsPerDay = {};
+  rangeAppointments.forEach((a) => {
+    const dayISO = a.starts_at?.slice(0, 10);
+    if (dayISO) apptsPerDay[dayISO] = (apptsPerDay[dayISO] || 0) + 1;
   });
+
+  const todayISO = formatDateISO(new Date());
 
   app.innerHTML = `
     <section class="page-heading">
       <div>
         <p class="eyebrow">AGENDA & CALENDARIO</p>
         <h1>Tu calendario<span class="dot">.</span></h1>
-        <p class="lead">Filtra por categorías de compromiso, artistas o boxes para coordinar tu día.</p>
+        <p class="lead">Navega por semanas o meses y filtra por categorías, artistas, boxes y estados.</p>
       </div>
       <button class="primary" data-action="new-booking">${icon('plus')} <span>Nuevo compromiso</span></button>
     </section>
 
-    <!-- Category Filter Chips -->
-    <section class="agenda-category-chips">
-      <button class="cat-filter-btn ${agendaFilter.categoryId === 'all' ? 'active' : ''}" data-select-category="all">
-        Todos <span class="badge">${appointmentsList.length}</span>
-      </button>
-      ${categories.map((c) => `
-        <button class="cat-filter-btn ${String(agendaFilter.categoryId) === String(c.id) ? 'active' : ''}" data-select-category="${c.id}" style="--cat-color: ${c.color}">
-          <span class="cat-color-dot" style="background: ${c.color}"></span>
-          <span>${c.name}</span>
-          <span class="badge">${c.appointment_count || 0}</span>
-        </button>
-      `).join('')}
-      <button class="text-button" data-view="ajustes" style="margin-left: auto; font-size: 12px; white-space: nowrap; color: var(--muted);">
-        ${icon('edit')} Gestionar categorías
-      </button>
-    </section>
-
-    <!-- Interactive Week Filter -->
-    <section class="week panel">
-      <div class="week-header">
-        <span class="week-title">${agendaFilter.date ? `Filtrando día: ${agendaFilter.date}` : 'Próximos 7 días'}</span>
-        ${agendaFilter.date ? `<button class="text-button" data-clear-date>Mostrar toda la semana</button>` : ''}
-      </div>
-      <div class="week-days">
-        ${daysOfWeek.map((d) => `
-          <button class="day ${d.isSelected ? 'selected' : ''}" data-select-date="${d.dateISO}">
-            <span>${d.weekday}</span>
-            <strong>${d.day}</strong>
+    <!-- Calendar Card with View Toggle & Navigation -->
+    <section class="panel calendar-card">
+      <div class="calendar-header-bar">
+        <!-- View Toggle (Semana vs Mes) -->
+        <div class="calendar-view-toggle">
+          <button class="cal-view-btn ${isWeekView ? 'active' : ''}" data-cal-view="week">
+            Semanal (7 días)
           </button>
-        `).join('')}
+          <button class="cal-view-btn ${!isWeekView ? 'active' : ''}" data-cal-view="month">
+            Mensual
+          </button>
+        </div>
+
+        <!-- Navigation Controls (<, Hoy, >) -->
+        <div class="calendar-nav-controls">
+          <button class="cal-nav-btn" data-action="cal-prev" title="Anterior" aria-label="Anterior">
+            ${icon('back')}
+          </button>
+          <button class="cal-today-btn" data-action="cal-today">
+            Hoy
+          </button>
+          <button class="cal-nav-btn" data-action="cal-next" title="Siguiente" aria-label="Siguiente">
+            ${icon('arrowRight')}
+          </button>
+          <strong class="cal-current-label">${rangeInfo.label}</strong>
+        </div>
       </div>
+
+      ${agendaFilter.date ? `
+        <div class="cal-selected-day-banner">
+          <span>📅 Filtrando por día seleccionado: <strong>${agendaFilter.date}</strong></span>
+          <button class="text-button" data-clear-date style="color: #6D28D9; font-size: 11.5px; font-weight: 800;">
+            ✕ Ver todo el período (${isWeekView ? '7 días' : 'Mes'})
+          </button>
+        </div>
+      ` : ''}
+
+      ${isWeekView ? `
+        <!-- Week Days Grid (7 days) -->
+        <div class="week-days">
+          ${rangeInfo.days.map((d) => {
+            const dateISO = formatDateISO(d);
+            const isSelected = agendaFilter.date === dateISO;
+            const isToday = dateISO === todayISO;
+            const count = apptsPerDay[dateISO] || 0;
+            const weekday = d.toLocaleDateString('es-CL', { weekday: 'short' });
+            return `
+              <button class="day ${isSelected ? 'selected' : ''} ${isToday ? 'is-today' : ''}" data-select-date="${dateISO}" title="${d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}">
+                <span class="day-name">${weekday}</span>
+                <strong class="day-num">${d.getDate()}</strong>
+                ${count > 0 ? `<span class="day-badge-dot" title="${count} ${count === 1 ? 'compromiso' : 'compromisos'}">${count}</span>` : '<span class="day-badge-placeholder"></span>'}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      ` : `
+        <!-- Month Calendar Grid -->
+        <div class="month-calendar-grid">
+          ${['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(w => `<div class="month-weekday-header">${w}</div>`).join('')}
+          ${rangeInfo.matrix.map((d) => {
+            const dateISO = formatDateISO(d);
+            const isSelected = agendaFilter.date === dateISO;
+            const isToday = dateISO === todayISO;
+            const isOtherMonth = d.getMonth() !== rangeInfo.month;
+            const count = apptsPerDay[dateISO] || 0;
+            return `
+              <button class="month-day-cell ${isOtherMonth ? 'other-month' : ''} ${isToday ? 'is-today' : ''} ${isSelected ? 'selected' : ''}" data-select-date="${dateISO}" title="${d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}">
+                <span class="month-day-num">${d.getDate()}</span>
+                ${count > 0 ? `<span class="month-day-badge" title="${count} citas">${count}</span>` : ''}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      `}
     </section>
 
-    <!-- Filters Bar (Artist, Space & Count) -->
+    <!-- Filters Bar (Dropdowns for Categories, Artists, Boxes, Status) -->
     <section class="agenda-filter-bar">
+      <!-- 1. Categoría Dropdown (replaces lateral slider) -->
       <div class="filter-group">
-        <label>Artista / Responsable:</label>
+        <label for="agenda-category-filter">Categoría:</label>
+        <select id="agenda-category-filter">
+          <option value="all" ${agendaFilter.categoryId === 'all' ? 'selected' : ''}>Todas las categorías (${rangeAppointments.length})</option>
+          ${categories.map((c) => `
+            <option value="${c.id}" ${String(agendaFilter.categoryId) === String(c.id) ? 'selected' : ''}>
+              ${c.name} (${c.appointment_count || 0})
+            </option>
+          `).join('')}
+        </select>
+      </div>
+
+      <!-- 2. Artista / Responsable -->
+      <div class="filter-group">
+        <label for="agenda-artist-filter">Artista / Responsable:</label>
         <select id="agenda-artist-filter">
-          <option value="all" ${agendaFilter.artistId === 'all' ? 'selected' : ''}>Todos (${members.length})</option>
-          ${members.map((m) => `<option value="${m.id}" ${String(agendaFilter.artistId) === String(m.id) ? 'selected' : ''}>${m.full_name}</option>`).join('')}
+          <option value="all" ${agendaFilter.artistId === 'all' ? 'selected' : ''}>Todos los artistas (${members.length})</option>
+          ${members.map((m) => `
+            <option value="${m.id}" ${String(agendaFilter.artistId) === String(m.id) ? 'selected' : ''}>
+              ${m.full_name}
+            </option>
+          `).join('')}
         </select>
       </div>
 
+      <!-- 3. Box / Espacio -->
       <div class="filter-group">
-        <label>Box / Espacio:</label>
+        <label for="agenda-space-filter">Box / Espacio:</label>
         <select id="agenda-space-filter">
-          <option value="all" ${agendaFilter.spaceId === 'all' ? 'selected' : ''}>Todos los boxes</option>
-          ${spaces.map((s) => `<option value="${s.id}" ${String(agendaFilter.spaceId) === String(s.id) ? 'selected' : ''}>${s.name}</option>`).join('')}
+          <option value="all" ${agendaFilter.spaceId === 'all' ? 'selected' : ''}>Todos los boxes (${spaces.length})</option>
+          ${spaces.map((s) => `
+            <option value="${s.id}" ${String(agendaFilter.spaceId) === String(s.id) ? 'selected' : ''}>
+              ${s.name}
+            </option>
+          `).join('')}
         </select>
       </div>
 
-      <span class="count">${appointmentsList.length} ${appointmentsList.length === 1 ? 'compromiso' : 'compromisos'}</span>
+      <!-- 4. Estado -->
+      <div class="filter-group">
+        <label for="agenda-status-filter">Estado:</label>
+        <select id="agenda-status-filter">
+          <option value="all" ${agendaFilter.status === 'all' ? 'selected' : ''}>Todos los estados</option>
+          <option value="confirmed" ${agendaFilter.status === 'confirmed' ? 'selected' : ''}>Confirmadas</option>
+          <option value="deposit_paid" ${agendaFilter.status === 'deposit_paid' ? 'selected' : ''}>Seña pagada</option>
+          <option value="in_session" ${agendaFilter.status === 'in_session' ? 'selected' : ''}>En sesión</option>
+          <option value="completed" ${agendaFilter.status === 'completed' ? 'selected' : ''}>Completadas</option>
+          <option value="cancelled" ${agendaFilter.status === 'cancelled' ? 'selected' : ''}>Canceladas</option>
+        </select>
+      </div>
+
+      <!-- Summary & Clear Filters Button -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; width: 100%; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line-soft);">
+        <span class="count" style="font-weight: 700;">
+          ${appointmentsList.length} ${appointmentsList.length === 1 ? 'compromiso encontrado' : 'compromisos encontrados'}
+          ${agendaFilter.date ? `(el ${agendaFilter.date})` : `(en este período)`}
+        </span>
+        ${(agendaFilter.categoryId !== 'all' || agendaFilter.artistId !== 'all' || agendaFilter.spaceId !== 'all' || agendaFilter.status !== 'all' || agendaFilter.date) ? `
+          <button class="text-button" data-clear-all-filters style="color: var(--accent); font-size: 12px; font-weight: 700;">
+            ✕ Limpiar todos los filtros
+          </button>
+        ` : ''}
+      </div>
     </section>
 
     <section class="agenda-list">
-      ${appointmentsList.map(appointmentCard).join('') || emptyState('Agenda despejada', 'No hay compromisos registrados para los filtros seleccionados.')}
+      ${appointmentsList.map(appointmentCard).join('') || emptyState('Agenda despejada', 'No hay compromisos registrados para los filtros o período seleccionado.')}
     </section>
   `;
 
+  document.querySelector('#agenda-category-filter')?.addEventListener('change', (e) => {
+    agendaFilter.categoryId = e.target.value;
+    renderAgenda();
+  });
   document.querySelector('#agenda-artist-filter')?.addEventListener('change', (e) => {
     agendaFilter.artistId = e.target.value;
     renderAgenda();
   });
   document.querySelector('#agenda-space-filter')?.addEventListener('change', (e) => {
     agendaFilter.spaceId = e.target.value;
+    renderAgenda();
+  });
+  document.querySelector('#agenda-status-filter')?.addEventListener('change', (e) => {
+    agendaFilter.status = e.target.value;
     renderAgenda();
   });
 }
@@ -4810,7 +4989,44 @@ document.addEventListener('click', async (event) => {
   if (event.target.closest('[data-action="new-transaction"]')) return newTransactionModal();
   if (event.target.closest('[data-close-modal]') || event.target === modal) return closeModal();
 
-  // Category filter in agenda
+  // Calendar View mode toggle (week / month)
+  const calViewBtn = event.target.closest('[data-cal-view]');
+  if (calViewBtn) {
+    agendaFilter.viewMode = calViewBtn.dataset.calView;
+    agendaFilter.date = null;
+    return await renderAgenda();
+  }
+
+  // Calendar Navigation controls
+  if (event.target.closest('[data-action="cal-prev"]')) {
+    if (agendaFilter.viewMode === 'month') {
+      agendaFilter.currentDate = new Date(agendaFilter.currentDate.getFullYear(), agendaFilter.currentDate.getMonth() - 1, 1);
+    } else {
+      const d = new Date(agendaFilter.currentDate);
+      d.setDate(d.getDate() - 7);
+      agendaFilter.currentDate = d;
+    }
+    agendaFilter.date = null;
+    return await renderAgenda();
+  }
+  if (event.target.closest('[data-action="cal-next"]')) {
+    if (agendaFilter.viewMode === 'month') {
+      agendaFilter.currentDate = new Date(agendaFilter.currentDate.getFullYear(), agendaFilter.currentDate.getMonth() + 1, 1);
+    } else {
+      const d = new Date(agendaFilter.currentDate);
+      d.setDate(d.getDate() + 7);
+      agendaFilter.currentDate = d;
+    }
+    agendaFilter.date = null;
+    return await renderAgenda();
+  }
+  if (event.target.closest('[data-action="cal-today"]')) {
+    agendaFilter.currentDate = new Date();
+    agendaFilter.date = formatDateISO(new Date());
+    return await renderAgenda();
+  }
+
+  // Category filter in agenda (if any legacy trigger is used)
   const catBtn = event.target.closest('[data-select-category]');
   if (catBtn) {
     agendaFilter.categoryId = catBtn.dataset.selectCategory;
@@ -4835,6 +5051,14 @@ document.addEventListener('click', async (event) => {
     return await renderAgenda();
   }
   if (event.target.closest('[data-clear-date]')) {
+    agendaFilter.date = null;
+    return await renderAgenda();
+  }
+  if (event.target.closest('[data-clear-all-filters]')) {
+    agendaFilter.artistId = 'all';
+    agendaFilter.spaceId = 'all';
+    agendaFilter.categoryId = 'all';
+    agendaFilter.status = 'all';
     agendaFilter.date = null;
     return await renderAgenda();
   }

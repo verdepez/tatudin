@@ -1278,7 +1278,7 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
 app.get('/api/appointments', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
-    const { artistId, spaceId, categoryId, date } = request.query;
+    const { artistId, spaceId, categoryId, date, startDate, endDate, status } = request.query;
     let query = `SELECT a.*, c.name AS client_name, c.phone AS client_phone,
       u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
       cc.name AS category_name, cc.color AS category_color, cc.icon AS category_icon, cc.kind AS category_kind,
@@ -1304,9 +1304,16 @@ app.get('/api/appointments', requireAuth, async (request, response) => {
       params.push(Number(categoryId));
       query += ` AND a.category_id = $${params.length}`;
     }
+    if (status && status !== 'all') {
+      params.push(status);
+      query += ` AND a.status = $${params.length}`;
+    }
     if (date) {
       params.push(date);
       query += ` AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') = $${params.length}`;
+    } else if (startDate && endDate) {
+      params.push(startDate, endDate);
+      query += ` AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') >= $${params.length - 1} AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') <= $${params.length}`;
     }
 
     query += ` ORDER BY a.starts_at`;
