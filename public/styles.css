@@ -931,41 +931,70 @@ svg {
 }
 
 /* Dashboard Diagramation Styles */
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: 1.15fr 1.35fr 0.75fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+@media (max-width: 1080px) and (min-width: 720px) {
+  .dashboard-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dashboard-stats > article:last-child {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 719px) {
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
 .dashboard-feature-card {
-  padding: 18px 18px 20px;
+  padding: 16px 16px 18px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .dashboard-tri-grid {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
   margin-top: 6px;
+  min-width: 0;
 }
 
 .tri-grid-col {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   gap: 1px;
+  padding: 0 2px;
 }
 
 .tri-grid-divider {
   width: 1px;
-  height: 56px;
+  height: 52px;
   background: var(--line-soft, #e6dff7);
   flex-shrink: 0;
 }
 
 .mini-bubble {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   margin-bottom: 4px;
+  flex-shrink: 0;
 }
 
 .mini-bubble.purple-soft { background: #ece5fc; color: #6d28d9; }
@@ -973,48 +1002,57 @@ svg {
 .mini-bubble.dark-soft { background: #221c35; color: #ffffff; }
 
 .tri-metric-val {
-  font-size: clamp(17px, 2.2vw, 22px);
+  font-size: clamp(14px, 1.25vw, 18px);
   font-weight: 800;
   color: var(--ink);
   margin: 0;
   line-height: 1.15;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .tri-metric-label {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink);
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .tri-metric-sub {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--muted);
   line-height: 1;
+  white-space: nowrap;
 }
 
 .dashboard-quad-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
   margin-top: 8px;
+  min-width: 0;
 }
 
 .quad-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .quad-bubble {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .quad-bubble.gray-soft { background: #ece5fc; color: var(--ink); }
@@ -1027,28 +1065,39 @@ svg {
   flex-direction: column;
   gap: 1px;
   min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .quad-eyebrow {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   color: var(--muted);
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .quad-val {
-  font-size: clamp(15px, 1.8vw, 19px);
+  font-size: clamp(13px, 1.2vw, 17px);
   font-weight: 800;
   color: var(--ink);
   line-height: 1.15;
   letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .quad-sub {
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--muted);
   line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Operations Banner */

@@ -615,7 +615,7 @@ async function render(view = 'dashboard') {
           </div>
         </section>
 
-        <section class="stats">
+        <section class="stats dashboard-stats">
           <!-- 1. Trabajos del Mes (Tri-Grid: Agendadas | Completadas | Total Ingresos) -->
           <article class="stat-card dashboard-feature-card">
             <div class="stat-card-header">
