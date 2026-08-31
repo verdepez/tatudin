@@ -1259,6 +1259,7 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
         LEFT JOIN spaces sp ON sp.id = a.space_id
         WHERE a.studio_id = $1 AND a.status <> 'cancelled' ORDER BY a.starts_at LIMIT 8`, [request.studioId]),
       pool.query(`SELECT
+        (SELECT COUNT(*) FROM appointments WHERE studio_id = $1 AND status <> 'cancelled')::int AS scheduled_appointments,
         (SELECT COUNT(*) FROM appointments WHERE studio_id = $1 AND status = 'completed')::int AS completed_appointments,
         (SELECT COUNT(*) FROM clients WHERE studio_id = $1)::int AS clients,
         COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 AND status <> 'cancelled'), 0)::numeric AS expected_income,

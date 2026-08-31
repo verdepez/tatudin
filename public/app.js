@@ -619,17 +619,23 @@ async function render(view = 'dashboard') {
             <span class="stat-icon-bubble purple">${icon('clock')}</span>
             <p class="eyebrow">TRABAJOS DEL MES</p>
           </div>
-          <strong>${data.stats?.completed_appointments || 0}</strong>
-          <small>Citas completadas</small>
+          <strong>${data.stats?.scheduled_appointments || 0} <span style="font-size: 14px; font-weight: 600; color: var(--muted);">agendadas</span></strong>
+          <small style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; font-size: 11.5px;">
+            <span>✓ <strong>${data.stats?.completed_appointments || 0}</strong> completadas</span>
+            <span>· <strong>${money(data.stats?.income || 0)}</strong> ingresos</span>
+          </small>
         </article>
 
         <article class="stat-card">
           <div class="stat-card-header">
             <span class="stat-icon-bubble green">${icon('finances')}</span>
-            <p class="eyebrow">INGRESOS</p>
+            <p class="eyebrow">INGRESOS & ABONOS</p>
           </div>
           <strong>${money(data.stats?.income || 0)}</strong>
-          <small>Registrados este mes</small>
+          <small style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; font-size: 11.5px;">
+            <span>💳 <strong>${money(data.stats?.total_deposits || 0)}</strong> en abonos</span>
+            <span>· <strong>${money(data.stats?.expected_income || 0)}</strong> esperados</span>
+          </small>
         </article>
 
         <article class="stat-card">
@@ -638,7 +644,7 @@ async function render(view = 'dashboard') {
             <p class="eyebrow">CLIENTES</p>
           </div>
           <strong>${data.stats?.clients || 0}</strong>
-          <small>Base de datos activa</small>
+          <small>Base de datos activa de clientes</small>
         </article>
       </section>
 
