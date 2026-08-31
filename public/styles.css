@@ -930,6 +930,127 @@ svg {
   margin: 4px 0 0;
 }
 
+/* Dashboard Diagramation Styles */
+.dashboard-feature-card {
+  padding: 18px 18px 20px;
+}
+
+.dashboard-tri-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.tri-grid-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1px;
+}
+
+.tri-grid-divider {
+  width: 1px;
+  height: 56px;
+  background: var(--line-soft, #e6dff7);
+  flex-shrink: 0;
+}
+
+.mini-bubble {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+}
+
+.mini-bubble.purple-soft { background: #ece5fc; color: #6d28d9; }
+.mini-bubble.green-soft { background: #d1fae5; color: #047857; }
+.mini-bubble.dark-soft { background: #221c35; color: #ffffff; }
+
+.tri-metric-val {
+  font-size: clamp(17px, 2.2vw, 22px);
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.tri-metric-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.tri-metric-sub {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.dashboard-quad-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 18px;
+  margin-top: 8px;
+}
+
+.quad-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.quad-bubble {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.quad-bubble.gray-soft { background: #ece5fc; color: var(--ink); }
+.quad-bubble.yellow-soft { background: #fef3c7; color: #b45309; }
+.quad-bubble.light-soft { background: var(--surface-high, #f2f0f8); color: var(--muted); border: 1px solid var(--line-soft); }
+.quad-bubble.slate-soft { background: var(--surface-dim, #e2dcf0); color: var(--ink); }
+
+.quad-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.quad-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.quad-val {
+  font-size: clamp(15px, 1.8vw, 19px);
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.quad-sub {
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.1;
+}
+
 /* Operations Banner */
 .next {
   display: flex;

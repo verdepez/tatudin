@@ -584,69 +584,138 @@ async function render(view = 'dashboard') {
 
     const todayStr = new Intl.DateTimeFormat('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()).toUpperCase();
 
-    app.innerHTML = `
-      <section class="intro">
-        <p class="eyebrow">${todayStr}</p>
-        <h1>Todo listo para hoy<span class="dot">.</span></h1>
-        <p class="lead">Una mirada clara a tu estudio, sin ruido.</p>
-      </section>
+      const pendingAmount = Math.max(0, Number(data.stats?.expected_income || 0) - Number(data.stats?.income || 0));
 
-      <section class="actions">
-        <button class="primary" data-action="new-booking">
-          ${icon('plus')} <span>Nuevo compromiso</span>
-        </button>
-        <button class="secondary" data-view="agenda">
-          ${icon('calendar')} <span>Ver agenda</span>
-        </button>
-      </section>
+      app.innerHTML = `
+        <section class="intro">
+          <p class="eyebrow">${todayStr}</p>
+          <h1>Todo listo para hoy<span class="dot">.</span></h1>
+          <p class="lead">Una mirada clara a tu estudio, sin ruido.</p>
+        </section>
 
-      <section class="today panel">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">PRÓXIMOS COMPROMISOS</p>
-            <h2>Tu agenda de hoy</h2>
+        <section class="actions">
+          <button class="primary" data-action="new-booking">
+            ${icon('plus')} <span>Nuevo compromiso</span>
+          </button>
+          <button class="secondary" data-view="agenda">
+            ${icon('calendar')} <span>Ver agenda</span>
+          </button>
+        </section>
+
+        <section class="today panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">PRÓXIMOS COMPROMISOS</p>
+              <h2>Tu agenda de hoy</h2>
+            </div>
+            <span class="count">${(data.appointments || []).length} ${(data.appointments || []).length === 1 ? 'compromiso' : 'compromisos'}</span>
           </div>
-          <span class="count">${(data.appointments || []).length} ${(data.appointments || []).length === 1 ? 'compromiso' : 'compromisos'}</span>
-        </div>
-        <div class="appointment-list">
-          ${(data.appointments || []).slice(0, 4).map(appointmentCard).join('') || emptyState('No hay compromisos próximos', 'Crea el primer compromiso de tu agenda.')}
-        </div>
-      </section>
-
-      <section class="stats">
-        <article class="stat-card">
-          <div class="stat-card-header">
-            <span class="stat-icon-bubble purple">${icon('clock')}</span>
-            <p class="eyebrow">TRABAJOS DEL MES</p>
+          <div class="appointment-list">
+            ${(data.appointments || []).slice(0, 4).map(appointmentCard).join('') || emptyState('No hay compromisos próximos', 'Crea el primer compromiso de tu agenda.')}
           </div>
-          <strong>${data.stats?.scheduled_appointments || 0} <span style="font-size: 14px; font-weight: 600; color: var(--muted);">agendadas</span></strong>
-          <small style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; font-size: 11.5px;">
-            <span>✓ <strong>${data.stats?.completed_appointments || 0}</strong> completadas</span>
-            <span>· <strong>${money(data.stats?.income || 0)}</strong> ingresos</span>
-          </small>
-        </article>
+        </section>
 
-        <article class="stat-card">
-          <div class="stat-card-header">
-            <span class="stat-icon-bubble green">${icon('finances')}</span>
-            <p class="eyebrow">INGRESOS & ABONOS</p>
-          </div>
-          <strong>${money(data.stats?.income || 0)}</strong>
-          <small style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; font-size: 11.5px;">
-            <span>💳 <strong>${money(data.stats?.total_deposits || 0)}</strong> en abonos</span>
-            <span>· <strong>${money(data.stats?.expected_income || 0)}</strong> esperados</span>
-          </small>
-        </article>
+        <section class="stats">
+          <!-- 1. Trabajos del Mes (Tri-Grid: Agendadas | Completadas | Total Ingresos) -->
+          <article class="stat-card dashboard-feature-card">
+            <div class="stat-card-header">
+              <span class="stat-icon-bubble purple">${icon('clock')}</span>
+              <p class="eyebrow">TRABAJOS DEL MES</p>
+            </div>
+            <div class="dashboard-tri-grid">
+              <div class="tri-grid-col">
+                <div class="mini-bubble purple-soft">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                </div>
+                <strong class="tri-metric-val">${data.stats?.scheduled_appointments || 0}</strong>
+                <span class="tri-metric-label">Agendadas</span>
+                <small class="tri-metric-sub">Total</small>
+              </div>
 
-        <article class="stat-card">
-          <div class="stat-card-header">
-            <span class="stat-icon-bubble red">${icon('clients')}</span>
-            <p class="eyebrow">CLIENTES</p>
-          </div>
-          <strong>${data.stats?.clients || 0}</strong>
-          <small>Base de datos activa de clientes</small>
-        </article>
-      </section>
+              <div class="tri-grid-divider"></div>
+
+              <div class="tri-grid-col">
+                <div class="mini-bubble green-soft">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <strong class="tri-metric-val">${data.stats?.completed_appointments || 0}</strong>
+                <span class="tri-metric-label">Completadas</span>
+                <small class="tri-metric-sub">Finalizadas</small>
+              </div>
+
+              <div class="tri-grid-divider"></div>
+
+              <div class="tri-grid-col">
+                <div class="mini-bubble dark-soft">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                </div>
+                <strong class="tri-metric-val">${money(data.stats?.income || 0)}</strong>
+                <small class="tri-metric-sub" style="margin-top: 2px;">Total Ingresos</small>
+              </div>
+            </div>
+          </article>
+
+          <!-- 2. Ingresos & Abonos (Quad-Grid: Ingresos | Abonos | Total Esperado | Pendiente) -->
+          <article class="stat-card dashboard-feature-card">
+            <div class="stat-card-header">
+              <span class="stat-icon-bubble green">${icon('finances')}</span>
+              <p class="eyebrow">INGRESOS & ABONOS</p>
+            </div>
+            <div class="dashboard-quad-grid">
+              <div class="quad-item">
+                <div class="quad-bubble gray-soft">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                </div>
+                <div class="quad-content">
+                  <span class="quad-eyebrow">INGRESOS</span>
+                  <strong class="quad-val">${money(data.stats?.income || 0)}</strong>
+                  <small class="quad-sub">Ingresos Totales</small>
+                </div>
+              </div>
+
+              <div class="quad-item">
+                <div class="quad-bubble yellow-soft">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M9 10h6"/></svg>
+                </div>
+                <div class="quad-content">
+                  <span class="quad-eyebrow">ABONOS</span>
+                  <strong class="quad-val">${money(data.stats?.total_deposits || 0)}</strong>
+                  <small class="quad-sub">En Abonos Actual</small>
+                </div>
+              </div>
+
+              <div class="quad-item">
+                <div class="quad-bubble light-soft">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/><line x1="3" x2="21" y1="9" y2="9"/></svg>
+                </div>
+                <div class="quad-content">
+                  <span class="quad-eyebrow">TOTAL ESPERADO</span>
+                  <strong class="quad-val">${money(data.stats?.expected_income || 0)}</strong>
+                </div>
+              </div>
+
+              <div class="quad-item">
+                <div class="quad-bubble slate-soft">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/></svg>
+                </div>
+                <div class="quad-content">
+                  <span class="quad-eyebrow">PENDIENTE</span>
+                  <strong class="quad-val">${money(pendingAmount)}</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- 3. Clientes -->
+          <article class="stat-card dashboard-feature-card">
+            <div class="stat-card-header">
+              <span class="stat-icon-bubble red">${icon('clients')}</span>
+              <p class="eyebrow">CLIENTES</p>
+            </div>
+            <strong class="stat-value" style="font-size: clamp(24px, 3vw, 32px);">${data.stats?.clients || 0}</strong>
+            <small class="stat-trend" style="margin-top: 4px;">Base de datos activa de clientes</small>
+          </article>
+        </section>
 
       <section class="next panel">
         <div>
