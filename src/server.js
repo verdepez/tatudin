@@ -1259,10 +1259,15 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
         LEFT JOIN spaces sp ON sp.id = a.space_id
         WHERE a.studio_id = $1 AND a.status <> 'cancelled' ORDER BY a.starts_at LIMIT 8`, [request.studioId]),
       pool.query(`SELECT
-        (SELECT COUNT(*) FROM appointments WHERE studio_id = $1 AND status = 'completed') AS completed_appointments,
-        (SELECT COUNT(*) FROM clients WHERE studio_id = $1) AS clients,
-        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'income'), 0) AS income,
-        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense'), 0) AS expenses`, [request.studioId]),
+        (SELECT COUNT(*) FROM appointments WHERE studio_id = $1 AND status = 'completed')::int AS completed_appointments,
+        (SELECT COUNT(*) FROM clients WHERE studio_id = $1)::int AS clients,
+        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 AND status <> 'cancelled'), 0)::numeric AS expected_income,
+        COALESCE((SELECT SUM(deposit) FROM appointments WHERE studio_id = $1 AND status <> 'cancelled'), 0)::numeric AS total_deposits,
+        (COALESCE((SELECT SUM(CASE WHEN status = 'completed' THEN price ELSE deposit END) FROM appointments WHERE studio_id = $1 AND status <> 'cancelled'), 0)
+          + COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'income'), 0))::numeric AS income,
+        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense'), 0)::numeric AS expenses,
+        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 AND status = 'cancelled'), 0)::numeric AS estimated_losses
+      `, [request.studioId]),
       pool.query(`SELECT id, name, currency, timezone, account_type FROM studios WHERE id = $1`, [request.studioId])
     ]);
     return response.json({ appointments: appointments.rows, stats: stats.rows[0], studio: studio.rows[0] });
@@ -1471,6 +1476,26 @@ app.get('/api/transactions', requireAuth, async (request, response) => {
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
+app.get('/api/finances/overview', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const result = await pool.query(`
+      SELECT
+        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 AND status <> 'cancelled'), 0)::numeric AS expected_income,
+        COALESCE((SELECT SUM(deposit) FROM appointments WHERE studio_id = $1 AND status <> 'cancelled'), 0)::numeric AS total_deposits,
+        COALESCE((SELECT SUM(CASE WHEN status = 'completed' THEN price ELSE deposit END) FROM appointments WHERE studio_id = $1 AND status <> 'cancelled'), 0)::numeric AS appointments_collected,
+        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'income'), 0)::numeric AS manual_income,
+        (COALESCE((SELECT SUM(CASE WHEN status = 'completed' THEN price ELSE deposit END) FROM appointments WHERE studio_id = $1 AND status <> 'cancelled'), 0)
+          + COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'income'), 0))::numeric AS total_gross_income,
+        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense' AND description ILIKE '%Liquidación%'), 0)::numeric AS settled_commissions,
+        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense' AND description NOT ILIKE '%Liquidación%'), 0)::numeric AS operational_expenses,
+        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense'), 0)::numeric AS total_expenses,
+        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 AND status = 'cancelled'), 0)::numeric AS estimated_losses
+    `, [request.studioId]);
+    return response.json(result.rows[0]);
+  } catch (error) { return response.status(500).json({ error: error.message }); }
+});
+
 app.get('/api/finances/summary', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
@@ -1478,6 +1503,8 @@ app.get('/api/finances/summary', requireAuth, async (request, response) => {
       SELECT u.id AS artist_id, u.full_name AS artist_name, sm.role AS artist_role,
              COALESCE(sm.commission_percent, 70.00)::numeric AS commission_percent,
              COUNT(a.id)::integer AS total_sessions,
+             COALESCE(SUM(a.price), 0)::numeric AS total_expected,
+             COALESCE(SUM(a.deposit), 0)::numeric AS total_deposits,
              COALESCE(SUM(CASE WHEN a.status = 'completed' THEN a.price ELSE a.deposit END), 0)::numeric AS total_generated,
              ROUND(COALESCE(SUM(CASE WHEN a.status = 'completed' THEN a.price ELSE a.deposit END), 0) * (COALESCE(sm.commission_percent, 70.00) / 100.0), 2)::numeric AS artist_payout,
              ROUND(COALESCE(SUM(CASE WHEN a.status = 'completed' THEN a.price ELSE a.deposit END), 0) * ((100.0 - COALESCE(sm.commission_percent, 70.00)) / 100.0), 2)::numeric AS studio_margin,

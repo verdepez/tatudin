@@ -900,8 +900,12 @@ svg {
 .stat-icon-bubble.purple { background: var(--soft-purple); color: var(--ink); }
 .stat-icon-bubble.green { background: var(--green-bg); color: var(--green-text); }
 .stat-icon-bubble.red { background: var(--red-soft); color: var(--red-deep); }
+.stat-icon-bubble.teal { background: #d1fae5; color: #047857; }
+.stat-icon-bubble.blue { background: #dbeafe; color: #1d4ed8; }
+.stat-icon-bubble.orange { background: #fef3c7; color: #b45309; }
 
-.stat-card strong {
+.stat-card strong,
+.stat-card .stat-value {
   display: block;
   font-size: clamp(20px, 2.2vw, 26px);
   font-weight: 800;
@@ -910,9 +914,20 @@ svg {
   margin-bottom: 2px;
 }
 
-.stat-card small {
+.stat-card .stat-label {
+  font-size: 11.5px;
+  font-weight: 700;
   color: var(--muted);
-  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-card small,
+.stat-card .stat-trend {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.3;
+  margin: 4px 0 0;
 }
 
 /* Operations Banner */

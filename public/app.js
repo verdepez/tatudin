@@ -880,25 +880,47 @@ function editClientModal(clientId) {
 }
 
 async function renderFinances() {
-  const [transactions, artistSummary] = await Promise.all([
+  const [transactions, artistSummary, overview, studio] = await Promise.all([
     api('/api/transactions').catch(() => []),
-    api('/api/finances/summary').catch(() => [])
+    api('/api/finances/summary').catch(() => []),
+    api('/api/finances/overview').catch(() => ({})),
+    api('/api/studio').catch(() => activeStudio)
   ]);
+  activeStudio = studio || activeStudio;
 
-  const income = transactions.filter((item) => item.kind === 'income').reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const expenses = transactions.filter((item) => item.kind === 'expense').reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const balance = income - expenses;
+  // 1. Ingresos Esperados (Expected Income): Proyección según el precio pactado de todas las citas agendadas
+  const expectedIncome = Number(overview.expected_income ?? artistSummary.reduce((sum, a) => sum + Number(a.total_expected || a.total_generated || 0), 0));
+  
+  // 2. Abonos Recaudados (Deposits Collected): Total de señas/anticipos cobrados
+  const totalDeposits = Number(overview.total_deposits ?? artistSummary.reduce((sum, a) => sum + Number(a.total_deposits || 0), 0));
 
+  // 3. Total Facturado / Recaudado Efectivo en Caja (Abonos + Citas completadas + Otros ingresos manuales)
+  const appointmentsRevenue = Number(overview.appointments_collected ?? artistSummary.reduce((sum, a) => sum + Number(a.total_generated || 0), 0));
+  const manualIncome = Number(overview.manual_income ?? transactions.filter(t => t.kind === 'income').reduce((sum, t) => sum + Number(t.amount || 0), 0));
+  const totalGrossIncome = appointmentsRevenue + manualIncome;
+
+  // 4. Comisiones Artistas
   const totalCommissions = artistSummary.reduce((sum, a) => sum + Number(a.artist_payout || 0), 0);
+  const settledCommissions = Number(overview.settled_commissions ?? artistSummary.reduce((sum, a) => sum + Number(a.settled_amount || 0), 0));
   const totalPending = artistSummary.reduce((sum, a) => sum + Number(a.pending_settlement || 0), 0);
+
+  // 5. Margen Neto del Estudio y Gastos
   const totalStudioMargin = artistSummary.reduce((sum, a) => sum + Number(a.studio_margin || 0), 0);
+  const operationalExpenses = Number(overview.operational_expenses ?? transactions.filter(t => t.kind === 'expense' && !(t.description || '').toLowerCase().includes('liquidación')).reduce((sum, t) => sum + Number(t.amount || 0), 0));
+  const totalExpenses = settledCommissions + operationalExpenses;
+
+  // Saldo Neto Disponible / Margen retenido en caja tras pagar comisiones y gastos
+  const netBalance = totalGrossIncome - totalExpenses;
+
+  // 6. Pérdidas Estimadas (Ingresos no percibidos por citas canceladas)
+  const estimatedLosses = Number(overview.estimated_losses || 0);
 
   app.innerHTML = `
     <section class="page-heading">
       <div>
         <p class="eyebrow">FINANZAS & LIQUIDACIONES</p>
         <h1>Lo que realmente te queda<span class="dot">.</span></h1>
-        <p class="lead">Control consolidado de ingresos, comisiones de artistas y margen neto del estudio.</p>
+        <p class="lead">Control consolidado de ingresos esperados, abonos cobrados, liquidación de artistas y margen neto del estudio.</p>
       </div>
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
         <button class="secondary" data-action="export-finances-csv">${icon('download')} <span>Exportar CSV</span></button>
@@ -906,41 +928,68 @@ async function renderFinances() {
       </div>
     </section>
 
+    <!-- 6 Unified Financial Stat Cards -->
     <section class="stats" style="margin-bottom: 24px;">
+      <!-- 1. Saldo Neto Disponible -->
       <article class="stat-card">
         <div class="stat-card-header">
-          <span class="stat-label">Saldo Neto Disponible</span>
-          <div class="stat-icon-bubble">${icon('finances')}</div>
+          <span class="stat-label">Saldo Neto Estudio</span>
+          <div class="stat-icon-bubble green">${icon('finances')}</div>
         </div>
-        <strong class="stat-value" style="color: ${balance >= 0 ? 'var(--green-text)' : 'var(--red)'};">${money(balance)}</strong>
-        <p class="stat-trend">Ingresos menos gastos totales</p>
+        <strong class="stat-value" style="color: ${netBalance >= 0 ? 'var(--green-text)' : 'var(--red)'};">${money(netBalance)}</strong>
+        <p class="stat-trend">Margen real retenido tras comisiones y gastos</p>
       </article>
 
+      <!-- 2. Ingresos Esperados (NUEVA CASILLA) -->
       <article class="stat-card">
         <div class="stat-card-header">
-          <span class="stat-label">Ingresos Registrados</span>
-          <div class="stat-icon-bubble">${icon('income')}</div>
+          <span class="stat-label">Ingresos Esperados</span>
+          <div class="stat-icon-bubble purple">${icon('calendar')}</div>
         </div>
-        <strong class="stat-value">${money(income)}</strong>
-        <p class="stat-trend">Total cobrado por sesiones y señas</p>
+        <strong class="stat-value">${money(expectedIncome)}</strong>
+        <p class="stat-trend">Valor proyectado de citas agendadas</p>
       </article>
 
+      <!-- 3. Abonos Recaudados (NUEVA CASILLA) -->
+      <article class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-label">Abonos Cobrados</span>
+          <div class="stat-icon-bubble teal">${icon('income')}</div>
+        </div>
+        <strong class="stat-value">${money(totalDeposits)}</strong>
+        <p class="stat-trend">Señas cobradas para asegurar citas</p>
+      </article>
+
+      <!-- 4. Total Recaudado en Caja -->
+      <article class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-label">Total Recaudado</span>
+          <div class="stat-icon-bubble blue">${icon('income')}</div>
+        </div>
+        <strong class="stat-value">${money(totalGrossIncome)}</strong>
+        <p class="stat-trend">Abonos + citas completadas + otros ingresos</p>
+      </article>
+
+      <!-- 5. Comisiones Artistas -->
       <article class="stat-card">
         <div class="stat-card-header">
           <span class="stat-label">Comisiones Artistas</span>
-          <div class="stat-icon-bubble">${icon('percent')}</div>
+          <div class="stat-icon-bubble orange">${icon('percent')}</div>
         </div>
         <strong class="stat-value">${money(totalCommissions)}</strong>
-        <p class="stat-trend" style="color: ${totalPending > 0 ? 'var(--red)' : 'var(--muted)'};">${totalPending > 0 ? `${money(totalPending)} por liquidar` : 'Todas liquidadas'}</p>
+        <p class="stat-trend" style="color: ${totalPending > 0 ? 'var(--red)' : 'var(--green-text)'}; font-weight: 600;">
+          ${totalPending > 0 ? `${money(totalPending)} por liquidar` : 'Todas liquidadas'}
+        </p>
       </article>
 
+      <!-- 6. Pérdidas Estimadas (NUEVA CASILLA) -->
       <article class="stat-card">
         <div class="stat-card-header">
-          <span class="stat-label">Margen Neto Estudio</span>
-          <div class="stat-icon-bubble">${icon('box')}</div>
+          <span class="stat-label">Pérdidas Estimadas</span>
+          <div class="stat-icon-bubble red">${icon('trash')}</div>
         </div>
-        <strong class="stat-value">${money(totalStudioMargin)}</strong>
-        <p class="stat-trend">Retención del estudio tras comisiones</p>
+        <strong class="stat-value" style="color: ${estimatedLosses > 0 ? 'var(--red)' : 'var(--muted)'};">${money(estimatedLosses)}</strong>
+        <p class="stat-trend">Ingresos no percibidos por citas canceladas</p>
       </article>
     </section>
 
@@ -968,6 +1017,7 @@ async function renderFinances() {
                 </div>
                 <div class="perf-metric-grid">
                   <span>Facturado: <strong>${money(a.total_generated)}</strong></span>
+                  <span>Abonos: <strong>${money(a.total_deposits || 0)}</strong></span>
                   <span>Comisión: <strong>${money(a.artist_payout)}</strong></span>
                   <span>Liquidado: <strong>${money(a.settled_amount)}</strong></span>
                   <span style="color: ${pending > 0 ? 'var(--red)' : 'var(--green-text)'}; font-weight: 700;">
@@ -4119,14 +4169,24 @@ function boEditUserModal(userId, userName, userEmail, isRoot) {
   `);
 }
 
-function exportFinancesCSV(artistSummary, transactions) {
-  let csv = '=== LIQUIDACIONES Y RENDIMIENTO POR ARTISTA ===\r\n';
-  csv += 'Artista,Rol,% Comision,Sesiones,Total Generado,Comision Artista,Liquidado,Pendiente\r\n';
+function exportFinancesCSV(artistSummary, transactions, overview = {}) {
+  let csv = '=== RESUMEN FINANCIERO GENERAL ===\r\n';
+  csv += `Ingresos Esperados (Proyección Citas),${overview.expected_income || 0}\r\n`;
+  csv += `Abonos Cobrados,${overview.total_deposits || 0}\r\n`;
+  csv += `Total Recaudado Efectivo,${overview.total_gross_income || 0}\r\n`;
+  csv += `Comisiones Pagadas a Artistas,${overview.settled_commissions || 0}\r\n`;
+  csv += `Comisiones Pendientes por Liquidar,${overview.total_pending || 0}\r\n`;
+  csv += `Gastos Operacionales,${overview.operational_expenses || 0}\r\n`;
+  csv += `Saldo Neto Disponible,${overview.net_balance || 0}\r\n`;
+  csv += `Pérdidas Estimadas (Citas Canceladas),${overview.estimated_losses || 0}\r\n\r\n`;
+
+  csv += '=== LIQUIDACIONES Y RENDIMIENTO POR ARTISTA ===\r\n';
+  csv += 'Artista,Rol,% Comisión,Sesiones,Total Generado,Abonos,Valor Citas,Comisión Artista,Liquidado,Pendiente\r\n';
   (artistSummary || []).forEach((a) => {
-    csv += `"${a.artist_name || ''}","${a.artist_role || ''}",${a.commission_percent || 70}%,${a.total_sessions || 0},${a.total_generated || 0},${a.artist_payout || 0},${a.settled_amount || 0},${a.pending_settlement || 0}\r\n`;
+    csv += `"${a.artist_name || ''}","${a.artist_role || ''}",${a.commission_percent || 70}%,${a.total_sessions || 0},${a.total_generated || 0},${a.total_deposits || 0},${a.total_expected || 0},${a.artist_payout || 0},${a.settled_amount || 0},${a.pending_settlement || 0}\r\n`;
   });
   csv += '\r\n=== HISTORIAL DE MOVIMIENTOS ===\r\n';
-  csv += 'ID,Fecha,Tipo,Descripcion,Monto,Artista\r\n';
+  csv += 'ID,Fecha,Tipo,Descripción,Monto,Artista\r\n';
   (transactions || []).forEach((t) => {
     csv += `${t.id},"${t.occurred_on}","${t.kind}","${(t.description || '').replace(/"/g, '""')}",${t.amount},"${t.artist_name || 'General'}"\r\n`;
   });
@@ -4345,11 +4405,12 @@ document.addEventListener('click', async (event) => {
 
   // Export CSV
   if (event.target.closest('[data-action="export-finances-csv"]')) {
-    const [txs, sum] = await Promise.all([
+    const [txs, sum, overview] = await Promise.all([
       api('/api/transactions').catch(() => []),
-      api('/api/finances/summary').catch(() => [])
+      api('/api/finances/summary').catch(() => []),
+      api('/api/finances/overview').catch(() => ({}))
     ]);
-    return exportFinancesCSV(sum, txs);
+    return exportFinancesCSV(sum, txs, overview);
   }
 
   // Guest spots actions
