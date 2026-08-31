@@ -323,9 +323,17 @@ svg {
   transition: all var(--transition-fast);
 }
 
-.sidebar nav a .nav-icon {
-  width: 18px;
-  height: 18px;
+.sidebar nav a .nav-icon,
+.sidebar nav .nav-icon,
+.sidebar-soon-item .nav-icon,
+.nav-icon {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  flex-shrink: 0 !important;
 }
 
 .sidebar nav a.active, .sidebar nav a:hover {
@@ -2214,8 +2222,13 @@ textarea {
   }
 
   .mobile-nav a svg {
-    width: 20px;
-    height: 20px;
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    max-width: 20px !important;
+    max-height: 20px !important;
+    flex-shrink: 0 !important;
     transition: transform var(--transition-fast);
   }
 
@@ -2375,11 +2388,18 @@ textarea {
   color: var(--ink);
 }
 
-.drawer-icon {
-  width: 20px;
-  height: 20px;
+.drawer-icon,
+.drawer-nav .drawer-icon,
+.drawer-soon-item .drawer-icon,
+.drawer-item-content .drawer-icon {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
   color: var(--ink);
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
 }
 
 .drawer-divider {
