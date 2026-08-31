@@ -1493,6 +1493,13 @@ async function renderFinances() {
           const rInfo = ROLE_MAP[a.artist_role] || { label: a.artist_role, class: 'role-resident' };
           const initials = (a.artist_name || 'A').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
           const pending = Number(a.pending_settlement || 0);
+          const agreeType = a.agreement_type || 'commission';
+          let agreeTag = `${a.commission_percent || 70}% comisión`;
+          if (agreeType === 'fixed_daily') {
+            agreeTag = `Fijo ${money(a.fixed_amount || 0)} / día`;
+          } else if (agreeType === 'fixed_monthly') {
+            agreeTag = `Fijo ${money(a.fixed_amount || 0)} / mes`;
+          }
           return `
             <article class="artist-performance-row">
               <div class="initials">${initials}</div>
@@ -1500,7 +1507,7 @@ async function renderFinances() {
                 <div class="member-header">
                   <h3>${a.artist_name}</h3>
                   <span class="artist-chip ${rInfo.class}">${rInfo.label}</span>
-                  <span class="commission-badge">${a.commission_percent || 70}% comisión</span>
+                  <span class="commission-badge">${agreeTag}</span>
                 </div>
                 <div class="perf-metric-grid">
                   <span>Facturado: <strong>${money(a.total_generated)}</strong></span>
@@ -1601,9 +1608,9 @@ async function renderSettings() {
         <div class="section-heading">
           <div>
             <p class="eyebrow">EQUIPO Y ARTISTAS</p>
-            <h2>Artistas y acuerdos de comisión</h2>
+            <h2>Artistas y acuerdos comerciales</h2>
           </div>
-          <button class="primary small-btn" data-action="new-member">${icon('plus')} <span>Agregar artista</span></button>
+          <button class="primary small-btn" data-action="new-member">${icon('plus')} <span>Agregar artista / Guest</span></button>
         </div>
         
         <div class="members-list">
@@ -1611,6 +1618,17 @@ async function renderSettings() {
             const rInfo = ROLE_MAP[m.role] || { label: m.role, class: 'role-resident' };
             const isOwner = m.role === 'owner';
             const initials = (m.full_name || 'A').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+            const agreeType = m.agreement_type || 'commission';
+            let agreementLabel = `${m.commission_percent || 70}% comisión`;
+            let agreementIcon = icon('percent');
+            if (agreeType === 'fixed_daily') {
+              agreementLabel = `Fijo ${money(m.fixed_amount || 0)} / día`;
+              agreementIcon = icon('clock');
+            } else if (agreeType === 'fixed_monthly') {
+              agreementLabel = `Fijo ${money(m.fixed_amount || 0)} / mes`;
+              agreementIcon = icon('calendar');
+            }
+
             return `
               <article class="setting-item">
                 <div class="setting-item-icon initials">${initials}</div>
@@ -1630,8 +1648,8 @@ async function renderSettings() {
                     </div>
                   </div>
                   <div class="setting-item-sub">
-                    <button class="edit-commission-tag" data-action="edit-commission" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-commission="${m.commission_percent || 70}">
-                      ${icon('percent')} ${m.commission_percent || 70}% comisión
+                    <button class="edit-commission-tag" data-action="edit-agreement" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-agreement-type="${agreeType}" data-commission="${m.commission_percent || 70}" data-fixed-amount="${m.fixed_amount || 0}" title="Editar modalidad de acuerdo">
+                      ${agreementIcon} ${agreementLabel}
                     </button>
                     <span class="member-meta">${m.email} · ${m.appointment_count || 0} citas</span>
                   </div>
@@ -2152,6 +2170,17 @@ async function renderManagers() {
             const rInfo = ROLE_MAP[m.role] || { label: m.role, class: 'role-resident' };
             const isOwner = m.role === 'owner';
             const initials = (m.full_name || 'A').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+            const agreeType = m.agreement_type || 'commission';
+            let agreementLabel = `${m.commission_percent || 70}% comisión`;
+            let agreementIcon = icon('percent');
+            if (agreeType === 'fixed_daily') {
+              agreementLabel = `Fijo ${money(m.fixed_amount || 0)} / día`;
+              agreementIcon = icon('clock');
+            } else if (agreeType === 'fixed_monthly') {
+              agreementLabel = `Fijo ${money(m.fixed_amount || 0)} / mes`;
+              agreementIcon = icon('calendar');
+            }
+
             return `
               <article class="setting-item">
                 <div class="setting-item-icon initials">${initials}</div>
@@ -2171,8 +2200,8 @@ async function renderManagers() {
                     </div>
                   </div>
                   <div class="setting-item-sub">
-                    <button class="edit-commission-tag" data-action="edit-commission" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-commission="${m.commission_percent || 70}">
-                      ${icon('percent')} ${m.commission_percent || 70}% comisión
+                    <button class="edit-commission-tag" data-action="edit-agreement" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-agreement-type="${agreeType}" data-commission="${m.commission_percent || 70}" data-fixed-amount="${m.fixed_amount || 0}" title="Editar modalidad de acuerdo">
+                      ${agreementIcon} ${agreementLabel}
                     </button>
                     <span class="member-meta">${m.email} · ${m.appointment_count || 0} citas registradas</span>
                   </div>
@@ -4448,22 +4477,74 @@ function newClientModal() {
 
 function newMemberModal() {
   openModal(`
-    <p class="eyebrow">EQUIPO</p>
-    <h2 id="modal-title">Agregar artista o colaborador</h2>
+    <p class="eyebrow">EQUIPO & ARTISTAS</p>
+    <h2 id="modal-title">Agregar artista o Guest</h2>
     <form data-form="member">
       <label>Nombre completo<input name="fullName" required placeholder="Ej. Alex Rivera" /></label>
       <label>Email<input name="email" type="email" required placeholder="alex@studio.com" /></label>
-      <label>Tipo de relación con el estudio
-        <select name="role">
-          <option value="resident">Residente (permanente)</option>
-          <option value="nomad">Nómade (visitante / temporal)</option>
-          <option value="admin">Administrador del estudio</option>
-        </select>
-      </label>
-      <button class="primary" type="submit">${icon('userCheck')} Incorporar al equipo</button>
+      <div class="form-grid">
+        <label>Tipo de relación / Rol
+          <select name="role">
+            <option value="resident">Residente (permanente)</option>
+            <option value="nomad">Nómade / Guest (visitante)</option>
+            <option value="admin">Administrador del estudio</option>
+          </select>
+        </label>
+        <label>Modalidad de acuerdo
+          <select name="agreementType" id="new-member-agreement-type">
+            <option value="commission">Comisión por cita (%)</option>
+            <option value="fixed_daily">Pago fijo por día ($ / día)</option>
+            <option value="fixed_monthly">Pago fijo mensual ($ / mes)</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="new-member-commission-field">
+        <label>Porcentaje para el artista (%)
+          <input name="commissionPercent" type="number" min="0" max="100" step="0.5" value="70" />
+          <span class="field-hint" style="font-size: 11.5px; color: var(--muted); margin-top: 4px; display: block;">El artista recibe el 70% del valor de la cita y el estudio el 30%.</span>
+        </label>
+      </div>
+
+      <div id="new-member-fixed-field" style="display: none;">
+        <label id="new-member-fixed-label">Monto fijo (CLP)
+          <input name="fixedAmount" type="number" min="0" step="1000" value="25000" />
+          <span id="new-member-fixed-hint" class="field-hint" style="font-size: 11.5px; color: var(--muted); margin-top: 4px; display: block;">Costo diario fijo por arriendo de puesto/box. El artista conserva el 100% del valor de sus citas.</span>
+        </label>
+      </div>
+
+      <button class="primary" type="submit" style="margin-top: 12px;">${icon('userCheck')} Incorporar al equipo</button>
       <p class="form-error"></p>
     </form>
   `);
+
+  const agreeSelect = document.querySelector('#new-member-agreement-type');
+  const commField = document.querySelector('#new-member-commission-field');
+  const fixedField = document.querySelector('#new-member-fixed-field');
+  const fixedLabel = document.querySelector('#new-member-fixed-label');
+  const fixedHint = document.querySelector('#new-member-fixed-hint');
+
+  agreeSelect?.addEventListener('change', (e) => {
+    const type = e.target.value;
+    if (type === 'commission') {
+      commField.style.display = 'block';
+      fixedField.style.display = 'none';
+    } else if (type === 'fixed_daily') {
+      commField.style.display = 'none';
+      fixedField.style.display = 'block';
+      if (fixedLabel?.firstChild) fixedLabel.firstChild.textContent = 'Monto fijo por día (CLP)';
+      if (fixedHint) fixedHint.textContent = 'Tarifa diaria fija de arriendo de box para el guest. El artista conserva el 100% de sus citas.';
+      const amtInput = fixedField.querySelector('input[name="fixedAmount"]');
+      if (amtInput && (amtInput.value === '0' || amtInput.value === '250000')) amtInput.value = '25000';
+    } else if (type === 'fixed_monthly') {
+      commField.style.display = 'none';
+      fixedField.style.display = 'block';
+      if (fixedLabel?.firstChild) fixedLabel.firstChild.textContent = 'Monto fijo mensual (CLP)';
+      if (fixedHint) fixedHint.textContent = 'Tarifa mensual fija de arriendo para el residente. El artista conserva el 100% de sus citas.';
+      const amtInput = fixedField.querySelector('input[name="fixedAmount"]');
+      if (amtInput && (amtInput.value === '0' || amtInput.value === '25000')) amtInput.value = '250000';
+    }
+  });
 }
 
 function newSpaceModal() {
@@ -4577,19 +4658,68 @@ function settleArtistModal(artistId, artistName, pendingAmount) {
   `);
 }
 
-function editCommissionModal(membershipId, artistName, currentPercent) {
+function editAgreementModal(membershipId, artistName, currentAgreementType = 'commission', currentCommission = 70, currentFixed = 0) {
   openModal(`
-    <p class="eyebrow">EQUIPO & COMISIONES</p>
-    <h2 id="modal-title">Comisión de ${artistName}</h2>
-    <p class="lead" style="margin-bottom: 16px;">Define el porcentaje que recibe el artista por cada sesión (el resto corresponde al estudio).</p>
-    <form data-form="edit-commission" data-id="${membershipId}">
-      <label>Porcentaje para el artista (%)
-        <input name="commissionPercent" type="number" min="0" max="100" step="0.5" value="${currentPercent}" required />
+    <p class="eyebrow">EQUIPO & ACUERDOS</p>
+    <h2 id="modal-title">Acuerdo comercial con ${artistName}</h2>
+    <p class="lead" style="margin-bottom: 16px;">Selecciona la modalidad de arriendo o repartición:</p>
+    <form data-form="edit-agreement" data-id="${membershipId}">
+      <label>Modalidad de acuerdo
+        <select name="agreementType" id="edit-agreement-type">
+          <option value="commission" ${currentAgreementType === 'commission' ? 'selected' : ''}>Comisión por cita (%)</option>
+          <option value="fixed_daily" ${currentAgreementType === 'fixed_daily' ? 'selected' : ''}>Pago fijo por día ($ / día)</option>
+          <option value="fixed_monthly" ${currentAgreementType === 'fixed_monthly' ? 'selected' : ''}>Pago fijo mensual ($ / mes)</option>
+        </select>
       </label>
-      <button class="primary" type="submit">${icon('check')} Guardar porcentaje</button>
+
+      <div id="edit-commission-field" style="${currentAgreementType === 'commission' ? 'display: block;' : 'display: none;'}">
+        <label>Porcentaje para el artista (%)
+          <input name="commissionPercent" type="number" min="0" max="100" step="0.5" value="${currentCommission || 70}" />
+          <span class="field-hint" style="font-size: 11.5px; color: var(--muted); margin-top: 4px; display: block;">El artista recibe el ${currentCommission || 70}% de cada cita y el estudio el resto.</span>
+        </label>
+      </div>
+
+      <div id="edit-fixed-field" style="${currentAgreementType !== 'commission' ? 'display: block;' : 'display: none;'}">
+        <label id="edit-fixed-label">Monto fijo (CLP)
+          <input name="fixedAmount" type="number" min="0" step="1000" value="${currentFixed || (currentAgreementType === 'fixed_monthly' ? 250000 : 25000)}" />
+          <span id="edit-fixed-hint" class="field-hint" style="font-size: 11.5px; color: var(--muted); margin-top: 4px; display: block;">
+            ${currentAgreementType === 'fixed_monthly' ? 'Tarifa mensual fija de arriendo.' : 'Tarifa diaria fija de arriendo.'}
+          </span>
+        </label>
+      </div>
+
+      <button class="primary" type="submit" style="margin-top: 12px;">${icon('check')} Guardar acuerdo</button>
       <p class="form-error"></p>
     </form>
   `);
+
+  const agreeSelect = document.querySelector('#edit-agreement-type');
+  const commField = document.querySelector('#edit-commission-field');
+  const fixedField = document.querySelector('#edit-fixed-field');
+  const fixedLabel = document.querySelector('#edit-fixed-label');
+  const fixedHint = document.querySelector('#edit-fixed-hint');
+
+  agreeSelect?.addEventListener('change', (e) => {
+    const type = e.target.value;
+    if (type === 'commission') {
+      commField.style.display = 'block';
+      fixedField.style.display = 'none';
+    } else if (type === 'fixed_daily') {
+      commField.style.display = 'none';
+      fixedField.style.display = 'block';
+      if (fixedLabel?.firstChild) fixedLabel.firstChild.textContent = 'Monto fijo por día (CLP)';
+      if (fixedHint) fixedHint.textContent = 'Tarifa diaria fija de arriendo de box para el guest.';
+    } else if (type === 'fixed_monthly') {
+      commField.style.display = 'none';
+      fixedField.style.display = 'block';
+      if (fixedLabel?.firstChild) fixedLabel.firstChild.textContent = 'Monto fijo mensual (CLP)';
+      if (fixedHint) fixedHint.textContent = 'Tarifa mensual fija de arriendo para el residente.';
+    }
+  });
+}
+
+function editCommissionModal(membershipId, artistName, currentPercent) {
+  return editAgreementModal(membershipId, artistName, 'commission', currentPercent, 0);
 }
 
 function newGuestSpotModal() {
@@ -4883,11 +5013,11 @@ document.addEventListener('click', async (event) => {
     return settleArtistModal(artistId, artistName, pending);
   }
 
-  // Edit commission
-  const editCommBtn = event.target.closest('[data-action="edit-commission"]');
-  if (editCommBtn) {
-    const { membershipId, artistName, commission } = editCommBtn.dataset;
-    return editCommissionModal(membershipId, artistName, commission);
+  // Edit agreement & commission
+  const editAgreeBtn = event.target.closest('[data-action="edit-agreement"], [data-action="edit-commission"]');
+  if (editAgreeBtn) {
+    const { membershipId, artistName, agreementType, commission, fixedAmount } = editAgreeBtn.dataset;
+    return editAgreementModal(membershipId, artistName, agreementType || 'commission', Number(commission || 70), Number(fixedAmount || 0));
   }
 
   // Export CSV
@@ -5483,17 +5613,35 @@ document.addEventListener('submit', async (event) => {
       return await clientDetailModal(form.dataset.id);
     }
     if (form.dataset.form === 'member') {
-      await api('/api/members', { method: 'POST', body: JSON.stringify(body) });
+      await api('/api/members', {
+        method: 'POST',
+        body: JSON.stringify({
+          fullName: body.fullName,
+          email: body.email,
+          role: body.role,
+          agreementType: body.agreementType || 'commission',
+          commissionPercent: Number(body.commissionPercent || 70),
+          fixedAmount: Number(body.fixedAmount || 0)
+        })
+      });
+      members = await api('/api/members').catch(() => []);
       closeModal();
-      return await renderSettings();
+      const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'ajustes';
+      return await render(currentActiveView);
     }
-    if (form.dataset.form === 'edit-commission') {
+    if (form.dataset.form === 'edit-agreement' || form.dataset.form === 'edit-commission') {
       await api(`/api/members/${form.dataset.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ commissionPercent: Number(body.commissionPercent) })
+        body: JSON.stringify({
+          agreementType: body.agreementType || 'commission',
+          commissionPercent: Number(body.commissionPercent || 70),
+          fixedAmount: Number(body.fixedAmount || 0)
+        })
       });
+      members = await api('/api/members').catch(() => []);
       closeModal();
-      return await renderSettings();
+      const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'ajustes';
+      return await render(currentActiveView);
     }
     if (form.dataset.form === 'space') {
       await api('/api/spaces', { method: 'POST', body: JSON.stringify(body) });

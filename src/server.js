@@ -1137,14 +1137,17 @@ app.get('/api/members', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
     const result = await pool.query(`SELECT u.id, u.email, u.full_name, sm.id AS membership_id, sm.role, sm.status,
-      COALESCE(sm.commission_percent, 70.00)::numeric AS commission_percent, u.created_at,
+      COALESCE(sm.agreement_type, 'commission') AS agreement_type,
+      COALESCE(sm.fixed_amount, 0.00)::numeric AS fixed_amount,
+      COALESCE(sm.commission_percent, 70.00)::numeric AS commission_percent,
+      sm.created_at, u.created_at AS user_created_at,
       COUNT(a.id)::integer AS appointment_count
       FROM studio_memberships sm
       JOIN users u ON u.id = sm.user_id
       LEFT JOIN appointments a ON a.artist_id = u.id AND a.studio_id = sm.studio_id
       WHERE sm.studio_id = $1
-      GROUP BY u.id, u.email, u.full_name, sm.id, sm.role, sm.status, sm.commission_percent, u.created_at
-      ORDER BY CASE sm.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 WHEN 'resident' THEN 3 ELSE 4 END, u.full_name`, [request.studioId]);
+      GROUP BY u.id, u.email, u.full_name, sm.id, sm.role, sm.status, sm.agreement_type, sm.fixed_amount, sm.commission_percent, sm.created_at, u.created_at
+      ORDER BY sm.created_at DESC, sm.id DESC`, [request.studioId]);
     return response.json(result.rows);
   } catch (error) {
     console.error('Error in GET /api/members:', error);
@@ -1154,9 +1157,12 @@ app.get('/api/members', requireAuth, async (request, response) => {
 
 app.post('/api/members', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
-  const { fullName, email, role = 'resident', commissionPercent = 70.0, password = 'tatudin123' } = request.body;
+  const { fullName, email, role = 'resident', agreementType = 'commission', commissionPercent = 70.0, fixedAmount = 0, password = 'tatudin123' } = request.body;
   if (!fullName?.trim() || !email?.trim()) return response.status(400).json({ error: 'Nombre completo y email son requeridos' });
   if (!['admin', 'resident', 'nomad'].includes(role)) return response.status(400).json({ error: 'Rol inválido' });
+
+  const validAgreementTypes = ['commission', 'fixed_daily', 'fixed_monthly'];
+  const cleanAgreementType = validAgreementTypes.includes(agreementType) ? agreementType : 'commission';
 
   const client = await pool.connect();
   try {
@@ -1169,10 +1175,15 @@ app.post('/api/members', requireAuth, async (request, response) => {
       const newUser = await client.query('INSERT INTO users (email, password_hash, full_name) VALUES (LOWER($1), $2, $3) RETURNING id', [email.trim(), await hashPassword(password), fullName.trim()]);
       userId = newUser.rows[0].id;
     }
-    const membership = await client.query(`INSERT INTO studio_memberships (user_id, studio_id, role, status, commission_percent)
-      VALUES ($1, $2, $3, 'active', $4)
-      ON CONFLICT (user_id, studio_id) DO UPDATE SET role = EXCLUDED.role, status = 'active', commission_percent = EXCLUDED.commission_percent
-      RETURNING *`, [userId, request.studioId, role, Number(commissionPercent || 70)]);
+    const membership = await client.query(`INSERT INTO studio_memberships (user_id, studio_id, role, status, agreement_type, commission_percent, fixed_amount)
+      VALUES ($1, $2, $3, 'active', $4, $5, $6)
+      ON CONFLICT (user_id, studio_id) DO UPDATE SET
+        role = EXCLUDED.role,
+        status = 'active',
+        agreement_type = EXCLUDED.agreement_type,
+        commission_percent = EXCLUDED.commission_percent,
+        fixed_amount = EXCLUDED.fixed_amount
+      RETURNING *`, [userId, request.studioId, role, cleanAgreementType, Number(commissionPercent || 70), Number(fixedAmount || 0)]);
     await client.query('COMMIT');
     return response.status(201).json({ ...membership.rows[0], id: userId, membership_id: membership.rows[0].id, ok: true, userId });
   } catch (error) {
@@ -1184,13 +1195,23 @@ app.post('/api/members', requireAuth, async (request, response) => {
 
 app.patch('/api/members/:id', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
-  const { role, status, commissionPercent } = request.body;
+  const { role, status, agreementType, commissionPercent, fixedAmount } = request.body;
   try {
     const result = await pool.query(`UPDATE studio_memberships SET
       role = COALESCE($1, role),
       status = COALESCE($2, status),
-      commission_percent = CASE WHEN $3::numeric IS NOT NULL THEN $3::numeric ELSE commission_percent END
-      WHERE id = $4 AND studio_id = $5 RETURNING *`, [role || null, status || null, commissionPercent !== undefined ? Number(commissionPercent) : null, request.params.id, request.studioId]);
+      agreement_type = COALESCE($3, agreement_type),
+      commission_percent = CASE WHEN $4::numeric IS NOT NULL THEN $4::numeric ELSE commission_percent END,
+      fixed_amount = CASE WHEN $5::numeric IS NOT NULL THEN $5::numeric ELSE fixed_amount END
+      WHERE id = $6 AND studio_id = $7 RETURNING *`, [
+        role || null,
+        status || null,
+        agreementType || null,
+        commissionPercent !== undefined ? Number(commissionPercent) : null,
+        fixedAmount !== undefined ? Number(fixedAmount) : null,
+        request.params.id,
+        request.studioId
+      ]);
     if (!result.rowCount) return response.status(404).json({ error: 'Miembro no encontrado' });
     return response.json(result.rows[0]);
   } catch (error) { return response.status(500).json({ error: error.message }); }
@@ -1509,6 +1530,8 @@ app.get('/api/finances/summary', requireAuth, async (request, response) => {
   try {
     const result = await pool.query(`
       SELECT u.id AS artist_id, u.full_name AS artist_name, sm.role AS artist_role,
+             COALESCE(sm.agreement_type, 'commission') AS agreement_type,
+             COALESCE(sm.fixed_amount, 0.00)::numeric AS fixed_amount,
              COALESCE(sm.commission_percent, 70.00)::numeric AS commission_percent,
              COUNT(a.id)::integer AS total_sessions,
              COALESCE(SUM(a.price), 0)::numeric AS total_expected,
@@ -1521,7 +1544,7 @@ app.get('/api/finances/summary', requireAuth, async (request, response) => {
       JOIN users u ON u.id = sm.user_id
       LEFT JOIN appointments a ON a.artist_id = u.id AND a.studio_id = sm.studio_id AND a.status NOT IN ('cancelled', 'no_show')
       WHERE sm.studio_id = $1 AND sm.status = 'active'
-      GROUP BY u.id, sm.role, sm.commission_percent
+      GROUP BY u.id, sm.role, sm.agreement_type, sm.fixed_amount, sm.commission_percent
       ORDER BY total_generated DESC
     `, [request.studioId]);
 
@@ -2255,12 +2278,16 @@ async function ensureAuthSchema() {
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
     role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'resident', 'nomad')),
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    agreement_type TEXT NOT NULL DEFAULT 'commission' CHECK (agreement_type IN ('commission', 'fixed_daily', 'fixed_monthly')),
+    fixed_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     commission_percent NUMERIC(5, 2) NOT NULL DEFAULT 70.00,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, studio_id)
   )`);
   await safeExec('ALTER TABLE studio_memberships created_at', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await safeExec('ALTER TABLE studio_memberships commission_percent', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS commission_percent NUMERIC(5, 2) NOT NULL DEFAULT 70.00`);
+  await safeExec('ALTER TABLE studio_memberships agreement_type', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS agreement_type TEXT NOT NULL DEFAULT 'commission'`);
+  await safeExec('ALTER TABLE studio_memberships fixed_amount', `ALTER TABLE studio_memberships ADD COLUMN IF NOT EXISTS fixed_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00`);
 
   // 5. Spaces / Boxes
   await safeExec('CREATE TABLE spaces', `CREATE TABLE IF NOT EXISTS spaces (
