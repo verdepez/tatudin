@@ -6444,6 +6444,63 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
+// ---------------- DYNAMIC SPIRAL FAVICON FADE ANIMATION ----------------
+function initDynamicFavicon() {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let iconLink = document.querySelector('link[rel="icon"][type="image/png"]') || document.querySelector('link[rel="icon"]');
+    if (!iconLink) {
+      iconLink = document.createElement('link');
+      iconLink.rel = 'icon';
+      document.head.appendChild(iconLink);
+    }
+
+    const imgBlue = new Image();
+    const imgGrey = new Image();
+    let loadedCount = 0;
+
+    const onLoaded = () => {
+      loadedCount++;
+      if (loadedCount < 2) return;
+
+      const totalSteps = 40; // Smooth 3.2s loop
+      let currentStep = 0;
+
+      setInterval(() => {
+        currentStep = (currentStep + 1) % totalSteps;
+        // Sinusoidal easing between 0 (blue) and 1 (grey)
+        const t = currentStep / totalSteps;
+        const alpha = 0.5 * (1 + Math.sin(t * 2 * Math.PI - Math.PI / 2));
+
+        ctx.clearRect(0, 0, 64, 64);
+        ctx.globalAlpha = 1 - alpha;
+        ctx.drawImage(imgBlue, 0, 0, 64, 64);
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(imgGrey, 0, 0, 64, 64);
+
+        iconLink.href = canvas.toDataURL('image/png');
+      }, 80);
+    };
+
+    imgBlue.crossOrigin = 'anonymous';
+    imgGrey.crossOrigin = 'anonymous';
+    imgBlue.onload = onLoaded;
+    imgGrey.onload = onLoaded;
+    imgBlue.src = '/favicon-blue-64.png';
+    imgGrey.src = '/favicon-grey-64.png';
+  } catch (err) {
+    console.debug('[Favicon] Native SVG/GIF fallback active');
+  }
+}
+
+// Initialize dynamic animated favicon
+initDynamicFavicon();
+
 // Session verification and bootstrap
 api('/api/auth/me')
   .then((data) => {
