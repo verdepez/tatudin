@@ -358,6 +358,77 @@ function updateUserMenuUI() {
 
   const menuEmailEl = document.querySelector('#user-menu-email');
   if (menuEmailEl) menuEmailEl.textContent = email;
+
+  updateDrawerUI();
+}
+
+function updateDrawerUI() {
+  if (!currentUser) return;
+  const name = currentUser.full_name || currentUser.fullName || 'Marcus';
+  const initials = ((name).split(' ').map((p) => p[0]).slice(0, 2).join('')).toUpperCase();
+  
+  let roleLabel = 'Artist Owner';
+  if (currentUser.role === 'resident') roleLabel = 'Residente';
+  else if (currentUser.role === 'nomad') roleLabel = 'Nómade (Visitante)';
+  else if (currentUser.role === 'admin') roleLabel = 'Manager / Administrador';
+  else if (currentUser.role === 'owner') roleLabel = activeStudio?.account_type === 'independent' ? 'Artista Independiente' : `Artist Owner · ${activeStudio?.name || 'Estudio'}`;
+  else if (activeStudio?.name) roleLabel = activeStudio.account_type === 'independent' ? 'Artista Independiente' : `Estudio · ${activeStudio.name}`;
+
+  const drawerAvatarEl = document.querySelector('#drawer-avatar');
+  if (drawerAvatarEl) {
+    if (currentUser.avatar_url) {
+      drawerAvatarEl.innerHTML = `<img src="${currentUser.avatar_url}" alt="${name}" />`;
+    } else {
+      drawerAvatarEl.textContent = initials;
+    }
+  }
+
+  const drawerNameEl = document.querySelector('#drawer-user-name');
+  if (drawerNameEl) drawerNameEl.textContent = name;
+
+  const drawerRoleEl = document.querySelector('#drawer-user-role');
+  if (drawerRoleEl) drawerRoleEl.textContent = roleLabel;
+
+  const isSuper = Boolean(currentUser.is_superadmin || currentUser.isSuperAdmin || currentUser.email === 'soyelroot@tatudin.cl');
+  document.querySelectorAll('.root-drawer-item').forEach((el) => {
+    el.style.display = isSuper ? 'flex' : 'none';
+  });
+}
+
+function openMobileDrawer() {
+  updateDrawerUI();
+  const drawer = document.querySelector('#mobile-drawer');
+  const scrim = document.querySelector('#mobile-drawer-scrim');
+  if (scrim) {
+    scrim.hidden = false;
+    setTimeout(() => scrim.classList.add('open'), 10);
+  }
+  if (drawer) {
+    drawer.classList.add('open');
+  }
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMobileDrawer() {
+  const drawer = document.querySelector('#mobile-drawer');
+  const scrim = document.querySelector('#mobile-drawer-scrim');
+  if (drawer) drawer.classList.remove('open');
+  if (scrim) {
+    scrim.classList.remove('open');
+    setTimeout(() => {
+      if (!scrim.classList.contains('open')) scrim.hidden = true;
+    }, 320);
+  }
+  document.body.style.overflow = '';
+}
+
+function toggleMobileDrawer() {
+  const drawer = document.querySelector('#mobile-drawer');
+  if (drawer?.classList.contains('open')) {
+    closeMobileDrawer();
+  } else {
+    openMobileDrawer();
+  }
 }
 
 async function startApp() {
@@ -384,11 +455,12 @@ async function startApp() {
 
     currentUser = meData.user;
     updateUserMenuUI();
+    updateDrawerUI();
 
     const isSuper = Boolean(currentUser.is_superadmin || currentUser.isSuperAdmin || currentUser.email === 'soyelroot@tatudin.cl');
     const rootBadge = document.querySelector('#superadmin-top-badge');
     if (rootBadge) rootBadge.style.display = isSuper ? 'flex' : 'none';
-    document.querySelectorAll('.root-nav-item, .root-dropdown-item').forEach((el) => {
+    document.querySelectorAll('.root-nav-item, .root-dropdown-item, .root-drawer-item').forEach((el) => {
       el.style.display = isSuper ? 'flex' : 'none';
     });
 
@@ -487,6 +559,7 @@ function emptyState(title, text) {
 let currentAppView = 'dashboard';
 
 async function render(view = 'dashboard') {
+  closeMobileDrawer();
   currentAppView = view;
   document.querySelectorAll('[data-view]').forEach((link) => {
     link.classList.toggle('active', link.dataset.view === view);
@@ -495,10 +568,13 @@ async function render(view = 'dashboard') {
   try {
     if (view === 'agenda') return await renderAgenda();
     if (view === 'clientes') return await renderClients();
-    if (view === 'inventario' || view === 'inventory') return await renderInventory();
+    if (view === 'comunicaciones') return await renderCommunications();
     if (view === 'finanzas') return await renderFinances();
+    if (view === 'inventario' || view === 'inventory') return await renderInventory();
+    if (view === 'portafolio' || view === 'artistas') return await renderPortfolio();
+    if (view === 'integraciones') return await renderIntegrations();
+    if (view === 'managers') return await renderManagers();
     if (view === 'ajustes') return await renderSettings();
-    if (view === 'portafolio') return await renderPortfolio();
     if (view === 'terminos') return renderTermsAndConditions(false);
     if (view === 'backoffice') return await renderBackoffice();
 
@@ -1221,6 +1297,352 @@ async function renderSettings() {
           <button type="button" class="text-button" data-action="open-terms" style="color: var(--red); font-weight: 700; align-self: flex-start; margin-top: 4px;">
             Leer Términos y Condiciones y Política de Privacidad →
           </button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+// ---------------- COMUNICACIONES & RECORDATORIOS ----------------
+async function renderCommunications() {
+  const [stData, apptsList, clientsList] = await Promise.all([
+    api('/api/studio').catch(() => activeStudio),
+    api('/api/appointments').catch(() => []),
+    api('/api/clients').catch(() => [])
+  ]);
+
+  const studioName = stData?.name || activeStudio?.name || 'Tatudin Estudio';
+
+  app.innerHTML = `
+    <section class="page-heading">
+      <div>
+        <p class="eyebrow">COMUNICACIONES Y RECORDATORIOS</p>
+        <h1>Comunicaciones<span class="dot">.</span></h1>
+        <p class="lead">Envía confirmaciones y recordatorios por WhatsApp, administra cuestionarios de salud y consentimientos informados.</p>
+      </div>
+      <button class="primary" data-action="new-booking">${icon('plus')} <span>Nuevo compromiso</span></button>
+    </section>
+
+    <div class="settings-stack">
+      <!-- Quick WhatsApp Message Sender -->
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">WHATSAPP DIRECTO</p>
+            <h2>Recordatorios a Citas Próximas</h2>
+          </div>
+        </div>
+        <p class="lead" style="margin-bottom: 16px; font-size: 13.5px;">Haz clic en "Enviar WhatsApp" para abrir directamente la conversación con el mensaje de confirmación y horarios precargados.</p>
+        
+        <div class="members-list">
+          ${apptsList.slice(0, 5).map((apt) => {
+            const dateFormatted = new Intl.DateTimeFormat('es-CL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(apt.starts_at));
+            const phone = (apt.client_phone || '').replace(/[^0-9+]/g, '');
+            const msg = encodeURIComponent(`¡Hola ${apt.client_name || 'Cliente'}! Te recordamos tu cita de tatuaje "${apt.title}" en ${studioName} para el ${dateFormatted}. Por favor ven bien descansado/a y con ropa cómoda. ¡Nos vemos!`);
+            const waUrl = phone ? `https://wa.me/${phone.replace('+', '')}?text=${msg}` : `https://wa.me/?text=${msg}`;
+            return `
+              <article class="setting-item">
+                <div class="setting-item-icon space-icon-bubble" style="background: #25D36620; color: #25D366;">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <div class="setting-item-body">
+                  <div class="setting-item-top">
+                    <div class="setting-item-title">
+                      <h3>${apt.client_name || 'Sin cliente asignado'} — ${apt.title}</h3>
+                      <span class="status-chip status-${apt.status}">${STATUS_MAP[apt.status] || apt.status}</span>
+                    </div>
+                    <div class="setting-item-action">
+                      <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="primary small-btn" style="background: #25D366; color: #ffffff; text-decoration: none;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <span>Enviar WhatsApp</span>
+                      </a>
+                    </div>
+                  </div>
+                  <div class="setting-item-sub">
+                    <span class="member-meta">${dateFormatted} · ${apt.client_phone || 'Sin teléfono'}</span>
+                  </div>
+                </div>
+              </article>
+            `;
+          }).join('') || emptyState('Sin citas próximas', 'Crea una cita en la agenda para activar el envío de recordatorios automáticos.')}
+        </div>
+      </section>
+
+      <!-- Automated Message Templates -->
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">PLANTILLAS DE MENSAJES</p>
+            <h2>Plantillas Rápidas para Clientes</h2>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="portfolio-banner-card" style="margin-bottom: 0;">
+            <strong style="color: var(--ink); font-size: 14.5px; display: block; margin-bottom: 6px;">📅 1. Confirmación de Cita & Seña</strong>
+            <p class="lead" style="font-size: 12.5px; margin-bottom: 10px;">"¡Hola [Cliente]! Tu cita para [Servicio] en ${studioName} el [Fecha] ha sido confirmada. Recuerda que tu abono asegura tu bloque."</p>
+            <button class="secondary small-btn" data-copy-text="¡Hola! Tu cita en ${studioName} ha sido confirmada. Te esperamos con la mejor energía para tu sesión.">
+              ${icon('link')} <span>Copiar plantilla</span>
+            </button>
+          </div>
+
+          <div class="portfolio-banner-card" style="margin-bottom: 0;">
+            <strong style="color: var(--ink); font-size: 14.5px; display: block; margin-bottom: 6px;">⏰ 2. Recordatorio 24 Horas Antes</strong>
+            <p class="lead" style="font-size: 12.5px; margin-bottom: 10px;">"¡Hola [Cliente]! Te recordamos que mañana es tu sesión de tatuaje. Recomendaciones: hidratarse bien, comer antes y no consumir alcohol."</p>
+            <button class="secondary small-btn" data-copy-text="¡Hola! Te recordamos que mañana es tu cita de tatuaje en ${studioName}. Recuerda comer bien y descansar adecuadamente.">
+              ${icon('link')} <span>Copiar plantilla</span>
+            </button>
+          </div>
+
+          <div class="portfolio-banner-card" style="margin-bottom: 0;">
+            <strong style="color: var(--ink); font-size: 14.5px; display: block; margin-bottom: 6px;">🩹 3. Cuidados Posteriores (Aftercare)</strong>
+            <p class="lead" style="font-size: 12.5px; margin-bottom: 10px;">"¡Gracias por tatuarte con nosotros! Para curar tu pieza: lavar 3 veces al día con jabón neutro, aplicar crema cicatrizante y no exponer al sol."</p>
+            <button class="secondary small-btn" data-copy-text="¡Gracias por tatuarte en ${studioName}! Cuida tu tatuaje lavando con jabón neutro y crema cicatrizante 3 veces al día.">
+              ${icon('link')} <span>Copiar plantilla</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Health Consent Questionnaire -->
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">SALUD Y CONSENTIMIENTO INFORMADO</p>
+            <h2>Cuestionario Médico Pre-Tatuaje</h2>
+          </div>
+        </div>
+        <p class="lead" style="margin-bottom: 16px; font-size: 13.5px;">Formulario digital estandarizado para verificación de salud de clientes antes de comenzar cada sesión, conforme a normas sanitarias vigentes.</p>
+        
+        <div class="members-list">
+          <div class="setting-item">
+            <div class="setting-item-icon space-icon-bubble">✓</div>
+            <div class="setting-item-body">
+              <div class="setting-item-top"><div class="setting-item-title"><h3>Alergias a pigmentos, tintas o látex</h3></div></div>
+              <div class="setting-item-sub"><span class="member-meta">Identifica reactividad previa a tintas rojas o insumos médicos.</span></div>
+            </div>
+          </div>
+          <div class="setting-item">
+            <div class="setting-item-icon space-icon-bubble">✓</div>
+            <div class="setting-item-body">
+              <div class="setting-item-top"><div class="setting-item-title"><h3>Trastornos de coagulación y medicamentos</h3></div></div>
+              <div class="setting-item-sub"><span class="member-meta">Registro de consumo de anticoagulantes, aspirina o hemofilia.</span></div>
+            </div>
+          </div>
+          <div class="setting-item">
+            <div class="setting-item-icon space-icon-bubble">✓</div>
+            <div class="setting-item-body">
+              <div class="setting-item-top"><div class="setting-item-title"><h3>Condiciones de la piel y cicatrización</h3></div></div>
+              <div class="setting-item-sub"><span class="member-meta">Historial de queloides, psoriasis, eczemas o dermatitis en la zona.</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+// ---------------- INTEGRACIONES ----------------
+async function renderIntegrations() {
+  const stData = await api('/api/studio').catch(() => activeStudio);
+  const studioName = stData?.name || activeStudio?.name || 'Ink Sanctuary';
+
+  app.innerHTML = `
+    <section class="page-heading">
+      <div>
+        <p class="eyebrow">CONECTIVIDAD & PLATAFORMAS</p>
+        <h1>Integraciones<span class="dot">.</span></h1>
+        <p class="lead">Conecta tus calendarios personales, redes sociales y mensajería para automatizar tu flujo de trabajo.</p>
+      </div>
+    </section>
+
+    <div class="settings-stack">
+      <!-- Calendar Integrations -->
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">CALENDARIOS EXTERNOS</p>
+            <h2>Sincronización de Agenda</h2>
+          </div>
+        </div>
+        <p class="lead" style="margin-bottom: 16px; font-size: 13.5px;">Conecta tus calendarios personales para bloquear horarios ocupados y evitar citas solapadas automáticamente.</p>
+
+        <div class="members-list">
+          <article class="setting-item">
+            <div class="setting-item-icon" style="background: #4285F420; color: #4285F4; border-radius: 12px; display: grid; place-items: center; width: 44px; height: 44px; font-weight: 800; font-size: 16px;">G</div>
+            <div class="setting-item-body">
+              <div class="setting-item-top">
+                <div class="setting-item-title">
+                  <h3>Google Calendar</h3>
+                  <span class="status-chip status-confirmed">Conectado</span>
+                </div>
+                <div class="setting-item-action">
+                  <button class="member-toggle-btn" data-action="toggle-gcal-sync">Sincronizado</button>
+                </div>
+              </div>
+              <div class="setting-item-sub">
+                <span class="member-meta">Sincronización bidireccional activa con cuenta de estudio.</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="setting-item">
+            <div class="setting-item-icon" style="background: #221C3520; color: var(--ink); border-radius: 12px; display: grid; place-items: center; width: 44px; height: 44px; font-weight: 800; font-size: 16px;"></div>
+            <div class="setting-item-body">
+              <div class="setting-item-top">
+                <div class="setting-item-title">
+                  <h3>Apple Calendar (iCal)</h3>
+                  <span class="status-chip status-inquiry">Disponible</span>
+                </div>
+                <div class="setting-item-action">
+                  <button class="primary small-btn" data-action="connect-ical">Conectar</button>
+                </div>
+              </div>
+              <div class="setting-item-sub">
+                <span class="member-meta">Exporta tus eventos mediante URL segura de suscripción iCal.</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Messaging & Social Integrations -->
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">CANALES DE COMUNICACIÓN</p>
+            <h2>WhatsApp & Redes Sociales</h2>
+          </div>
+        </div>
+
+        <div class="members-list">
+          <article class="setting-item">
+            <div class="setting-item-icon" style="background: #25D36620; color: #25D366; border-radius: 12px; display: grid; place-items: center; width: 44px; height: 44px; font-weight: 800; font-size: 14px;">WA</div>
+            <div class="setting-item-body">
+              <div class="setting-item-top">
+                <div class="setting-item-title">
+                  <h3>WhatsApp Direct Link</h3>
+                  <span class="status-chip status-confirmed">Activo</span>
+                </div>
+                <div class="setting-item-action">
+                  <span class="tag-owner">Habilitado</span>
+                </div>
+              </div>
+              <div class="setting-item-sub">
+                <span class="member-meta">Permite enviar confirmaciones con 1 clic desde la ficha de cita.</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="setting-item">
+            <div class="setting-item-icon" style="background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045); color: #ffffff; border-radius: 12px; display: grid; place-items: center; width: 44px; height: 44px; font-weight: 800; font-size: 14px;">IG</div>
+            <div class="setting-item-body">
+              <div class="setting-item-top">
+                <div class="setting-item-title">
+                  <h3>Instagram Portfolio Sync</h3>
+                  <span class="status-chip status-confirmed">Activo</span>
+                </div>
+                <div class="setting-item-action">
+                  <button class="secondary small-btn" data-view="portafolio">Ver Galería</button>
+                </div>
+              </div>
+              <div class="setting-item-sub">
+                <span class="member-meta">Sincroniza tus publicaciones y fotos recientes en tu landing pública.</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+// ---------------- MANAGERS & EQUIPO ----------------
+async function renderManagers() {
+  const [memList, stData] = await Promise.all([
+    api('/api/members').catch(() => []),
+    api('/api/studio').catch(() => activeStudio)
+  ]);
+  members = memList;
+  activeStudio = stData;
+
+  const owners = members.filter(m => m.role === 'owner');
+  const admins = members.filter(m => m.role === 'admin');
+  const residents = members.filter(m => m.role === 'resident');
+  const nomads = members.filter(m => m.role === 'nomad');
+
+  app.innerHTML = `
+    <section class="page-heading">
+      <div>
+        <p class="eyebrow">EQUIPO Y GESTIÓN DE ROLES</p>
+        <h1>Managers & Equipo<span class="dot">.</span></h1>
+        <p class="lead">Administra los accesos, administradores del estudio, artistas residentes y nómades.</p>
+      </div>
+      <button class="primary" data-action="new-member">${icon('plus')} <span>Agregar miembro</span></button>
+    </section>
+
+    <!-- Quick Stats -->
+    <section class="client-stats-row" style="margin-bottom: 20px;">
+      <div class="client-mini-stat panel">
+        <span class="eyebrow">TOTAL EQUIPO</span>
+        <strong>${members.length}</strong>
+      </div>
+      <div class="client-mini-stat panel">
+        <span class="eyebrow">MANAGERS / ADMIN</span>
+        <strong>${owners.length + admins.length}</strong>
+      </div>
+      <div class="client-mini-stat panel">
+        <span class="eyebrow">RESIDENTES</span>
+        <strong>${residents.length}</strong>
+      </div>
+      <div class="client-mini-stat panel">
+        <span class="eyebrow">NÓMADES</span>
+        <strong>${nomads.length}</strong>
+      </div>
+    </section>
+
+    <div class="settings-stack">
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">LISTA DE INTEGRANTES</p>
+            <h2>Miembros activos e inactivos</h2>
+          </div>
+          <button class="primary small-btn" data-action="new-member">${icon('plus')} <span>Nuevo miembro</span></button>
+        </div>
+
+        <div class="members-list">
+          ${members.map((m) => {
+            const rInfo = ROLE_MAP[m.role] || { label: m.role, class: 'role-resident' };
+            const isOwner = m.role === 'owner';
+            const initials = (m.full_name || 'A').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+            return `
+              <article class="setting-item">
+                <div class="setting-item-icon initials">${initials}</div>
+                <div class="setting-item-body">
+                  <div class="setting-item-top">
+                    <div class="setting-item-title">
+                      <h3>${m.full_name}</h3>
+                      <span class="artist-chip ${rInfo.class}">${rInfo.label}</span>
+                      <span class="member-status ${m.status}">${m.status === 'active' ? 'Activo' : 'Inactivo'}</span>
+                    </div>
+                    <div class="setting-item-action">
+                      ${!isOwner ? `
+                        <button class="member-toggle-btn" data-toggle-member-id="${m.membership_id}" data-current-status="${m.status}">
+                          ${m.status === 'active' ? 'Desactivar' : 'Activar'}
+                        </button>
+                      ` : '<span class="tag-owner">Principal</span>'}
+                    </div>
+                  </div>
+                  <div class="setting-item-sub">
+                    <button class="edit-commission-tag" data-action="edit-commission" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-commission="${m.commission_percent || 70}">
+                      ${icon('percent')} ${m.commission_percent || 70}% comisión
+                    </button>
+                    <span class="member-meta">${m.email} · ${m.appointment_count || 0} citas registradas</span>
+                  </div>
+                </div>
+              </article>
+            `;
+          }).join('') || emptyState('Sin integrantes registrados', 'Agrega miembros para colaborar en el estudio.')}
         </div>
       </section>
     </div>
@@ -3957,10 +4379,81 @@ document.addEventListener('click', async (event) => {
     return await renderSettings();
   }
 
+  // Mobile drawer actions
+  if (event.target.closest('[data-action="toggle-mobile-drawer"]')) {
+    event.preventDefault();
+    toggleMobileDrawer();
+    return;
+  }
+  if (event.target.closest('[data-action="close-mobile-drawer"]')) {
+    event.preventDefault();
+    closeMobileDrawer();
+    return;
+  }
+  if (event.target.closest('[data-action="open-mobile-drawer"]')) {
+    event.preventDefault();
+    openMobileDrawer();
+    return;
+  }
+
+  // Copy template text
+  const copyTextBtn = event.target.closest('[data-copy-text]');
+  if (copyTextBtn) {
+    const textToCopy = copyTextBtn.dataset.copyText;
+    navigator.clipboard?.writeText(textToCopy);
+    alert(`Texto copiado al portapapeles:\n\n"${textToCopy}"`);
+    return;
+  }
+
+  // Toggle GCal sync simulation
+  if (event.target.closest('[data-action="toggle-gcal-sync"]')) {
+    alert('Sincronización con Google Calendar actualizada.');
+    return;
+  }
+
+  // Connect iCal simulation
+  if (event.target.closest('[data-action="connect-ical"]')) {
+    const icalUrl = `webcal://${window.location.host}/api/public/calendar/${activeStudio?.id || 1}.ics`;
+    navigator.clipboard?.writeText(icalUrl);
+    alert(`URL de suscripción Apple Calendar copiada:\n\n${icalUrl}`);
+    return;
+  }
+
+  // Test consent form modal
+  if (event.target.closest('[data-action="test-consent-form"]')) {
+    openModal(`
+      <div class="client-detail-header">
+        <div class="initials large">📋</div>
+        <div>
+          <p class="eyebrow">CONSENTIMIENTO INFORMADO</p>
+          <h2>Cuestionario de Salud</h2>
+          <p class="client-contact-lead">Verificación previa al procedimiento</p>
+        </div>
+      </div>
+      <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <label style="display: flex; gap: 10px; align-items: center; font-size: 13.5px;">
+          <input type="checkbox" checked /> No tengo alergias conocidas a tintas ni látex
+        </label>
+        <label style="display: flex; gap: 10px; align-items: center; font-size: 13.5px;">
+          <input type="checkbox" checked /> No consumo medicamentos anticoagulantes
+        </label>
+        <label style="display: flex; gap: 10px; align-items: center; font-size: 13.5px;">
+          <input type="checkbox" checked /> No presento infecciones cutáneas en la zona
+        </label>
+        <label style="display: flex; gap: 10px; align-items: center; font-size: 13.5px;">
+          <input type="checkbox" checked /> Declaro ser mayor de edad y aceptar el diseño
+        </label>
+        <button class="primary" data-close-modal style="margin-top: 10px;">Comprendido</button>
+      </div>
+    `);
+    return;
+  }
+
   // Views navigation
   const viewLink = event.target.closest('[data-view]');
   if (viewLink) {
     event.preventDefault();
+    closeMobileDrawer();
     return await render(viewLink.dataset.view);
   }
 
@@ -4606,6 +5099,14 @@ document.addEventListener('change', async (event) => {
   }
 });
 
+// Global ESC listener to close modal and mobile drawer
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closeModal();
+    closeMobileDrawer();
+  }
+});
+
 // Session verification and bootstrap
 api('/api/auth/me')
   .then((data) => {
@@ -4618,3 +5119,4 @@ api('/api/auth/me')
   .catch(() => {
     renderOnboarding(0);
   });
+
