@@ -695,7 +695,8 @@ async function render(view = 'dashboard') {
     if (view === 'comunicaciones') return await renderCommunications();
     if (view === 'finanzas') return await renderFinances();
     if (view === 'inventario' || view === 'inventory') return await renderInventory();
-    if (view === 'portafolio' || view === 'artistas') return await renderPortfolio();
+    if (view === 'artistas' || view === 'artists') return await renderArtists();
+    if (view === 'portafolio') return await renderPortfolio();
     if (view === 'integraciones') return await renderIntegrations();
     if (view === 'managers') return await renderManagers();
     if (view === 'ajustes') return await renderSettings();
@@ -1555,17 +1556,19 @@ async function renderFinances() {
 }
 
 async function renderSettings() {
-  const [stData, memList, spList, guestList, catList] = await Promise.all([
+  const [stData, memList, spList, gsList, catList, features] = await Promise.all([
     api('/api/studio').catch(() => ({ name: 'Mi Estudio', currency: 'CLP', timezone: 'America/Santiago', account_type: 'independent' })),
     api('/api/members').catch(() => []),
     api('/api/spaces').catch(() => []),
     api('/api/guest-spots').catch(() => []),
-    api('/api/categories').catch(() => [])
+    api('/api/categories').catch(() => []),
+    api('/api/system/features').catch(() => ({ feature_microsite_enabled: false }))
   ]);
   activeStudio = stData;
   members = memList;
   spaces = spList;
   categories = catList;
+  const isMicrositeEnabled = Boolean(features?.feature_microsite_enabled) || Boolean(currentUser?.is_superadmin);
 
   app.innerHTML = `
     <section class="page-heading">
@@ -1577,31 +1580,33 @@ async function renderSettings() {
     </section>
 
     <div class="settings-stack">
-      <!-- Artist Portfolio & Landing Page Section -->
-      <section class="panel portfolio-highlight-panel">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">WEB & PORTAFOLIO PÚBLICO</p>
-            <h2>Landing Page y Portafolio de Artista</h2>
+      ${isMicrositeEnabled ? `
+        <!-- Artist Portfolio & Landing Page Section -->
+        <section class="panel portfolio-highlight-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">WEB & PORTAFOLIO PÚBLICO</p>
+              <h2>Landing Page y Portafolio de Artista</h2>
+            </div>
+            <button class="primary small-btn" data-view="portafolio">
+              ${icon('eye')} <span>Editar mi Portafolio</span>
+            </button>
           </div>
-          <button class="primary small-btn" data-view="portafolio">
-            ${icon('eye')} <span>Editar mi Portafolio</span>
-          </button>
-        </div>
-        <div class="portfolio-banner-card">
-          <div class="portfolio-banner-info">
-            <p class="lead" style="margin: 0 0 10px 0; font-size: 13.5px;">Configura tu página web de artista, enlaces directos de WhatsApp y agendamiento, paleta de colores de marca y galería de trabajos sincronizada con Instagram.</p>
-            <div class="portfolio-banner-actions">
-              <button class="primary small-btn" data-view="portafolio">
-                ${icon('edit')} <span>Configurar Portafolio</span>
-              </button>
-              <button class="secondary small-btn" data-action="preview-portfolio">
-                ${icon('eye')} <span>Ver mi Landing pública</span>
-              </button>
+          <div class="portfolio-banner-card">
+            <div class="portfolio-banner-info">
+              <p class="lead" style="margin: 0 0 10px 0; font-size: 13.5px;">Configura tu página web de artista, enlaces directos de WhatsApp y agendamiento, paleta de colores de marca y galería de trabajos sincronizada con Instagram.</p>
+              <div class="portfolio-banner-actions">
+                <button class="primary small-btn" data-view="portafolio">
+                  ${icon('edit')} <span>Configurar Portafolio</span>
+                </button>
+                <button class="secondary small-btn" data-action="preview-portfolio">
+                  ${icon('eye')} <span>Ver mi Landing pública</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ` : ''}
 
       <!-- Team / Members Panel -->
       <section class="panel">
@@ -2435,7 +2440,10 @@ async function renderBackoffice(tab = currentBackofficeTab) {
 
       <nav class="backoffice-tabs" aria-label="Pestañas de Backoffice">
         <button type="button" class="bo-tab-btn ${tab === 'stats' ? 'active' : ''}" data-bo-tab="stats">
-          📊 Estadísticas Globales (Ley 19.628)
+          📊 Estadísticas & Funciones
+        </button>
+        <button type="button" class="bo-tab-btn ${tab === 'artists' ? 'active' : ''}" data-bo-tab="artists">
+          🎨 Artistas Globales
         </button>
         <button type="button" class="bo-tab-btn ${tab === 'users' ? 'active' : ''}" data-bo-tab="users">
           👥 Usuarios y Estudios
@@ -2462,6 +2470,10 @@ async function renderBackoffice(tab = currentBackofficeTab) {
       const statsData = await api('/api/backoffice/stats');
       backofficeCache.stats = statsData;
       container.innerHTML = renderBackofficeStatsTab(statsData);
+    } else if (tab === 'artists') {
+      const artistsData = await api('/api/backoffice/artists');
+      backofficeCache.artists = artistsData;
+      container.innerHTML = renderBackofficeArtistsTab(artistsData);
     } else if (tab === 'users') {
       const [usersData, studiosData] = await Promise.all([
         api('/api/backoffice/users'),
@@ -2490,8 +2502,31 @@ async function renderBackoffice(tab = currentBackofficeTab) {
 
 function renderBackofficeStatsTab(data) {
   const m = data.metrics || {};
+  const isMicrositeOn = Boolean(data.features?.feature_microsite_enabled);
+
   return `
     <div style="display: flex; flex-direction: column; gap: 20px;">
+      <!-- Feature Flags & Global Modules Control -->
+      <div class="panel" style="border: 1.5px solid var(--line-soft); background: var(--surface); padding: 18px 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <span style="font-size: 20px;">🌐</span>
+              <strong style="font-size: 15px; color: var(--ink);">Pequeño Sitio Web (Landing Pública de Artistas)</strong>
+              <span class="badge" style="background: ${isMicrositeOn ? '#d1fae5' : '#fee2e2'}; color: ${isMicrositeOn ? '#065f46' : '#991b1b'}; font-size: 11.5px; font-weight: 800;">
+                ${isMicrositeOn ? '🟢 ACTIVADO' : '🔴 DESACTIVADO TEMPORALMENTE'}
+              </span>
+            </div>
+            <p style="font-size: 12.5px; color: var(--muted); margin: 0; max-width: 660px; line-height: 1.4;">
+              ${isMicrositeOn ? 'El pequeño sitio web y los portafolios públicos están disponibles para su uso y publicación.' : 'El pequeño sitio web se encuentra oculto para los usuarios y los accesos públicos están desactivados.'}
+            </p>
+          </div>
+          <button type="button" class="primary small" data-action="toggle-feature-microsite" data-current-state="${isMicrositeOn}" style="background: ${isMicrositeOn ? 'var(--red)' : '#10b981'}; border-color: transparent; font-weight: 700; padding: 8px 16px;">
+            ${isMicrositeOn ? '⏸️ Desactivar Pequeño Sitio Web' : '⚡ Activar Pequeño Sitio Web'}
+          </button>
+        </div>
+      </div>
+
       <!-- Law Compliance Info Notice -->
       <div class="terms-intro-box" style="border-left-color: var(--red);">
         <p><strong>📜 Cumplimiento de Privacidad y Telemetría:</strong> ${data.system?.lawCompliance}</p>
@@ -2617,6 +2652,61 @@ function renderBackofficeStatsTab(data) {
         </section>
       </div>
     </div>
+  `;
+}
+
+function renderBackofficeArtistsTab(artists) {
+  return `
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">DIRECTORIO GLOBAL DE ARTISTAS (${artists.length})</p>
+          <h2>Artistas y Guests registrados en el sistema</h2>
+        </div>
+      </div>
+      <div class="bo-table-wrap">
+        <table class="bo-table">
+          <thead>
+            <tr>
+              <th>Artista</th>
+              <th>Email</th>
+              <th>Estudio Asociado</th>
+              <th>Rol</th>
+              <th>Modalidad de Acuerdo</th>
+              <th>Acceso App</th>
+              <th>Persona a Cargo</th>
+              <th>Citas</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${artists.map((a) => {
+              const rInfo = ROLE_MAP[a.role] || { label: a.role || 'Artista', class: 'role-resident' };
+              const agreeType = a.agreement_type || 'commission';
+              let agreementLabel = `${a.commission_percent || 70}% comisión`;
+              if (agreeType === 'fixed_daily') agreementLabel = `Fijo ${money(a.fixed_amount || 0)} / día`;
+              if (agreeType === 'fixed_monthly') agreementLabel = `Fijo ${money(a.fixed_amount || 0)} / mes`;
+
+              return `
+                <tr>
+                  <td>
+                    <strong>${a.full_name}</strong>
+                  </td>
+                  <td><code>${a.email}</code></td>
+                  <td><strong>${a.studio_name || 'Sin estudio'}</strong></td>
+                  <td><span class="artist-chip ${rInfo.class}">${rInfo.label}</span></td>
+                  <td><span class="badge" style="background: var(--surface-high); border: 1px solid var(--line-soft); font-size: 11px;">${agreementLabel}</span></td>
+                  <td>
+                    ${a.has_app_access ? '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; font-size: 11px;">📱 Habilitado</span>' : '<span class="badge" style="background: rgba(107, 114, 128, 0.15); color: #4b5563; font-size: 11px;">🔒 Solo Registro</span>'}
+                  </td>
+                  <td>${a.responsible_name ? `👤 ${a.responsible_name}` : '<span style="color: var(--muted);">-</span>'}</td>
+                  <td><strong>${a.total_appointments || 0}</strong></td>
+                </tr>
+              `;
+            }).join('') || '<tr><td colspan="8" style="text-align: center; color: var(--muted);">Sin artistas registrados</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </section>
   `;
 }
 
@@ -2828,6 +2918,225 @@ function renderBackofficeDatabaseTab() {
   `;
 }
 
+// ---------------- ARTISTS DIRECTORY & TEAM MANAGEMENT ----------------
+let artistsFilterRole = 'all';
+let artistsFilterModality = 'all';
+let artistsSearchQuery = '';
+
+async function renderArtists() {
+  currentAppView = 'artistas';
+  document.querySelectorAll('[data-view]').forEach((link) => {
+    link.classList.toggle('active', link.dataset.view === 'artistas');
+  });
+
+  try {
+    const [fetchedMembers, features] = await Promise.all([
+      api('/api/members').catch(() => members || []),
+      api('/api/system/features').catch(() => ({ feature_microsite_enabled: false }))
+    ]);
+    members = fetchedMembers;
+    const isMicrositeEnabled = Boolean(features.feature_microsite_enabled);
+
+    const totalCount = members.length;
+    const residentCount = members.filter((m) => m.role === 'resident' || m.role === 'owner').length;
+    const nomadCount = members.filter((m) => m.role === 'nomad').length;
+    const appAccessCount = members.filter((m) => m.has_app_access !== false).length;
+
+    // Filter members
+    const filtered = members.filter((m) => {
+      if (artistsFilterRole !== 'all' && m.role !== artistsFilterRole) return false;
+      if (artistsFilterModality !== 'all' && (m.agreement_type || 'commission') !== artistsFilterModality) return false;
+      if (artistsSearchQuery.trim()) {
+        const q = artistsSearchQuery.toLowerCase().trim();
+        const nameMatch = (m.full_name || '').toLowerCase().includes(q);
+        const emailMatch = (m.email || '').toLowerCase().includes(q);
+        const respMatch = (m.responsible_name || '').toLowerCase().includes(q);
+        if (!nameMatch && !emailMatch && !respMatch) return false;
+      }
+      return true;
+    });
+
+    app.innerHTML = `
+      <section class="intro">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <p class="eyebrow">EQUIPO & ARTISTAS</p>
+            <h1>Artistas del Estudio<span class="dot">.</span></h1>
+            <p class="lead">Listado completo de artistas registrados en el sistema, modalidades comerciales y permisos de acceso.</p>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="primary" data-action="new-member">
+              ${icon('plus')} <span>Agregar artista / Guest</span>
+            </button>
+            ${isMicrositeEnabled ? `
+              <button class="secondary" data-view="portafolio">
+                🌐 Ver / Editar Sitio Web
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      </section>
+
+      <!-- KPI Summary Cards -->
+      <section class="stats" style="margin: 18px 0 24px;">
+        <article class="stat-card">
+          <div class="stat-card-top">
+            <p class="stat-card-title">Total Artistas</p>
+            <span class="stat-card-icon">👥</span>
+          </div>
+          <p class="stat-card-value">${totalCount}</p>
+          <p class="stat-card-change">Registrados en el estudio</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-card-top">
+            <p class="stat-card-title">Residentes</p>
+            <span class="stat-card-icon">🏠</span>
+          </div>
+          <p class="stat-card-value">${residentCount}</p>
+          <p class="stat-card-change">Permanentes en el equipo</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-card-top">
+            <p class="stat-card-title">Guests / Nómades</p>
+            <span class="stat-card-icon">✈️</span>
+          </div>
+          <p class="stat-card-value">${nomadCount}</p>
+          <p class="stat-card-change">Invitados y visitantes</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-card-top">
+            <p class="stat-card-title">Con Acceso a la App</p>
+            <span class="stat-card-icon">📱</span>
+          </div>
+          <p class="stat-card-value">${appAccessCount} <span style="font-size: 13px; color: var(--muted); font-weight: 500;">/ ${totalCount}</span></p>
+          <p class="stat-card-change">${totalCount - appAccessCount} solo para registro/agenda</p>
+        </article>
+      </section>
+
+      <!-- Filters & Search Toolbar -->
+      <section class="panel" style="margin-bottom: 20px; padding: 14px 16px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: center;">
+          <div style="position: relative;">
+            <input type="text" id="artists-search-input" value="${artistsSearchQuery}" placeholder="🔍 Buscar por nombre o email..." style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface);" />
+          </div>
+
+          <div>
+            <select id="artists-role-filter" style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface);">
+              <option value="all" ${artistsFilterRole === 'all' ? 'selected' : ''}>Todos los roles</option>
+              <option value="resident" ${artistsFilterRole === 'resident' ? 'selected' : ''}>Residentes</option>
+              <option value="nomad" ${artistsFilterRole === 'nomad' ? 'selected' : ''}>Guests / Nómades</option>
+              <option value="admin" ${artistsFilterRole === 'admin' ? 'selected' : ''}>Administradores</option>
+            </select>
+          </div>
+
+          <div>
+            <select id="artists-agreement-filter" style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface);">
+              <option value="all" ${artistsFilterModality === 'all' ? 'selected' : ''}>Todas las modalidades</option>
+              <option value="commission" ${artistsFilterModality === 'commission' ? 'selected' : ''}>Porcentaje de Comisión (%)</option>
+              <option value="fixed_daily" ${artistsFilterModality === 'fixed_daily' ? 'selected' : ''}>Pago Fijo por Día ($ / día)</option>
+              <option value="fixed_monthly" ${artistsFilterModality === 'fixed_monthly' ? 'selected' : ''}>Pago Fijo Mensual ($ / mes)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Artists Cards Grid -->
+      <section class="artists-grid-container" style="display: grid; gap: 14px;">
+        ${filtered.length ? filtered.map((m) => {
+          const rInfo = ROLE_MAP[m.role] || { label: m.role, class: 'role-resident' };
+          const isOwner = m.role === 'owner';
+          const initials = (m.full_name || 'A').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+          const agreeType = m.agreement_type || 'commission';
+          let agreementLabel = `${m.commission_percent || 70}% comisión`;
+          let agreementIcon = icon('percent');
+          if (agreeType === 'fixed_daily') {
+            agreementLabel = `Fijo ${money(m.fixed_amount || 0)} / día`;
+            agreementIcon = icon('clock');
+          } else if (agreeType === 'fixed_monthly') {
+            agreementLabel = `Fijo ${money(m.fixed_amount || 0)} / mes`;
+            agreementIcon = icon('calendar');
+          }
+
+          return `
+            <article class="panel" style="display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; border: 1.5px solid var(--line-soft); transition: all var(--transition-fast);">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                  <div class="initials large" style="width: 48px; height: 48px; font-size: 16px;">${initials}</div>
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 3px;">
+                      <h3 style="font-size: 16px; margin: 0; color: var(--ink); font-weight: 800;">${m.full_name}</h3>
+                      <span class="artist-chip ${rInfo.class}">${rInfo.label}</span>
+                      <span class="member-status ${m.status}">${m.status === 'active' ? 'Activo' : 'Inactivo'}</span>
+                      ${m.has_app_access ? '<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 11px; font-weight: 700;">📱 Acceso App</span>' : '<span class="badge" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; font-size: 11px; font-weight: 700;">🔒 Sin acceso app</span>'}
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted);">
+                      <span>📧 ${m.email}</span>
+                      <span>📅 ${m.appointment_count || 0} citas registradas</span>
+                      ${m.responsible_name ? `<span style="color: var(--ink);">👤 A cargo: <strong>${m.responsible_name}</strong></span>` : ''}
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  ${m.role === 'nomad' ? `
+                    <button type="button" class="secondary small-btn" data-action="open-guest-guide" data-membership-id="${m.membership_id}" title="Ver y enviar ficha de onboarding del Guest" style="border-color: #25D366; color: #059669; background: rgba(37, 211, 102, 0.08);">
+                      ${icon('whatsapp')} <span>Guía Onboarding</span>
+                    </button>
+                  ` : ''}
+                  <button class="edit-commission-tag" data-action="edit-agreement" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-agreement-type="${agreeType}" data-commission="${m.commission_percent || 70}" data-fixed-amount="${m.fixed_amount || 0}" data-has-app-access="${m.has_app_access !== false}" data-responsible-id="${m.responsible_user_id || ''}" title="Editar modalidad de acuerdo y permisos" style="font-weight: 700;">
+                    ${agreementIcon} <span>${agreementLabel}</span>
+                  </button>
+                  ${!isOwner ? `
+                    <button class="member-toggle-btn" data-toggle-member-id="${m.membership_id}" data-current-status="${m.status}">
+                      ${m.status === 'active' ? 'Desactivar' : 'Activar'}
+                    </button>
+                  ` : '<span class="tag-owner">Dueño Principal</span>'}
+                </div>
+              </div>
+
+              ${m.supplies_included ? `
+                <div style="font-size: 11.5px; color: var(--muted); background: var(--surface-high); padding: 6px 12px; border-radius: var(--radius-sm); border: 1px dashed var(--line-soft);">
+                  🧴 <strong>Insumos incluidos:</strong> ${m.supplies_included}
+                </div>
+              ` : ''}
+            </article>
+          `;
+        }).join('') : emptyState('No se encontraron artistas', 'Ajusta los filtros de búsqueda o agrega un nuevo artista / Guest al equipo.')}
+      </section>
+    `;
+
+    // Attach search & filter listeners
+    const searchInput = document.querySelector('#artists-search-input');
+    const roleFilter = document.querySelector('#artists-role-filter');
+    const agreeFilter = document.querySelector('#artists-agreement-filter');
+
+    searchInput?.addEventListener('input', (e) => {
+      artistsSearchQuery = e.target.value;
+      renderArtists();
+    });
+    roleFilter?.addEventListener('change', (e) => {
+      artistsFilterRole = e.target.value;
+      renderArtists();
+    });
+    agreeFilter?.addEventListener('change', (e) => {
+      artistsFilterModality = e.target.value;
+      renderArtists();
+    });
+
+  } catch (error) {
+    app.innerHTML = `
+      <div class="empty">
+        <h3>Error al cargar artistas</h3>
+        <p>${error.message}</p>
+        <button class="primary small" data-view="dashboard">Volver al inicio</button>
+      </div>
+    `;
+  }
+}
+
 // ---------------- PORTFOLIO MODULE ----------------
 let portfolioData = null;
 let portfolioCurrentTab = 'profile';
@@ -2857,7 +3166,33 @@ const SAMPLE_AVATARS = [
 
 async function renderPortfolio() {
   try {
-    const data = await api('/api/portfolio/me');
+    const [data, features] = await Promise.all([
+      api('/api/portfolio/me'),
+      api('/api/system/features').catch(() => ({ feature_microsite_enabled: false }))
+    ]);
+
+    if (!features.feature_microsite_enabled && !currentUser?.is_superadmin) {
+      app.innerHTML = `
+        <div class="empty" style="max-width: 520px; margin: 60px auto; text-align: center; padding: 40px 24px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius-lg);">
+          <div style="font-size: 44px; margin-bottom: 12px;">🌐</div>
+          <p class="eyebrow">FUNCIONALIDAD DESACTIVADA</p>
+          <h2 style="margin: 8px 0 12px; font-size: 22px;">Pequeño Sitio Web Desactivado</h2>
+          <p class="lead" style="font-size: 14px; line-height: 1.5; color: var(--muted); margin-bottom: 24px;">
+            El módulo de pequeño sitio web y landing pública de artistas se encuentra temporalmente fuera de servicio. Puedes gestionar y consultar tu lista de artistas en la sección correspondiente.
+          </p>
+          <div style="display: flex; justify-content: center; gap: 10px;">
+            <button class="primary" data-view="artistas">
+              👥 Ver Listado de Artistas
+            </button>
+            <button class="secondary" data-view="dashboard">
+              Volver al Inicio
+            </button>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     portfolioData = data;
     const portfolio = data.portfolio;
     const gallery = data.gallery || [];
@@ -2868,7 +3203,7 @@ async function renderPortfolio() {
         <!-- Top Action Bar matching Figma wireframe -->
         <header class="portfolio-topbar">
           <div class="portfolio-topbar-left">
-            <button class="icon-button-back" data-view="ajustes" aria-label="Volver" title="Volver a Ajustes">
+            <button class="icon-button-back" data-view="artistas" aria-label="Volver" title="Volver a Artistas">
               ${icon('back')}
             </button>
             <div class="portfolio-title-group">
@@ -5098,6 +5433,24 @@ document.addEventListener('click', async (event) => {
   const boTabBtn = event.target.closest('[data-bo-tab]');
   if (boTabBtn) {
     return await renderBackoffice(boTabBtn.dataset.boTab);
+  }
+
+  // Backoffice toggle feature microsite
+  const toggleMicrositeBtn = event.target.closest('[data-action="toggle-feature-microsite"]');
+  if (toggleMicrositeBtn) {
+    const currentState = toggleMicrositeBtn.dataset.currentState === 'true';
+    const newState = !currentState;
+    try {
+      await api('/api/backoffice/features', {
+        method: 'PATCH',
+        body: JSON.stringify({ feature_microsite_enabled: newState })
+      });
+      alert(newState ? '¡Pequeño sitio web activado exitosamente!' : '¡Pequeño sitio web desactivado temporalmente!');
+      return await renderBackoffice('stats');
+    } catch (err) {
+      alert('Error al actualizar estado del sitio web: ' + err.message);
+    }
+    return;
   }
 
   // Backoffice impersonate

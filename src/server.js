@@ -175,6 +175,30 @@ async function seedDefaultCategories(clientOrPool, studioId, accountType = 'inde
   }
 }
 
+async function getSystemConfig(key, defaultVal = '') {
+  if (!pool) return defaultVal;
+  try {
+    const res = await pool.query('SELECT value FROM system_config WHERE key = $1', [key]);
+    if (res.rowCount) return res.rows[0].value;
+    return defaultVal;
+  } catch {
+    return defaultVal;
+  }
+}
+
+async function setSystemConfig(key, value) {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `INSERT INTO system_config (key, value, updated_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [key, String(value)]
+    );
+  } catch (err) {
+    console.error('Error in setSystemConfig:', err);
+  }
+}
+
 async function requireSuperAdmin(request, response, next) {
   return requireAuth(request, response, () => {
     if (!request.isSuperAdmin) {
@@ -184,9 +208,58 @@ async function requireSuperAdmin(request, response, next) {
   });
 }
 
+// ---------------- SYSTEM FEATURES & CONFIG ----------------
+app.get('/api/system/features', async (_request, response) => {
+  const micrositeEnabled = (await getSystemConfig('feature_microsite_enabled', 'false')) === 'true';
+  return response.json({
+    feature_microsite_enabled: micrositeEnabled
+  });
+});
+
+app.patch('/api/backoffice/features', requireSuperAdmin, async (request, response) => {
+  const { feature_microsite_enabled } = request.body;
+  if (feature_microsite_enabled !== undefined) {
+    await setSystemConfig('feature_microsite_enabled', String(Boolean(feature_microsite_enabled)));
+  }
+  const micrositeEnabled = (await getSystemConfig('feature_microsite_enabled', 'false')) === 'true';
+  return response.json({
+    ok: true,
+    feature_microsite_enabled: micrositeEnabled
+  });
+});
+
 // ---------------- BACKOFFICE ROOT ENDPOINTS ----------------
+app.get('/api/backoffice/artists', requireSuperAdmin, async (_request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const result = await pool.query(`
+      SELECT u.id, u.email, u.full_name, u.created_at,
+             sm.id AS membership_id, sm.role, sm.status,
+             COALESCE(sm.agreement_type, 'commission') AS agreement_type,
+             COALESCE(sm.commission_percent, 70.00)::numeric AS commission_percent,
+             COALESCE(sm.fixed_amount, 0.00)::numeric AS fixed_amount,
+             COALESCE(sm.has_app_access, TRUE) AS has_app_access,
+             sm.responsible_user_id,
+             resp_u.full_name AS responsible_name,
+             s.id AS studio_id, s.name AS studio_name,
+             COUNT(a.id)::integer AS total_appointments
+      FROM users u
+      LEFT JOIN studio_memberships sm ON sm.user_id = u.id
+      LEFT JOIN studios s ON s.id = sm.studio_id
+      LEFT JOIN users resp_u ON resp_u.id = sm.responsible_user_id
+      LEFT JOIN appointments a ON a.artist_id = u.id AND a.studio_id = sm.studio_id
+      GROUP BY u.id, u.email, u.full_name, u.created_at, sm.id, sm.role, sm.status, sm.agreement_type, sm.commission_percent, sm.fixed_amount, sm.has_app_access, sm.responsible_user_id, resp_u.full_name, s.id, s.name
+      ORDER BY u.created_at DESC
+    `);
+    return response.json(result.rows);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/backoffice/stats', requireSuperAdmin, async (_request, response) => {
   try {
+    const micrositeEnabled = (await getSystemConfig('feature_microsite_enabled', 'false')) === 'true';
     const [
       usersCount,
       studiosCount,
@@ -244,6 +317,9 @@ app.get('/api/backoffice/stats', requireSuperAdmin, async (_request, response) =
     ]);
 
     return response.json({
+      features: {
+        feature_microsite_enabled: micrositeEnabled
+      },
       system: {
         serverTime: new Date().toISOString(),
         nodeVersion: process.version,
@@ -1956,9 +2032,13 @@ app.post('/api/portfolio/sync-instagram', requireAuth, async (request, response)
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
-// Endpoint público para Landing Page de Portafolio
+// Endpoint público para Landing Page de Portafolio / Pequeño Sitio Web
 app.get('/api/public/portfolio/:handle', async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const micrositeEnabled = (await getSystemConfig('feature_microsite_enabled', 'false')) === 'true';
+  if (!micrositeEnabled) {
+    return response.status(403).json({ error: 'El pequeño sitio web se encuentra temporalmente desactivado.' });
+  }
   const rawHandle = (request.params.handle || '').toLowerCase().trim();
   try {
     const res = await pool.query(`
@@ -2672,6 +2752,14 @@ async function ensureAuthSchema() {
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
   await safeExec('INSERT onboarding_profiles default', `INSERT INTO onboarding_profiles (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+
+  // 16. System Config & Global Feature Flags
+  await safeExec('CREATE TABLE system_config', `CREATE TABLE IF NOT EXISTS system_config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  await safeExec('INSERT system_config feature_microsite_enabled', `INSERT INTO system_config (key, value) VALUES ('feature_microsite_enabled', 'false') ON CONFLICT (key) DO NOTHING`);
 
   // Seed default categories
   try {
