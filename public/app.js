@@ -5,6 +5,30 @@ const modalContent = document.querySelector('#modal-content');
 // Helper to format currency
 const money = (value) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0));
 
+const compactMoney = (value) => {
+  const num = Number(value || 0);
+  if (isNaN(num)) return '$0';
+  const abs = Math.abs(num);
+  const sign = num < 0 ? '-' : '';
+
+  if (abs >= 1_000_000_000) {
+    const val = abs / 1_000_000_000;
+    const formatted = val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace('.', ',');
+    return `${sign}$${formatted}B`;
+  }
+  if (abs >= 1_000_000) {
+    const val = abs / 1_000_000;
+    const formatted = val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace('.', ',');
+    return `${sign}$${formatted}M`;
+  }
+  if (abs >= 1_000) {
+    const val = abs / 1_000;
+    const formatted = val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace('.', ',');
+    return `${sign}$${formatted}mil`;
+  }
+  return `${sign}$${abs.toLocaleString('es-CL')}`;
+};
+
 // SVG Icons library
 const ICONS = {
   home: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
@@ -645,11 +669,11 @@ async function render(view = 'dashboard') {
 
               <div class="tri-grid-divider"></div>
 
-              <div class="tri-grid-col">
+              <div class="tri-grid-col" title="${money(data.stats?.income || 0)}">
                 <div class="mini-bubble dark-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
                 </div>
-                <strong class="tri-metric-val">${money(data.stats?.income || 0)}</strong>
+                <strong class="tri-metric-val" title="${money(data.stats?.income || 0)}">${compactMoney(data.stats?.income || 0)}</strong>
                 <small class="tri-metric-sub" style="margin-top: 2px;">Total Ingresos</small>
               </div>
             </div>
@@ -662,45 +686,45 @@ async function render(view = 'dashboard') {
               <p class="eyebrow">INGRESOS & ABONOS</p>
             </div>
             <div class="dashboard-quad-grid">
-              <div class="quad-item">
+              <div class="quad-item" title="${money(data.stats?.income || 0)}">
                 <div class="quad-bubble gray-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
                 </div>
                 <div class="quad-content">
                   <span class="quad-eyebrow">INGRESOS</span>
-                  <strong class="quad-val">${money(data.stats?.income || 0)}</strong>
+                  <strong class="quad-val" title="${money(data.stats?.income || 0)}">${money(data.stats?.income || 0)}</strong>
                   <small class="quad-sub">Ingresos Totales</small>
                 </div>
               </div>
 
-              <div class="quad-item">
+              <div class="quad-item" title="${money(data.stats?.total_deposits || 0)}">
                 <div class="quad-bubble yellow-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M9 10h6"/></svg>
                 </div>
                 <div class="quad-content">
                   <span class="quad-eyebrow">ABONOS</span>
-                  <strong class="quad-val">${money(data.stats?.total_deposits || 0)}</strong>
+                  <strong class="quad-val" title="${money(data.stats?.total_deposits || 0)}">${money(data.stats?.total_deposits || 0)}</strong>
                   <small class="quad-sub">En Abonos Actual</small>
                 </div>
               </div>
 
-              <div class="quad-item">
+              <div class="quad-item" title="${money(data.stats?.expected_income || 0)}">
                 <div class="quad-bubble light-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/><line x1="3" x2="21" y1="9" y2="9"/></svg>
                 </div>
                 <div class="quad-content">
                   <span class="quad-eyebrow">TOTAL ESPERADO</span>
-                  <strong class="quad-val">${money(data.stats?.expected_income || 0)}</strong>
+                  <strong class="quad-val" title="${money(data.stats?.expected_income || 0)}">${money(data.stats?.expected_income || 0)}</strong>
                 </div>
               </div>
 
-              <div class="quad-item">
+              <div class="quad-item" title="${money(pendingAmount)}">
                 <div class="quad-bubble slate-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/></svg>
                 </div>
                 <div class="quad-content">
                   <span class="quad-eyebrow">PENDIENTE</span>
-                  <strong class="quad-val">${money(pendingAmount)}</strong>
+                  <strong class="quad-val" title="${money(pendingAmount)}">${money(pendingAmount)}</strong>
                 </div>
               </div>
             </div>
