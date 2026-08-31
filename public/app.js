@@ -59,7 +59,8 @@ const ICONS = {
   trash: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>',
   instagram: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>',
   share: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>',
-  cloudUpload: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>'
+  cloudUpload: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>',
+  sliders: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><circle cx="8" cy="6" r="3" fill="#ffffff" stroke="currentColor"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="16" cy="12" r="3" fill="#ffffff" stroke="currentColor"/><line x1="3" y1="18" x2="21" y2="18"/><circle cx="11" cy="18" r="3" fill="#ffffff" stroke="currentColor"/></svg>'
 };
 
 const icon = (name) => ICONS[name] || '';
@@ -871,27 +872,54 @@ async function renderAgenda() {
   });
 
   const todayISO = formatDateISO(new Date());
+  const hasActiveFilters = agendaFilter.categoryId !== 'all' || agendaFilter.artistId !== 'all' || agendaFilter.spaceId !== 'all' || agendaFilter.status !== 'all';
+
+  // Build active filter summary chips
+  const activeFiltersLabels = [];
+  if (agendaFilter.categoryId !== 'all') {
+    const cat = categories.find((c) => String(c.id) === String(agendaFilter.categoryId));
+    if (cat) activeFiltersLabels.push(`Categoría: ${cat.name}`);
+  }
+  if (agendaFilter.artistId !== 'all') {
+    const art = members.find((m) => String(m.id) === String(agendaFilter.artistId));
+    if (art) activeFiltersLabels.push(`Artista: ${art.full_name}`);
+  }
+  if (agendaFilter.spaceId !== 'all') {
+    const sp = spaces.find((s) => String(s.id) === String(agendaFilter.spaceId));
+    if (sp) activeFiltersLabels.push(`Box: ${sp.name}`);
+  }
+  if (agendaFilter.status !== 'all') {
+    const statusObj = STATUS_MAP[agendaFilter.status];
+    if (statusObj) activeFiltersLabels.push(`Estado: ${statusObj.label}`);
+  }
 
   app.innerHTML = `
     <section class="page-heading">
       <div>
         <p class="eyebrow">AGENDA & CALENDARIO</p>
         <h1>Tu calendario<span class="dot">.</span></h1>
-        <p class="lead">Navega por semanas o meses y filtra por categorías, artistas, boxes y estados.</p>
+        <p class="lead">Navega por semanas o meses y gestiona tus compromisos con filtros avanzados.</p>
       </div>
       <button class="primary" data-action="new-booking">${icon('plus')} <span>Nuevo compromiso</span></button>
     </section>
 
-    <!-- Calendar Card with View Toggle & Navigation -->
+    <!-- Calendar Card with View Toggle, Filter Button & Navigation -->
     <section class="panel calendar-card">
       <div class="calendar-header-bar">
-        <!-- View Toggle (Semana vs Mes) -->
-        <div class="calendar-view-toggle">
-          <button class="cal-view-btn ${isWeekView ? 'active' : ''}" data-cal-view="week">
-            Semanal (7 días)
-          </button>
-          <button class="cal-view-btn ${!isWeekView ? 'active' : ''}" data-cal-view="month">
-            Mensual
+        <!-- View Toggle (Semana vs Mes) & Filter Trigger Button -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="calendar-view-toggle">
+            <button class="cal-view-btn ${isWeekView ? 'active' : ''}" data-cal-view="week">
+              Semanal (7 días)
+            </button>
+            <button class="cal-view-btn ${!isWeekView ? 'active' : ''}" data-cal-view="month">
+              Mensual
+            </button>
+          </div>
+
+          <button type="button" class="cal-filter-trigger-btn ${hasActiveFilters ? 'has-active' : ''}" data-action="open-agenda-filter-modal" title="Filtrar agenda" aria-label="Filtrar agenda">
+            ${icon('sliders')}
+            ${hasActiveFilters ? `<span class="filter-badge-dot"></span>` : ''}
           </button>
         </div>
 
@@ -956,15 +984,47 @@ async function renderAgenda() {
           }).join('')}
         </div>
       `}
+
+      ${hasActiveFilters ? `
+        <div class="agenda-active-filters-pill">
+          <div>
+            <span style="color: var(--muted); font-weight: 700; margin-right: 6px;">Filtros activos:</span>
+            <strong>${activeFiltersLabels.join(' · ')}</strong>
+          </div>
+          <button class="text-button" data-clear-all-filters style="color: var(--accent); font-size: 11.5px; font-weight: 800;">
+            ✕ Quitar filtros
+          </button>
+        </div>
+      ` : ''}
     </section>
 
-    <!-- Filters Bar (Dropdowns for Categories, Artists, Boxes, Status) -->
-    <section class="agenda-filter-bar">
-      <!-- 1. Categoría Dropdown (replaces lateral slider) -->
-      <div class="filter-group">
-        <label for="agenda-category-filter">Categoría:</label>
-        <select id="agenda-category-filter">
-          <option value="all" ${agendaFilter.categoryId === 'all' ? 'selected' : ''}>Todas las categorías (${rangeAppointments.length})</option>
+    <!-- Appointment List Heading & Count -->
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; padding: 0 4px;">
+      <h2 style="font-size: 17px; margin: 0; font-weight: 800;">
+        ${agendaFilter.date ? `Compromisos del día (${agendaFilter.date})` : 'Compromisos programados'}
+      </h2>
+      <span class="count" style="font-weight: 700;">
+        ${appointmentsList.length} ${appointmentsList.length === 1 ? 'compromiso' : 'compromisos'}
+      </span>
+    </div>
+
+    <section class="agenda-list">
+      ${appointmentsList.map(appointmentCard).join('') || emptyState('Agenda despejada', 'No hay compromisos registrados para los filtros o período seleccionado.')}
+    </section>
+  `;
+}
+
+function openAgendaFilterModal() {
+  openModal(`
+    <p class="eyebrow">FILTROS AVANZADOS</p>
+    <h2 id="modal-title">Filtrar Agenda</h2>
+    <p class="lead" style="margin-bottom: 16px;">Ajusta los filtros para visualizar compromisos específicos en tu calendario:</p>
+
+    <form id="agenda-filter-form" style="display: grid; gap: 14px;">
+      <div class="field">
+        <label for="modal-agenda-category">Categoría:</label>
+        <select id="modal-agenda-category" name="categoryId">
+          <option value="all" ${agendaFilter.categoryId === 'all' ? 'selected' : ''}>Todas las categorías</option>
           ${categories.map((c) => `
             <option value="${c.id}" ${String(agendaFilter.categoryId) === String(c.id) ? 'selected' : ''}>
               ${c.name} (${c.appointment_count || 0})
@@ -973,10 +1033,9 @@ async function renderAgenda() {
         </select>
       </div>
 
-      <!-- 2. Artista / Responsable -->
-      <div class="filter-group">
-        <label for="agenda-artist-filter">Artista / Responsable:</label>
-        <select id="agenda-artist-filter">
+      <div class="field">
+        <label for="modal-agenda-artist">Artista / Responsable:</label>
+        <select id="modal-agenda-artist" name="artistId">
           <option value="all" ${agendaFilter.artistId === 'all' ? 'selected' : ''}>Todos los artistas (${members.length})</option>
           ${members.map((m) => `
             <option value="${m.id}" ${String(agendaFilter.artistId) === String(m.id) ? 'selected' : ''}>
@@ -986,10 +1045,9 @@ async function renderAgenda() {
         </select>
       </div>
 
-      <!-- 3. Box / Espacio -->
-      <div class="filter-group">
-        <label for="agenda-space-filter">Box / Espacio:</label>
-        <select id="agenda-space-filter">
+      <div class="field">
+        <label for="modal-agenda-space">Box / Espacio:</label>
+        <select id="modal-agenda-space" name="spaceId">
           <option value="all" ${agendaFilter.spaceId === 'all' ? 'selected' : ''}>Todos los boxes (${spaces.length})</option>
           ${spaces.map((s) => `
             <option value="${s.id}" ${String(agendaFilter.spaceId) === String(s.id) ? 'selected' : ''}>
@@ -999,10 +1057,9 @@ async function renderAgenda() {
         </select>
       </div>
 
-      <!-- 4. Estado -->
-      <div class="filter-group">
-        <label for="agenda-status-filter">Estado:</label>
-        <select id="agenda-status-filter">
+      <div class="field">
+        <label for="modal-agenda-status">Estado del compromiso:</label>
+        <select id="modal-agenda-status" name="status">
           <option value="all" ${agendaFilter.status === 'all' ? 'selected' : ''}>Todos los estados</option>
           <option value="confirmed" ${agendaFilter.status === 'confirmed' ? 'selected' : ''}>Confirmadas</option>
           <option value="deposit_paid" ${agendaFilter.status === 'deposit_paid' ? 'selected' : ''}>Seña pagada</option>
@@ -1012,39 +1069,36 @@ async function renderAgenda() {
         </select>
       </div>
 
-      <!-- Summary & Clear Filters Button -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; width: 100%; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line-soft);">
-        <span class="count" style="font-weight: 700;">
-          ${appointmentsList.length} ${appointmentsList.length === 1 ? 'compromiso encontrado' : 'compromisos encontrados'}
-          ${agendaFilter.date ? `(el ${agendaFilter.date})` : `(en este período)`}
-        </span>
-        ${(agendaFilter.categoryId !== 'all' || agendaFilter.artistId !== 'all' || agendaFilter.spaceId !== 'all' || agendaFilter.status !== 'all' || agendaFilter.date) ? `
-          <button class="text-button" data-clear-all-filters style="color: var(--accent); font-size: 12px; font-weight: 700;">
-            ✕ Limpiar todos los filtros
-          </button>
-        ` : ''}
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+        <button type="button" class="text-button" data-action="reset-agenda-filter-form" style="color: var(--red); font-size: 13px; font-weight: 700;">
+          ✕ Restablecer filtros
+        </button>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="secondary" data-close-modal>Cerrar</button>
+          <button type="submit" class="primary">Aplicar filtros</button>
+        </div>
       </div>
-    </section>
+    </form>
+  `);
 
-    <section class="agenda-list">
-      ${appointmentsList.map(appointmentCard).join('') || emptyState('Agenda despejada', 'No hay compromisos registrados para los filtros o período seleccionado.')}
-    </section>
-  `;
+  const form = document.querySelector('#agenda-filter-form');
+  form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    agendaFilter.categoryId = formData.get('categoryId') || 'all';
+    agendaFilter.artistId = formData.get('artistId') || 'all';
+    agendaFilter.spaceId = formData.get('spaceId') || 'all';
+    agendaFilter.status = formData.get('status') || 'all';
+    closeModal();
+    renderAgenda();
+  });
 
-  document.querySelector('#agenda-category-filter')?.addEventListener('change', (e) => {
-    agendaFilter.categoryId = e.target.value;
-    renderAgenda();
-  });
-  document.querySelector('#agenda-artist-filter')?.addEventListener('change', (e) => {
-    agendaFilter.artistId = e.target.value;
-    renderAgenda();
-  });
-  document.querySelector('#agenda-space-filter')?.addEventListener('change', (e) => {
-    agendaFilter.spaceId = e.target.value;
-    renderAgenda();
-  });
-  document.querySelector('#agenda-status-filter')?.addEventListener('change', (e) => {
-    agendaFilter.status = e.target.value;
+  document.querySelector('[data-action="reset-agenda-filter-form"]')?.addEventListener('click', () => {
+    agendaFilter.categoryId = 'all';
+    agendaFilter.artistId = 'all';
+    agendaFilter.spaceId = 'all';
+    agendaFilter.status = 'all';
+    closeModal();
     renderAgenda();
   });
 }
@@ -4987,6 +5041,7 @@ document.addEventListener('click', async (event) => {
   if (event.target.closest('[data-action="new-member"]')) return newMemberModal();
   if (event.target.closest('[data-action="new-space"]')) return newSpaceModal();
   if (event.target.closest('[data-action="new-transaction"]')) return newTransactionModal();
+  if (event.target.closest('[data-action="open-agenda-filter-modal"]')) return openAgendaFilterModal();
   if (event.target.closest('[data-close-modal]') || event.target === modal) return closeModal();
 
   // Calendar View mode toggle (week / month)
