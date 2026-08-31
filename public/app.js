@@ -70,8 +70,10 @@ const STATUS_MAP = {
   confirmed: { label: 'Confirmada', class: 'status-confirmed' },
   deposit_paid: { label: 'Seña pagada', class: 'status-deposit' },
   in_session: { label: 'En sesión', class: 'status-session' },
-  completed: { label: 'Completada', class: 'status-completed' },
-  cancelled: { label: 'Cancelada', class: 'status-cancelled' }
+  completed: { label: 'Listo / Efectuada', class: 'status-completed' },
+  rescheduled: { label: 'Reprogramada', class: 'status-rescheduled' },
+  cancelled: { label: 'Cancelada / No llegó', class: 'status-cancelled' },
+  no_show: { label: 'No llegó', class: 'status-cancelled' }
 };
 
 const ROLE_MAP = {
@@ -595,6 +597,8 @@ function appointmentCard(item) {
   const roleInfo = ROLE_MAP[item.artist_role] || { label: 'Artista', class: 'role-resident' };
   const timeFormatted = formatTime(item.starts_at);
   const isCompleted = item.status === 'completed';
+  const isRescheduled = item.status === 'rescheduled';
+  const isCancelled = item.status === 'cancelled' || item.status === 'no_show';
   const cleanPhone = (item.client_phone || '').replace(/[^0-9+]/g, '');
   const catColor = item.category_color || '#7C3AED';
   const catName = item.category_name || 'Compromiso';
@@ -603,6 +607,19 @@ function appointmentCard(item) {
   const secondaryTitle = item.client_name
     ? `${item.title} · ${item.duration_minutes || 60} min`
     : `${item.notes ? item.notes + ' · ' : ''}${item.duration_minutes || 60} min`;
+
+  let outcomeLabel = '¿Qué ocurrió?';
+  let outcomeClass = '';
+  if (isCompleted) {
+    outcomeLabel = '✓ Listo';
+    outcomeClass = 'is-completed';
+  } else if (isRescheduled) {
+    outcomeLabel = '📅 Reprog.';
+    outcomeClass = 'is-rescheduled';
+  } else if (isCancelled) {
+    outcomeLabel = '✕ Cancelada';
+    outcomeClass = 'is-cancelled';
+  }
 
   return `
     <article class="appointment-card">
@@ -638,9 +655,22 @@ function appointmentCard(item) {
             ${icon('whatsapp')}
           </button>
         ` : ''}
-        <button class="status-action-btn ${isCompleted ? 'is-completed' : ''}" data-status-id="${item.id}" aria-label="Marcar completada" title="${isCompleted ? 'Completada' : 'Marcar como completada'}">
-          ${icon('check')}
-        </button>
+
+        <div class="appointment-outcome-wrap">
+          <button type="button" class="appointment-outcome-btn ${outcomeClass}"
+            data-action="open-outcome-modal"
+            data-appt-id="${item.id}"
+            data-client-name="${item.client_name || ''}"
+            data-title="${item.title || 'Sesión'}"
+            data-starts-at="${item.starts_at}"
+            data-price="${item.price || 0}"
+            data-deposit="${item.deposit || 0}"
+            data-status="${item.status}"
+            title="Indicar estado: ¿Qué ocurrió con esta cita?">
+            <span>${outcomeLabel}</span>
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
       </div>
     </article>
   `;
@@ -1100,6 +1130,131 @@ function openAgendaFilterModal() {
     agendaFilter.status = 'all';
     closeModal();
     renderAgenda();
+  });
+}
+
+function openAppointmentOutcomeModal(appt) {
+  const currentStatus = appt.status || 'confirmed';
+  const price = Number(appt.price) || 0;
+  const deposit = Number(appt.deposit) || 0;
+  const startsAt = appt.starts_at ? new Date(appt.starts_at) : new Date();
+
+  // Format default for datetime-local (YYYY-MM-DDTHH:mm)
+  const year = startsAt.getFullYear();
+  const month = (startsAt.getMonth() + 1).toString().padStart(2, '0');
+  const day = startsAt.getDate().toString().padStart(2, '0');
+  const hours = startsAt.getHours().toString().padStart(2, '0');
+  const minutes = startsAt.getMinutes().toString().padStart(2, '0');
+  const defaultDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+  openModal(`
+    <p class="eyebrow">ESTADO DE LA CITA</p>
+    <h2 id="modal-title">¿Qué ocurrió con esta cita?</h2>
+    <div style="background: var(--surface-high); border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 10px 14px; margin: 12px 0 16px;">
+      <strong style="font-size: 14px; color: var(--ink);">${appt.client_name ? appt.client_name : appt.title}</strong>
+      <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+        ${appt.title ? `${appt.title} · ` : ''}${formatDateISO(startsAt)} a las ${formatTime(appt.starts_at)} hrs
+      </div>
+      <div style="font-size: 12px; font-weight: 700; color: var(--ink); margin-top: 4px;">
+        Valor: ${money(price)} ${deposit > 0 ? `· Abono pagado: ${money(deposit)}` : ''}
+      </div>
+    </div>
+
+    <div class="outcome-options-list">
+      <!-- Opción 1: Listo / Efectuada -->
+      <div class="outcome-option-card card-completed ${currentStatus === 'completed' ? 'active' : ''}">
+        <div class="outcome-option-header">
+          <div class="outcome-option-title" style="color: #059669;">
+            <span style="display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #d1fae5; color: #059669;">✓</span>
+            Listo / Efectuada
+          </div>
+          ${currentStatus === 'completed' ? `<span class="badge" style="background: #10b981; color: #fff;">Actual</span>` : ''}
+        </div>
+        <p class="outcome-option-desc">
+          La cita se realizó con éxito. <strong>Se reflejarán automáticamente en Finanzas</strong> el ingreso total (${money(price)}) y el cálculo de comisiones correspondiente.
+        </p>
+        <button type="button" class="primary" data-apply-outcome="completed" style="background: #059669; align-self: flex-start; margin-top: 4px; padding: 6px 14px; font-size: 12px;">
+          ${currentStatus === 'completed' ? 'Confirmar Efectuada' : 'Marcar como Efectuada'}
+        </button>
+      </div>
+
+      <!-- Opción 2: Reprogramada -->
+      <div class="outcome-option-card card-rescheduled ${currentStatus === 'rescheduled' ? 'active' : ''}">
+        <div class="outcome-option-header">
+          <div class="outcome-option-title" style="color: #0284c7;">
+            <span style="display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #e0f2fe; color: #0284c7;">📅</span>
+            Reprogramada
+          </div>
+          ${currentStatus === 'rescheduled' ? `<span class="badge" style="background: #0284c7; color: #fff;">Actual</span>` : ''}
+        </div>
+        <p class="outcome-option-desc">
+          Se acordó una nueva fecha y horario para la sesión. Se actualizará en el calendario de la agenda.
+        </p>
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px; flex-wrap: wrap;">
+          <input type="datetime-local" id="outcome-reschedule-datetime" value="${defaultDateTime}" style="font-size: 12px; height: 34px; width: auto; flex: 1;" />
+          <button type="button" class="primary" data-apply-outcome="rescheduled" style="background: #0284c7; padding: 6px 14px; font-size: 12px;">
+            Guardar Reprogramación
+          </button>
+        </div>
+      </div>
+
+      <!-- Opción 3: Cancelada / No llegó -->
+      <div class="outcome-option-card card-cancelled ${currentStatus === 'cancelled' || currentStatus === 'no_show' ? 'active' : ''}">
+        <div class="outcome-option-header">
+          <div class="outcome-option-title" style="color: #dc2626;">
+            <span style="display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #fee2e2; color: #dc2626;">✕</span>
+            Cancelada / No llegó
+          </div>
+          ${currentStatus === 'cancelled' || currentStatus === 'no_show' ? `<span class="badge" style="background: #ef4444; color: #fff;">Actual</span>` : ''}
+        </div>
+        <p class="outcome-option-desc">
+          El cliente canceló la cita o no se presentó (no-show). Se registrará como <strong>pérdida estimada</strong> en Finanzas y se liberará el horario.
+        </p>
+        <button type="button" class="secondary" data-apply-outcome="cancelled" style="color: #dc2626; border-color: #fca5a5; align-self: flex-start; margin-top: 4px; padding: 6px 14px; font-size: 12px;">
+          Marcar como Cancelada / No llegó
+        </button>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+      <button type="button" class="secondary" data-close-modal>Cerrar</button>
+    </div>
+  `);
+
+  // Event handlers for each outcome
+  document.querySelector('[data-apply-outcome="completed"]')?.addEventListener('click', async () => {
+    await api(`/api/appointments/${appt.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'completed' })
+    });
+    closeModal();
+    const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
+    await render(currentActiveView);
+  });
+
+  document.querySelector('[data-apply-outcome="rescheduled"]')?.addEventListener('click', async () => {
+    const newDateVal = document.querySelector('#outcome-reschedule-datetime')?.value;
+    const body = { status: 'rescheduled' };
+    if (newDateVal) {
+      body.startsAt = new Date(newDateVal).toISOString();
+    }
+    await api(`/api/appointments/${appt.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    });
+    closeModal();
+    const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
+    await render(currentActiveView);
+  });
+
+  document.querySelector('[data-apply-outcome="cancelled"]')?.addEventListener('click', async () => {
+    await api(`/api/appointments/${appt.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'cancelled' })
+    });
+    closeModal();
+    const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
+    await render(currentActiveView);
   });
 }
 
@@ -5143,14 +5298,29 @@ document.addEventListener('click', async (event) => {
     return await renderSettings();
   }
 
-  // Complete appointment
+  // Open Appointment Outcome Modal (3 options: Listo / Efectuada, Reprogramada, Cancelada / No llegó)
+  const outcomeBtn = event.target.closest('[data-action="open-outcome-modal"]');
+  if (outcomeBtn) {
+    const { apptId, clientName, title, startsAt, price, deposit, status } = outcomeBtn.dataset;
+    return openAppointmentOutcomeModal({
+      id: apptId,
+      client_name: clientName,
+      title,
+      starts_at: startsAt,
+      price: Number(price),
+      deposit: Number(deposit),
+      status
+    });
+  }
+
+  // Complete appointment fallback
   const completeBtn = event.target.closest('[data-status-id]');
   if (completeBtn) {
     await api(`/api/appointments/${completeBtn.dataset.statusId}`, {
       method: 'PATCH',
       body: JSON.stringify({ status: 'completed' })
     });
-    const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'dashboard';
+    const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
     return await render(currentActiveView);
   }
   // Inventory action buttons

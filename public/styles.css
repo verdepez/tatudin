@@ -786,7 +786,8 @@ svg {
 .status-deposit { background: var(--purple-bg); color: var(--purple-text); }
 .status-confirmed { background: var(--blue-bg); color: var(--blue-text); }
 .status-session { background: var(--orange-bg); color: var(--orange-text); }
-.status-cancelled { background: var(--surface-high); color: var(--muted); }
+.status-rescheduled { background: #e0f2fe; color: #0369a1; }
+.status-cancelled { background: #fee2e2; color: #b91c1c; }
 .status-inquiry { background: var(--surface-high); color: var(--ink); }
 .status-default { background: var(--surface-low); color: var(--muted); }
 
@@ -851,6 +852,113 @@ svg {
   background: var(--green-bg);
   border-color: var(--green-text);
   color: var(--green-text);
+}
+
+.appointment-outcome-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.appointment-outcome-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill, 9999px);
+  border: 1px solid var(--line-soft);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.appointment-outcome-btn:hover {
+  background: var(--surface-high);
+  border-color: var(--ink);
+}
+
+.appointment-outcome-btn.is-completed {
+  background: var(--green-bg);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: var(--green-text);
+}
+
+.appointment-outcome-btn.is-rescheduled {
+  background: #e0f2fe;
+  border-color: #bae6fd;
+  color: #0369a1;
+}
+
+.appointment-outcome-btn.is-cancelled {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+/* Outcome Modal Options */
+.outcome-options-list {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.outcome-option-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.outcome-option-card:hover {
+  border-color: var(--ink);
+  background: var(--surface-high);
+}
+
+.outcome-option-card.card-completed:hover, .outcome-option-card.card-completed.active {
+  border-color: #10B981;
+  background: #f0fdf4;
+}
+
+.outcome-option-card.card-rescheduled:hover, .outcome-option-card.card-rescheduled.active {
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+.outcome-option-card.card-cancelled:hover, .outcome-option-card.card-cancelled.active {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.outcome-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.outcome-option-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.outcome-option-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin: 0;
 }
 
 /* Stats Cards */
