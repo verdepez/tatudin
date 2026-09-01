@@ -259,12 +259,26 @@ svg {
 }
 
 .brand {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 4px 0 12px 0;
+}
+
+.sidebar-brand-logo {
+  height: 38px;
+  width: auto;
+  max-width: 170px;
+  object-fit: contain;
+  display: block;
+}
+
+.mobile-brand-logo {
+  height: 28px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
+  display: block;
 }
 
 .brand-mark {

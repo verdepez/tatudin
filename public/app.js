@@ -1980,7 +1980,7 @@ async function renderCommunications() {
                   <div class="setting-item-top">
                     <div class="setting-item-title">
                       <h3>${apt.client_name || 'Sin cliente asignado'} — ${apt.title}</h3>
-                      <span class="status-chip status-${apt.status}">${STATUS_MAP[apt.status] || apt.status}</span>
+                      <span class="status-chip status-${apt.status}">${STATUS_MAP[apt.status]?.label || apt.status}</span>
                     </div>
                     <div class="setting-item-action">
                       <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="primary small-btn" style="background: #25D366; color: #ffffff; text-decoration: none;">
