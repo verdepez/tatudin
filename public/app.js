@@ -764,9 +764,9 @@ async function render(view = 'dashboard') {
 
       app.innerHTML = `
         <section class="intro">
-          <p class="eyebrow">${todayStr}</p>
-          <h1>Todo listo para hoy<span class="dot">.</span></h1>
-          <p class="lead">Una mirada clara a tu estudio, sin ruido.</p>
+          <p class="eyebrow">LIENZO PRINCIPAL · ${todayStr}</p>
+          <h1>Tu Lienzo de hoy<span class="dot">.</span></h1>
+          <p class="lead">El espacio central donde ocurre todo en tu estudio, sin ruido.</p>
         </section>
 
         <section class="actions">
@@ -1235,7 +1235,7 @@ function openAppointmentOutcomeModal(appt) {
           ${currentStatus === 'completed' ? `<span class="badge" style="background: #10b981; color: #fff;">Actual</span>` : ''}
         </div>
         <p class="outcome-option-desc">
-          La cita se realizó con éxito. <strong>Se reflejarán automáticamente en Finanzas</strong> el ingreso total (${money(price)}) y el cálculo de comisiones correspondiente.
+          La cita se realizó con éxito. <strong>Se reflejarán automáticamente en Billetera</strong> el ingreso total (${money(price)}) y el cálculo de comisiones correspondiente.
         </p>
         <button type="button" class="primary" data-apply-outcome="completed" style="background: #059669; align-self: flex-start; margin-top: 4px; padding: 6px 14px; font-size: 12px;">
           ${currentStatus === 'completed' ? 'Confirmar Efectuada' : 'Marcar como Efectuada'}
@@ -1272,7 +1272,7 @@ function openAppointmentOutcomeModal(appt) {
           ${currentStatus === 'cancelled' || currentStatus === 'no_show' ? `<span class="badge" style="background: #ef4444; color: #fff;">Actual</span>` : ''}
         </div>
         <p class="outcome-option-desc">
-          El cliente canceló la cita o no se presentó (no-show). Se registrará como <strong>pérdida estimada</strong> en Finanzas y se liberará el horario.
+          El cliente canceló la cita o no se presentó (no-show). Se registrará como <strong>pérdida estimada</strong> en Billetera y se liberará el horario.
         </p>
         <button type="button" class="secondary" data-apply-outcome="cancelled" style="color: #dc2626; border-color: #fca5a5; align-self: flex-start; margin-top: 4px; padding: 6px 14px; font-size: 12px;">
           Marcar como Cancelada / No llegó
@@ -1469,9 +1469,9 @@ async function renderFinances() {
   app.innerHTML = `
     <section class="page-heading">
       <div>
-        <p class="eyebrow">FINANZAS & LIQUIDACIONES</p>
-        <h1>Lo que realmente te queda<span class="dot">.</span></h1>
-        <p class="lead">Control consolidado de ingresos esperados, abonos cobrados, liquidación de artistas y margen neto del estudio.</p>
+        <p class="eyebrow">BILLETERA & LIQUIDACIONES</p>
+        <h1>Billetera<span class="dot">.</span></h1>
+        <p class="lead">Control consolidado de saldo disponible en billetera, ingresos esperados, abonos, comisiones y margen neto del estudio.</p>
       </div>
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
         <button class="secondary" data-action="open-upload-screenshot">${icon('image')} <span>Leer Boleta / Captura</span></button>
@@ -1485,7 +1485,7 @@ async function renderFinances() {
       <!-- 1. Saldo Neto Disponible -->
       <article class="stat-card">
         <div class="stat-card-header">
-          <span class="stat-label">Saldo Neto Estudio</span>
+          <span class="stat-label">Saldo Neto Billetera</span>
           <div class="stat-icon-bubble green">${icon('finances')}</div>
         </div>
         <strong class="stat-value" style="color: ${netBalance >= 0 ? 'var(--green-text)' : 'var(--red)'};">${money(netBalance)}</strong>
@@ -1947,8 +1947,8 @@ async function renderCommunications() {
   app.innerHTML = `
     <section class="page-heading">
       <div>
-        <p class="eyebrow">COMUNICACIONES Y RECORDATORIOS</p>
-        <h1>Comunicaciones<span class="dot">.</span></h1>
+        <p class="eyebrow">MENSAJES & RECORDATORIOS</p>
+        <h1>Mensajes<span class="dot">.</span></h1>
         <p class="lead">Envía confirmaciones y recordatorios por WhatsApp, administra cuestionarios de salud y consentimientos informados.</p>
       </div>
       <button class="primary" data-action="new-booking">${icon('plus')} <span>Nuevo compromiso</span></button>
@@ -4379,7 +4379,7 @@ function openMovementModal(preselectedItemId = null, preselectedType = 'consumpt
 
       <label class="form-checkbox-label" id="mov-financial-record-wrap">
         <input type="checkbox" name="createFinancialRecord" value="true" checked />
-        <span>Registrar automáticamente en el módulo de <strong>Finanzas</strong> (como Ingreso o Egreso)</span>
+        <span>Registrar automáticamente en <strong>Billetera</strong> (como Ingreso o Egreso)</span>
       </label>
 
       <label>Notas u observación
@@ -4858,14 +4858,14 @@ function showReceiptConfirmationModal(data) {
 
       <label class="form-checkbox-label">
         <input type="checkbox" name="createExpense" value="true" checked />
-        <span>Registrar automáticamente como <strong>Egreso en Finanzas</strong></span>
+        <span>Registrar automáticamente como <strong>Egreso en Billetera</strong></span>
       </label>
 
       <p class="form-error"></p>
 
       <div class="modal-actions">
         <button type="button" class="secondary" data-close-modal>Descartar</button>
-        <button type="submit" class="primary">💾 Guardar en Inventario & Finanzas</button>
+        <button type="submit" class="primary">💾 Guardar en Inventario & Billetera</button>
       </div>
     </form>
   `);
@@ -7059,7 +7059,7 @@ document.addEventListener('submit', async (event) => {
       });
 
       closeModal();
-      alert('¡Compra de insumo registrada con éxito en Inventario' + (createExpense ? ' y Finanzas!' : '!'));
+      alert('¡Compra de insumo registrada con éxito en Inventario' + (createExpense ? ' y Billetera!' : '!'));
       return await render('inventario');
     }
   } catch (error) {

@@ -336,6 +336,22 @@ svg {
   flex-shrink: 0 !important;
 }
 
+.sidebar nav a .nav-icon.nav-icon-lienzo,
+.sidebar nav a.nav-item-lienzo .nav-icon,
+.nav-icon-lienzo {
+  width: 21px !important;
+  height: 21px !important;
+  min-width: 21px !important;
+  min-height: 21px !important;
+  max-width: 21px !important;
+  max-height: 21px !important;
+  stroke-width: 2.2 !important;
+}
+
+.sidebar nav a.nav-item-lienzo {
+  font-weight: 700;
+}
+
 .sidebar nav a.active, .sidebar nav a:hover {
   color: #ffffff;
   background: var(--ink-hover);
@@ -2790,10 +2806,30 @@ textarea {
     color: var(--ink);
   }
 
+  .mobile-nav a.mobile-nav-lienzo svg {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    max-width: 24px !important;
+    max-height: 24px !important;
+    stroke-width: 2.2 !important;
+    color: var(--primary, #7c3aed);
+  }
+
+  .mobile-nav a.mobile-nav-lienzo.active svg {
+    color: #4a2896;
+    filter: drop-shadow(0 2px 4px rgba(124, 58, 237, 0.3));
+  }
+
   .mobile-nav small {
     font-size: 10.5px;
     line-height: 1;
     font-weight: 600;
+  }
+
+  .mobile-nav a.mobile-nav-lienzo small {
+    font-weight: 800;
   }
 }
 
