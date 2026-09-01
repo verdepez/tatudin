@@ -240,6 +240,44 @@ app.patch('/api/backoffice/features', requireSuperAdmin, async (request, respons
   });
 });
 
+// ---------------- PLATFORM THEME & UI KIT SYSTEM ----------------
+app.get('/api/system/theme', async (_request, response) => {
+  try {
+    const themeRaw = await getSystemConfig('platform_theme_config', '{}');
+    let themeObj = {};
+    try {
+      themeObj = JSON.parse(themeRaw);
+    } catch {
+      themeObj = {};
+    }
+    return response.json(themeObj);
+  } catch (err) {
+    return response.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/backoffice/theme', requireSuperAdmin, async (request, response) => {
+  try {
+    const { theme } = request.body;
+    if (!theme || typeof theme !== 'object') {
+      return response.status(400).json({ error: 'Formato de tema inválido' });
+    }
+    await setSystemConfig('platform_theme_config', JSON.stringify(theme));
+    if (typeof logAuditEvent === 'function') {
+      await logAuditEvent({
+        userId: request.userId,
+        studioId: request.studioId,
+        action: 'update_system_theme',
+        entityType: 'theme',
+        metadata: { theme }
+      });
+    }
+    return response.json({ ok: true, theme });
+  } catch (err) {
+    return response.status(500).json({ error: err.message });
+  }
+});
+
 // ---------------- BACKOFFICE ROOT ENDPOINTS ----------------
 app.get('/api/backoffice/artists', requireSuperAdmin, async (_request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });

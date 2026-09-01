@@ -2477,6 +2477,181 @@ function renderTermsAndConditions(fromOnboarding = false, step = 0, authMode = '
   `;
 }
 
+// ---------------- THEME & DESIGN SYSTEM ENGINE (UI KIT) ----------------
+const TATUDIN_DEFAULT_THEME = {
+  id: 'classic',
+  name: 'Tatudin Classic (Obsidian & Ruby)',
+  red: '#ff3552',
+  ink: '#09041c',
+  inkSurface: '#221c35',
+  inkHover: '#322e40',
+  canvas: '#fdf7ff',
+  surface: '#ffffff',
+  surfaceLow: '#f7f1ff',
+  surfaceHigh: '#ece5fc',
+  softPurple: '#e8ddff',
+  radiusMd: '12px',
+  radiusXl: '20px',
+  fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+};
+
+const UIKIT_THEME_PRESETS = [
+  {
+    id: 'classic',
+    name: 'Tatudin Classic (Obsidian & Ruby)',
+    desc: 'La paleta oficial de Tatudin con acento carmesí y calma operativa.',
+    tokens: {
+      red: '#ff3552',
+      ink: '#09041c',
+      inkSurface: '#221c35',
+      inkHover: '#322e40',
+      canvas: '#fdf7ff',
+      surface: '#ffffff',
+      surfaceLow: '#f7f1ff',
+      surfaceHigh: '#ece5fc',
+      softPurple: '#e8ddff',
+      radiusMd: '12px',
+      radiusXl: '20px',
+      fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    }
+  },
+  {
+    id: 'cyberpunk',
+    name: 'Cyberpunk Neo-Tokyo',
+    desc: 'Contraste extremo, acento fucsia neón y noche profunda.',
+    tokens: {
+      red: '#ff007f',
+      ink: '#080816',
+      inkSurface: '#14142b',
+      inkHover: '#222245',
+      canvas: '#f0f4ff',
+      surface: '#ffffff',
+      surfaceLow: '#e4ecff',
+      surfaceHigh: '#d2e0ff',
+      softPurple: '#d8b4fe',
+      radiusMd: '8px',
+      radiusXl: '14px',
+      fontFamily: "'Space Grotesk', -apple-system, sans-serif"
+    }
+  },
+  {
+    id: 'emerald',
+    name: 'Emerald Botanical Studio',
+    desc: 'Bosque profundo y verde esmeralda para estudios botánicos e ilustrativos.',
+    tokens: {
+      red: '#059669',
+      ink: '#061e18',
+      inkSurface: '#0e332a',
+      inkHover: '#14493c',
+      canvas: '#f2fbf7',
+      surface: '#ffffff',
+      surfaceLow: '#e6f7ef',
+      surfaceHigh: '#d1f2e3',
+      softPurple: '#a7f3d0',
+      radiusMd: '14px',
+      radiusXl: '22px',
+      fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif"
+    }
+  },
+  {
+    id: 'amethyst',
+    name: 'Royal Velvet & Amethyst',
+    desc: 'Violeta iris profundo y lavanda para estudios de alta gama y elegancia.',
+    tokens: {
+      red: '#8b5cf6',
+      ink: '#130a24',
+      inkSurface: '#231540',
+      inkHover: '#352160',
+      canvas: '#f8f6ff',
+      surface: '#ffffff',
+      surfaceLow: '#f1edff',
+      surfaceHigh: '#e5deff',
+      softPurple: '#ddd6fe',
+      radiusMd: '16px',
+      radiusXl: '24px',
+      fontFamily: "'Outfit', -apple-system, sans-serif"
+    }
+  },
+  {
+    id: 'amber',
+    name: 'Golden Amber Atelier',
+    desc: 'Café tostado, ámbar dorado y lino cálido para ateliers tradicionales.',
+    tokens: {
+      red: '#d97706',
+      ink: '#1c140d',
+      inkSurface: '#2d2116',
+      inkHover: '#403020',
+      canvas: '#fffdfa',
+      surface: '#ffffff',
+      surfaceLow: '#fef8ee',
+      surfaceHigh: '#fdefd9',
+      softPurple: '#fde68a',
+      radiusMd: '10px',
+      radiusXl: '18px',
+      fontFamily: "'Manrope', -apple-system, sans-serif"
+    }
+  },
+  {
+    id: 'monochrome',
+    name: 'Nordic Minimalist (Monochrome)',
+    desc: 'Negro puro, grafito y blancos pulcros con bordes compactos y sobrios.',
+    tokens: {
+      red: '#18181b',
+      ink: '#18181b',
+      inkSurface: '#27272a',
+      inkHover: '#3f3f46',
+      canvas: '#fafafa',
+      surface: '#ffffff',
+      surfaceLow: '#f4f4f5',
+      surfaceHigh: '#e4e4e7',
+      softPurple: '#e4e4e7',
+      radiusMd: '6px',
+      radiusXl: '10px',
+      fontFamily: "'Inter', -apple-system, sans-serif"
+    }
+  }
+];
+
+let activeThemeTokens = { ...TATUDIN_DEFAULT_THEME };
+
+function applyThemeTokens(tokens, previewOnly = false) {
+  const root = document.documentElement;
+  if (!tokens) return;
+  if (tokens.red) root.style.setProperty('--red', tokens.red);
+  if (tokens.ink) root.style.setProperty('--ink', tokens.ink);
+  if (tokens.inkSurface) root.style.setProperty('--ink-surface', tokens.inkSurface);
+  if (tokens.inkHover) root.style.setProperty('--ink-hover', tokens.inkHover);
+  if (tokens.canvas) root.style.setProperty('--canvas', tokens.canvas);
+  if (tokens.surface) root.style.setProperty('--surface', tokens.surface);
+  if (tokens.surfaceLow) root.style.setProperty('--surface-low', tokens.surfaceLow);
+  if (tokens.surfaceHigh) root.style.setProperty('--surface-high', tokens.surfaceHigh);
+  if (tokens.softPurple) root.style.setProperty('--soft-purple', tokens.softPurple);
+  if (tokens.radiusMd) root.style.setProperty('--radius-md', tokens.radiusMd);
+  if (tokens.radiusXl) root.style.setProperty('--radius-xl', tokens.radiusXl);
+  if (tokens.fontFamily) root.style.setProperty('--font-sans', tokens.fontFamily);
+
+  if (!previewOnly) {
+    activeThemeTokens = { ...activeThemeTokens, ...tokens };
+  }
+}
+
+async function loadPersistedTheme() {
+  try {
+    const local = localStorage.getItem('tatudin_theme_tokens');
+    if (local) {
+      const parsed = JSON.parse(local);
+      applyThemeTokens(parsed);
+    }
+    const remote = await api('/api/system/theme').catch(() => null);
+    if (remote && Object.keys(remote).length > 0) {
+      applyThemeTokens(remote);
+      localStorage.setItem('tatudin_theme_tokens', JSON.stringify(remote));
+    }
+  } catch (err) {
+    console.debug('[Theme Engine] Using standard defaults');
+  }
+}
+
 // ---------------- SUPERADMIN ROOT BACKOFFICE MODULE ----------------
 let currentBackofficeTab = 'stats';
 let backofficeCache = { stats: null, users: null, studios: null, guestSpots: null };
@@ -2493,7 +2668,7 @@ async function renderBackoffice(tab = currentBackofficeTab) {
       <div class="backoffice-header-card">
         <div class="backoffice-header-title">
           <h1>⚡ Backoffice Superadministrador</h1>
-          <p>Control maestro de la plataforma, estadísticas agregadas según Ley N° 19.628, gestión global y administración de datos.</p>
+          <p>Control maestro de la plataforma, diseño e identidad visual, estadísticas agregadas, gestión global y administración.</p>
         </div>
         <div class="backoffice-header-badges">
           <span class="backoffice-tag-pill">👑 ${currentUser?.email || 'soyelroot@tatudin.cl'}</span>
@@ -2505,6 +2680,9 @@ async function renderBackoffice(tab = currentBackofficeTab) {
       <nav class="backoffice-tabs" aria-label="Pestañas de Backoffice">
         <button type="button" class="bo-tab-btn ${tab === 'stats' ? 'active' : ''}" data-bo-tab="stats">
           📊 Estadísticas & Funciones
+        </button>
+        <button type="button" class="bo-tab-btn ${tab === 'uikit' ? 'active' : ''}" data-bo-tab="uikit">
+          🎨 UI Kit & Personalización
         </button>
         <button type="button" class="bo-tab-btn ${tab === 'artists' ? 'active' : ''}" data-bo-tab="artists">
           🎨 Artistas Globales
@@ -2537,6 +2715,9 @@ async function renderBackoffice(tab = currentBackofficeTab) {
       const statsData = await api('/api/backoffice/stats');
       backofficeCache.stats = statsData;
       container.innerHTML = renderBackofficeStatsTab(statsData);
+    } else if (tab === 'uikit') {
+      container.innerHTML = renderBackofficeUIKitTab();
+      attachUIKitEventListeners();
     } else if (tab === 'artists') {
       const artistsData = await api('/api/backoffice/artists');
       backofficeCache.artists = artistsData;
@@ -2569,6 +2750,461 @@ async function renderBackoffice(tab = currentBackofficeTab) {
     `;
   }
 }
+
+function renderBackofficeUIKitTab() {
+  const currentTheme = activeThemeTokens;
+
+  return `
+    <div class="uikit-container">
+      <!-- Toolbar with Actions -->
+      <div class="uikit-toolbar">
+        <div class="uikit-toolbar-info">
+          <h3>🎨 Sistema de Diseño Maestro & UI Kit</h3>
+          <p>Personaliza tokens CSS globales, paletas cromáticas, bordes y tipografías en tiempo real.</p>
+        </div>
+        <div class="uikit-toolbar-actions">
+          <button type="button" class="secondary small-btn" id="btn-uikit-reset" title="Restaurar paleta original de fábrica">
+            🔄 Restablecer Original
+          </button>
+          <button type="button" class="secondary small-btn" id="btn-uikit-export-css" title="Copiar código CSS al portapapeles">
+            📋 Copiar CSS
+          </button>
+          <button type="button" class="primary small-btn" id="btn-uikit-save" style="background: #10b981; border-color: #10b981;">
+            💾 Guardar Tema Global
+          </button>
+        </div>
+      </div>
+
+      <!-- Presets Grid -->
+      <div class="uikit-section">
+        <div class="uikit-section-header">
+          <div>
+            <h2><span>🎨</span> Paletas Predefinidas de Marca</h2>
+            <p>Selecciona un tema curado para aplicar instantáneamente a todo el sistema.</p>
+          </div>
+        </div>
+        <div class="uikit-presets-grid">
+          ${UIKIT_THEME_PRESETS.map((p) => `
+            <div class="uikit-preset-card ${currentTheme.id === p.id ? 'active' : ''}" data-preset-id="${p.id}">
+              <div class="uikit-preset-title">
+                <span>${p.name}</span>
+                ${currentTheme.id === p.id ? '✓' : ''}
+              </div>
+              <p style="font-size: 11.5px; color: var(--muted); margin: 0; line-height: 1.35;">${p.desc}</p>
+              <div class="uikit-swatch-row">
+                <span class="uikit-swatch-circle" style="background: ${p.tokens.ink};" title="Sidebar / Dark: ${p.tokens.ink}"></span>
+                <span class="uikit-swatch-circle" style="background: ${p.tokens.red};" title="Acento: ${p.tokens.red}"></span>
+                <span class="uikit-swatch-circle" style="background: ${p.tokens.softPurple};" title="Tinte: ${p.tokens.softPurple}"></span>
+                <span class="uikit-swatch-circle" style="background: ${p.tokens.canvas};" title="Canvas: ${p.tokens.canvas}"></span>
+                <span class="uikit-swatch-circle" style="background: ${p.tokens.surface};" title="Superficie: ${p.tokens.surface}"></span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Live Token Customizer -->
+      <div class="uikit-section">
+        <div class="uikit-section-header">
+          <div>
+            <h2><span>🎛️</span> Ajuste Fino de Tokens de Diseño</h2>
+            <p>Modifica cualquier valor hexadecimal, radio de bordes o tipografía con vista previa instantánea.</p>
+          </div>
+        </div>
+
+        <form id="uikit-tokens-form">
+          <div class="uikit-tokens-grid">
+            <!-- Acento Primario -->
+            <div class="uikit-token-card">
+              <label class="uikit-token-label">Color Acento Primario (--red)</label>
+              <div class="uikit-color-input-row">
+                <input type="color" class="uikit-color-picker" id="token-red-picker" value="${currentTheme.red || '#ff3552'}" />
+                <input type="text" class="uikit-hex-input" id="token-red-hex" value="${currentTheme.red || '#ff3552'}" maxlength="7" />
+              </div>
+              <small style="font-size: 11px; color: var(--muted);">Botones primarios, llamadas a la acción, acentos.</small>
+            </div>
+
+            <!-- Fondo Sidebar / Ink -->
+            <div class="uikit-token-card">
+              <label class="uikit-token-label">Barra Lateral / Ink (--ink)</label>
+              <div class="uikit-color-input-row">
+                <input type="color" class="uikit-color-picker" id="token-ink-picker" value="${currentTheme.ink || '#09041c'}" />
+                <input type="text" class="uikit-hex-input" id="token-ink-hex" value="${currentTheme.ink || '#09041c'}" maxlength="7" />
+              </div>
+              <small style="font-size: 11px; color: var(--muted);">Fondo oscuro de barra lateral y menú principal.</small>
+            </div>
+
+            <!-- Ink Surface / Dropdown -->
+            <div class="uikit-token-card">
+              <label class="uikit-token-label">Superficie Oscura (--ink-surface)</label>
+              <div class="uikit-color-input-row">
+                <input type="color" class="uikit-color-picker" id="token-inkSurface-picker" value="${currentTheme.inkSurface || '#221c35'}" />
+                <input type="text" class="uikit-hex-input" id="token-inkSurface-hex" value="${currentTheme.inkSurface || '#221c35'}" maxlength="7" />
+              </div>
+              <small style="font-size: 11px; color: var(--muted);">Fondos de dropdowns y elementos activos oscuros.</small>
+            </div>
+
+            <!-- Canvas Background -->
+            <div class="uikit-token-card">
+              <label class="uikit-token-label">Lienzo / Canvas (--canvas)</label>
+              <div class="uikit-color-input-row">
+                <input type="color" class="uikit-color-picker" id="token-canvas-picker" value="${currentTheme.canvas || '#fdf7ff'}" />
+                <input type="text" class="uikit-hex-input" id="token-canvas-hex" value="${currentTheme.canvas || '#fdf7ff'}" maxlength="7" />
+              </div>
+              <small style="font-size: 11px; color: var(--muted);">Fondo principal detrás de las tarjetas y paneles.</small>
+            </div>
+
+            <!-- Tarjetas / Surface -->
+            <div class="uikit-token-card">
+              <label class="uikit-token-label">Superficie de Tarjetas (--surface)</label>
+              <div class="uikit-color-input-row">
+                <input type="color" class="uikit-color-picker" id="token-surface-picker" value="${currentTheme.surface || '#ffffff'}" />
+                <input type="text" class="uikit-hex-input" id="token-surface-hex" value="${currentTheme.surface || '#ffffff'}" maxlength="7" />
+              </div>
+              <small style="font-size: 11px; color: var(--muted);">Fondo de tarjetas, paneles y modales.</small>
+            </div>
+
+            <!-- Burbujas / Tinte Suave -->
+            <div class="uikit-token-card">
+              <label class="uikit-token-label">Tinte Suave / Burbujas (--soft-purple)</label>
+              <div class="uikit-color-input-row">
+                <input type="color" class="uikit-color-picker" id="token-softPurple-picker" value="${currentTheme.softPurple || '#e8ddff'}" />
+                <input type="text" class="uikit-hex-input" id="token-softPurple-hex" value="${currentTheme.softPurple || '#e8ddff'}" maxlength="7" />
+              </div>
+              <small style="font-size: 11px; color: var(--muted);">Burbujas de iconos, chips secundarios y tintes.</small>
+            </div>
+
+            <!-- Radio de Bordes -->
+            <div class="uikit-token-card">
+              <label class="uikit-token-label">Bordes y Esquinas (--radius-md / xl)</label>
+              <select id="token-radius-select" style="margin: 0; font-size: 13px; font-weight: 700;">
+                <option value="12px|20px" ${currentTheme.radiusMd === '12px' ? 'selected' : ''}>Suave / Moderno (12px / 20px - Recomendado)</option>
+                <option value="6px|10px" ${currentTheme.radiusMd === '6px' ? 'selected' : ''}>Compacto / Técnico (6px / 10px)</option>
+                <option value="16px|26px" ${currentTheme.radiusMd === '16px' ? 'selected' : ''}>Redondeado / Playful (16px / 26px)</option>
+                <option value="0px|0px" ${currentTheme.radiusMd === '0px' ? 'selected' : ''}>Brutalista / Recto (0px)</option>
+              </select>
+              <small style="font-size: 11px; color: var(--muted);">Curvatura de botones, tarjetas, inputs y modales.</small>
+            </div>
+
+            <!-- Tipografía Global -->
+            <div class="uikit-token-card">
+              <label class="uikit-token-label">Tipografía Global (--font-sans)</label>
+              <select id="token-font-select" style="margin: 0; font-size: 13px; font-weight: 700;">
+                <option value="'Manrope', -apple-system, sans-serif" ${(currentTheme.fontFamily || '').includes('Manrope') ? 'selected' : ''}>Manrope (Oficial Tatudin)</option>
+                <option value="'Plus Jakarta Sans', -apple-system, sans-serif" ${(currentTheme.fontFamily || '').includes('Jakarta') ? 'selected' : ''}>Plus Jakarta Sans</option>
+                <option value="'Outfit', -apple-system, sans-serif" ${(currentTheme.fontFamily || '').includes('Outfit') ? 'selected' : ''}>Outfit</option>
+                <option value="'Inter', -apple-system, sans-serif" ${(currentTheme.fontFamily || '').includes('Inter') ? 'selected' : ''}>Inter (Minimalista)</option>
+                <option value="'Space Grotesk', -apple-system, sans-serif" ${(currentTheme.fontFamily || '').includes('Space') ? 'selected' : ''}>Space Grotesk (Técnica / Cyber)</option>
+              </select>
+              <small style="font-size: 11px; color: var(--muted);">Fuente tipográfica principal para toda la interfaz.</small>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Live Sandbox & Component Gallery -->
+      <div class="uikit-section">
+        <div class="uikit-section-header">
+          <div>
+            <h2><span>🧪</span> Sandbox de Componentes en Vivo</h2>
+            <p>Prueba en tiempo real cómo lucen los botones, chips, métricas y controles con tus tokens.</p>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <!-- 1. Buttons -->
+          <div class="uikit-sandbox-block">
+            <h4 class="uikit-sandbox-title">1. Botones & Acciones</h4>
+            <div class="uikit-components-flow">
+              <button type="button" class="primary">${icon('plus')} Botón Primario</button>
+              <button type="button" class="secondary">${icon('calendar')} Botón Secundario</button>
+              <button type="button" class="secondary small-btn">${icon('chat')} Botón Pequeño</button>
+              <button type="button" class="primary" style="background: #059669; border-color: #059669;">${icon('check')} Éxito / Listo</button>
+              <button type="button" class="primary" style="background: #dc2626; border-color: #dc2626;">${icon('trash')} Peligro / Eliminar</button>
+              <button type="button" class="secondary" disabled>Deshabilitado</button>
+            </div>
+          </div>
+
+          <!-- 2. Status Chips & Role Badges -->
+          <div class="uikit-sandbox-block">
+            <h4 class="uikit-sandbox-title">2. Chips de Estado & Badges de Roles</h4>
+            <div class="uikit-components-flow">
+              <span class="status-chip status-inquiry">Consulta</span>
+              <span class="status-chip status-confirmed">Confirmada</span>
+              <span class="status-chip status-deposit">Seña pagada</span>
+              <span class="status-chip status-session">En sesión</span>
+              <span class="status-chip status-completed">Listo / Efectuada</span>
+              <span class="status-chip status-rescheduled">Reprogramada</span>
+              <span class="status-chip status-cancelled">Cancelada / No llegó</span>
+              <span class="role-badge role-owner">👑 Propietario</span>
+              <span class="role-badge role-resident">🎨 Residente</span>
+              <span class="role-badge role-guest">✈️ Nómade</span>
+              <span class="role-badge role-superadmin">⚡ Root Master</span>
+            </div>
+          </div>
+
+          <!-- 3. Stat Cards & Metrics Preview -->
+          <div class="uikit-sandbox-block">
+            <h4 class="uikit-sandbox-title">3. Tarjetas de Estadísticas & Métricas</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+              <article class="stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-icon-bubble purple">${icon('package')}</span>
+                  <p class="eyebrow">MÉTRICA ESTÁNDAR</p>
+                </div>
+                <strong>42 Insumos</strong>
+                <small>Valoración total $1.250.000</small>
+              </article>
+
+              <article class="stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-icon-bubble green">${icon('finances')}</span>
+                  <p class="eyebrow">SALDO EN CAJA</p>
+                </div>
+                <strong style="color: var(--green-text);">$4.850.000</strong>
+                <small>Margen retenido del estudio</small>
+              </article>
+
+              <article class="stat-card alert-card">
+                <div class="stat-card-header">
+                  <span class="stat-icon-bubble red">${icon('alert')}</span>
+                  <p class="eyebrow">ALERTA REPOSICIÓN</p>
+                </div>
+                <strong>3 Insumos</strong>
+                <small>Stock crítico por reponer</small>
+              </article>
+            </div>
+          </div>
+
+          <!-- 4. Form Controls -->
+          <div class="uikit-sandbox-block">
+            <h4 class="uikit-sandbox-title">4. Controles de Formulario & Inputs</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+              <label style="margin: 0; font-size: 12px; font-weight: 700;">Campo de Texto
+                <input type="text" placeholder="Ej. Tatuaje Neotradicional" value="Tatuaje Dragon Sleeve" style="margin-top: 4px;" />
+              </label>
+              <label style="margin: 0; font-size: 12px; font-weight: 700;">Selector Dropdown
+                <select style="margin-top: 4px;">
+                  <option>Box 1 (Principal)</option>
+                  <option>Box 2 (Secundario)</option>
+                  <option>Box 3 (Privado)</option>
+                </select>
+              </label>
+              <div style="display: flex; flex-direction: column; justify-content: center; gap: 8px;">
+                <label class="form-checkbox-label" style="margin: 0;">
+                  <input type="checkbox" checked />
+                  <span>Casilla de verificación activa</span>
+                </label>
+                <label class="form-checkbox-label" style="margin: 0;">
+                  <input type="checkbox" />
+                  <span>Casilla sin marcar</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Interactive Test Triggers -->
+          <div class="uikit-sandbox-block">
+            <h4 class="uikit-sandbox-title">5. Disparadores de Prueba</h4>
+            <div class="uikit-components-flow">
+              <button type="button" class="secondary" id="btn-uikit-test-modal">
+                🪟 Probar Modal con Nuevo Tema
+              </button>
+              <button type="button" class="secondary" id="btn-uikit-test-alert">
+                🔔 Probar Notificación / Alerta
+              </button>
+            </div>
+          </div>
+
+          <!-- 6. Icons Catalog -->
+          <div class="uikit-sandbox-block">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h4 class="uikit-sandbox-title">6. Catálogo de Íconos SVG del Sistema</h4>
+              <span style="font-size: 11px; color: var(--muted);">${Object.keys(ICONS).length} íconos disponibles</span>
+            </div>
+            <div class="uikit-icons-catalog">
+              ${Object.keys(ICONS).map((iconKey) => `
+                <div class="uikit-icon-item" data-icon-name="${iconKey}" title="Haz clic para copiar icon('${iconKey}')">
+                  ${icon(iconKey)}
+                  <span>${iconKey}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function attachUIKitEventListeners() {
+  // 1. Preset Cards
+  document.querySelectorAll('.uikit-preset-card').forEach((card) => {
+    card.onclick = () => {
+      const presetId = card.dataset.presetId;
+      const found = UIKIT_THEME_PRESETS.find((p) => p.id === presetId);
+      if (found) {
+        activeThemeTokens = { id: found.id, name: found.name, ...found.tokens };
+        applyThemeTokens(found.tokens);
+        renderBackoffice('uikit');
+      }
+    };
+  });
+
+  // 2. Color Pickers <-> Hex Inputs Sync
+  const colorMap = [
+    { picker: 'token-red-picker', hex: 'token-red-hex', prop: 'red' },
+    { picker: 'token-ink-picker', hex: 'token-ink-hex', prop: 'ink' },
+    { picker: 'token-inkSurface-picker', hex: 'token-inkSurface-hex', prop: 'inkSurface' },
+    { picker: 'token-canvas-picker', hex: 'token-canvas-hex', prop: 'canvas' },
+    { picker: 'token-surface-picker', hex: 'token-surface-hex', prop: 'surface' },
+    { picker: 'token-softPurple-picker', hex: 'token-softPurple-hex', prop: 'softPurple' }
+  ];
+
+  colorMap.forEach(({ picker, hex, prop }) => {
+    const pEl = document.getElementById(picker);
+    const hEl = document.getElementById(hex);
+    if (pEl && hEl) {
+      pEl.oninput = () => {
+        hEl.value = pEl.value;
+        activeThemeTokens[prop] = pEl.value;
+        activeThemeTokens.id = 'custom';
+        applyThemeTokens({ [prop]: pEl.value });
+      };
+      hEl.oninput = () => {
+        if (/^#[0-9A-Fa-f]{6}$/.test(hEl.value)) {
+          pEl.value = hEl.value;
+          activeThemeTokens[prop] = hEl.value;
+          activeThemeTokens.id = 'custom';
+          applyThemeTokens({ [prop]: hEl.value });
+        }
+      };
+    }
+  });
+
+  // 3. Border Radius
+  const radiusSelect = document.getElementById('token-radius-select');
+  if (radiusSelect) {
+    radiusSelect.onchange = () => {
+      const [rMd, rXl] = radiusSelect.value.split('|');
+      activeThemeTokens.radiusMd = rMd;
+      activeThemeTokens.radiusXl = rXl;
+      activeThemeTokens.id = 'custom';
+      applyThemeTokens({ radiusMd: rMd, radiusXl: rXl });
+    };
+  }
+
+  // 4. Font Family
+  const fontSelect = document.getElementById('token-font-select');
+  if (fontSelect) {
+    fontSelect.onchange = () => {
+      activeThemeTokens.fontFamily = fontSelect.value;
+      activeThemeTokens.id = 'custom';
+      applyThemeTokens({ fontFamily: fontSelect.value });
+    };
+  }
+
+  // 5. Actions: Reset, Export CSS, Save
+  const btnReset = document.getElementById('btn-uikit-reset');
+  if (btnReset) {
+    btnReset.onclick = () => {
+      if (confirm('¿Restablecer el diseño a los valores oficiales de Tatudin?')) {
+        activeThemeTokens = { ...TATUDIN_DEFAULT_THEME };
+        applyThemeTokens(TATUDIN_DEFAULT_THEME);
+        localStorage.removeItem('tatudin_theme_tokens');
+        api('/api/backoffice/theme', {
+          method: 'PATCH',
+          body: JSON.stringify({ theme: TATUDIN_DEFAULT_THEME })
+        }).catch(() => null);
+        renderBackoffice('uikit');
+      }
+    };
+  }
+
+  const btnExport = document.getElementById('btn-uikit-export-css');
+  if (btnExport) {
+    btnExport.onclick = () => {
+      const t = activeThemeTokens;
+      const css = `:root {
+  --red: ${t.red || '#ff3552'};
+  --ink: ${t.ink || '#09041c'};
+  --ink-surface: ${t.inkSurface || '#221c35'};
+  --ink-hover: ${t.inkHover || '#322e40'};
+  --canvas: ${t.canvas || '#fdf7ff'};
+  --surface: ${t.surface || '#ffffff'};
+  --surface-low: ${t.surfaceLow || '#f7f1ff'};
+  --surface-high: ${t.surfaceHigh || '#ece5fc'};
+  --soft-purple: ${t.softPurple || '#e8ddff'};
+  --radius-md: ${t.radiusMd || '12px'};
+  --radius-xl: ${t.radiusXl || '20px'};
+  --font-sans: ${t.fontFamily || "'Manrope', sans-serif"};
+}`;
+      navigator.clipboard.writeText(css).then(() => {
+        const orig = btnExport.textContent;
+        btnExport.textContent = '✓ ¡CSS Copiado!';
+        setTimeout(() => { btnExport.textContent = orig; }, 2000);
+      });
+    };
+  }
+
+  const btnSave = document.getElementById('btn-uikit-save');
+  if (btnSave) {
+    btnSave.onclick = async () => {
+      try {
+        localStorage.setItem('tatudin_theme_tokens', JSON.stringify(activeThemeTokens));
+        await api('/api/backoffice/theme', {
+          method: 'PATCH',
+          body: JSON.stringify({ theme: activeThemeTokens })
+        });
+        alert('🎉 ¡Tema maestro guardado con éxito! Se aplicará de forma global en la plataforma.');
+      } catch (err) {
+        alert('Tema guardado localmente en este navegador (' + err.message + ')');
+      }
+    };
+  }
+
+  // 6. Interactive Sandbox Triggers
+  const btnTestModal = document.getElementById('btn-uikit-test-modal');
+  if (btnTestModal) {
+    btnTestModal.onclick = () => {
+      openModal(`
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <p class="eyebrow">UI KIT MODAL PREVIEW</p>
+          <h2 id="modal-title" style="margin: 0;">Prueba de Diálogo Modal</h2>
+          <p style="font-size: 13.5px; color: var(--muted); margin: 0;">
+            Este modal utiliza dinámicamente las variables de fondo (--surface), bordes (--radius-xl), tipografía (--font-sans) y colores de acento configurados.
+          </p>
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+            <button type="button" class="secondary" data-close-modal>Cerrar</button>
+            <button type="button" class="primary" data-close-modal>Entendido</button>
+          </div>
+        </div>
+      `);
+    };
+  }
+
+  const btnTestAlert = document.getElementById('btn-uikit-test-alert');
+  if (btnTestAlert) {
+    btnTestAlert.onclick = () => {
+      alert('🔔 Notificación de prueba: El sistema de diseño se encuentra 100% reactivo.');
+    };
+  }
+
+  // 7. Icon Copy Trigger
+  document.querySelectorAll('.uikit-icon-item').forEach((item) => {
+    item.onclick = () => {
+      const iconName = item.dataset.iconName;
+      navigator.clipboard.writeText(`icon('${iconName}')`);
+      const span = item.querySelector('span');
+      if (span) {
+        const orig = span.textContent;
+        span.textContent = '✓ Copiado';
+        setTimeout(() => { span.textContent = orig; }, 1500);
+      }
+    };
+  });
+}
+
 
 function renderBackofficeStatsTab(data) {
   const m = data.metrics || {};
@@ -7194,6 +7830,9 @@ document.addEventListener('paste', (event) => {
     }
   }
 });
+
+// Initialize persisted custom theme immediately
+loadPersistedTheme();
 
 // Session verification and bootstrap
 if (!checkUrlHash()) {

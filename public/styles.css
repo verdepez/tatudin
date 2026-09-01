@@ -6105,3 +6105,266 @@ textarea {
   border-radius: var(--radius-sm);
   border-left: 3px solid #8b5cf6;
 }
+
+/* ==========================================================================
+   UI Kit & Design System Maestro (Superuser Backoffice)
+   ========================================================================== */
+
+.uikit-container {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.uikit-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+}
+
+.uikit-toolbar-info h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.uikit-toolbar-info p {
+  margin: 4px 0 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.uikit-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.uikit-section {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.uikit-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid var(--line-soft);
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+}
+
+.uikit-section-header h2 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.uikit-section-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Preset Palettes Grid */
+.uikit-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.uikit-preset-card {
+  border: 2px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  background: var(--surface-low);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.uikit-preset-card:hover {
+  border-color: var(--primary, #7c3aed);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+}
+
+.uikit-preset-card.active {
+  border-color: #ff3552;
+  background: var(--surface-high);
+  box-shadow: 0 0 0 3px rgba(255, 53, 82, 0.15);
+}
+
+.uikit-preset-title {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.uikit-swatch-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.uikit-swatch-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* Token Customizer Grid */
+.uikit-tokens-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.uikit-token-card {
+  background: var(--surface-low);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.uikit-token-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.uikit-color-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.uikit-color-picker {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 2px solid var(--line-soft);
+  cursor: pointer;
+  background: none;
+  padding: 0;
+}
+
+.uikit-color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.uikit-color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 6px;
+}
+
+.uikit-hex-input {
+  font-family: monospace;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  height: 38px !important;
+  margin: 0 !important;
+}
+
+/* Sandbox Playground */
+.uikit-sandbox-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface-low);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  border: 1px solid var(--line-soft);
+}
+
+.uikit-sandbox-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.uikit-components-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.uikit-icons-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.uikit-icon-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 6px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.uikit-icon-item:hover {
+  border-color: var(--primary, #ff3552);
+  transform: translateY(-2px);
+  background: var(--surface-high);
+}
+
+.uikit-icon-item svg {
+  width: 22px;
+  height: 22px;
+  color: var(--ink);
+}
+
+.uikit-icon-item span {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: center;
+}
