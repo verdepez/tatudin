@@ -1596,7 +1596,7 @@ async function renderFinances() {
 }
 
 async function renderSettings() {
-  const [stData, memList, spList, gsList, catList, features] = await Promise.all([
+  const [stData, memList, spList, guestList, catList, features] = await Promise.all([
     api('/api/studio').catch(() => ({ name: 'Mi Estudio', currency: 'CLP', timezone: 'America/Santiago', account_type: 'independent' })),
     api('/api/members').catch(() => []),
     api('/api/spaces').catch(() => []),
