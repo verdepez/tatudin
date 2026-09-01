@@ -21,3 +21,13 @@ stitch_tatudin_app_estudio_view/
 DESIGN.md
 tatudin_contexto_proyecto.md
 
+# Generated project documentation
+resumen-proyecto.md
+arquitectura.md
+aprendizajes.md
+decisiones-detectadas.md
+knowledge-card.md
+# Test reports & artifacts
+playwright-report/
+test-results/
+.playwright/

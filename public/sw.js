@@ -1,13 +1,34 @@
-const CACHE_NAME = 'tatudin-shell-v14';
+const CACHE_NAME = 'tatudin-shell-v15';
+const PRECACHE_ASSETS = [
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/app.js',
+  '/offline-store.js',
+  '/manifest.webmanifest',
+  '/favicon.svg',
+  '/favicon-32.png',
+  '/icon-192.png',
+  '/icon-512.png'
+];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
+        console.warn('[SW] Pre-cache warning:', err);
+      });
+    }).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
-      .then(() => self.clients.claim())
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      );
+    }).then(() => self.clients.claim())
   );
 });
 
@@ -15,7 +36,7 @@ self.addEventListener('fetch', (event) => {
   // Always fetch fresh from network for API calls
   if (event.request.url.includes('/api/')) return;
 
-  // Network-first strategy for app shell and assets
+  // Network-first strategy with cache fallback for shell and static assets
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -25,6 +46,28 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => {
+        return caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          // Fallback to index.html for SPA client navigation when offline
+          if (event.request.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+          return new Response('Offline content unavailable', { status: 503, statusText: 'Service Unavailable' });
+        });
+      })
   );
+});
+
+// Background Sync API support for offline mutation replay
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'tatudin-sync') {
+    event.waitUntil(
+      self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: 'TRIGGER_OFFLINE_SYNC' });
+        });
+      })
+    );
+  }
 });

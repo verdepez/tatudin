@@ -83,17 +83,54 @@ const ROLE_MAP = {
   nomad: { label: 'Nómade', class: 'role-nomad' }
 };
 
-const api = (url, options = {}) => fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options }).then(async (response) => {
-  let data = {};
-  const text = await response.text();
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch (err) {
-    throw new Error(text || `Error ${response.status}: No se pudo procesar la solicitud`);
+function getCsrfCookie() {
+  const match = document.cookie.match(new RegExp('(^| )tatudin_csrf=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : '';
+}
+
+const api = async (url, options = {}) => {
+  const method = (options.method || 'GET').toUpperCase();
+  const csrfToken = getCsrfCookie();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    ...(options.headers || {})
+  };
+
+  if (!navigator.onLine && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    if (window.TatutinOffline?.enqueueOfflineRequest) {
+      await window.TatutinOffline.enqueueOfflineRequest({
+        url,
+        method,
+        body: options.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : null
+      });
+      return { ok: true, offlineQueued: true };
+    }
   }
-  if (!response.ok) throw new Error(data.error || 'No se pudo completar la operación');
-  return data;
-});
+
+  try {
+    const response = await fetch(url, { ...options, headers });
+    let data = {};
+    const text = await response.text();
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (err) {
+      throw new Error(text || `Error ${response.status}: No se pudo procesar la solicitud`);
+    }
+    if (!response.ok) throw new Error(data.error || 'No se pudo completar la operación');
+    return data;
+  } catch (err) {
+    if (!navigator.onLine && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && window.TatutinOffline?.enqueueOfflineRequest) {
+      await window.TatutinOffline.enqueueOfflineRequest({
+        url,
+        method,
+        body: options.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : null
+      });
+      return { ok: true, offlineQueued: true };
+    }
+    throw err;
+  }
+};
 
 let clients = [];
 let members = [];
@@ -300,6 +337,9 @@ function renderOnboarding(step = 0, authMode = 'register') {
           <form class="onboarding-card auth-fade" data-onboarding-form="login">
             <label>Email<input name="email" type="email" value="${onboarding.email || ''}" placeholder="artist@studio.com" autocomplete="email" required /></label>
             <label>Contraseña<input name="password" type="password" placeholder="Tu contraseña" autocomplete="current-password" required /></label>
+            <div style="text-align: right; margin-top: -6px; margin-bottom: 10px;">
+              <button type="button" class="text-button" data-action="open-forgot-password" style="font-size: 12px; color: #a78bfa;">¿Olvidaste tu contraseña?</button>
+            </div>
             <button class="primary" type="submit" style="margin-top: 6px;">Iniciar sesión <span>→</span></button>
             <p class="form-error"></p>
 
@@ -2451,6 +2491,9 @@ async function renderBackoffice(tab = currentBackofficeTab) {
         <button type="button" class="bo-tab-btn ${tab === 'guest-spots' ? 'active' : ''}" data-bo-tab="guest-spots">
           📋 Solicitudes de Nómades
         </button>
+        <button type="button" class="bo-tab-btn ${tab === 'audit' ? 'active' : ''}" data-bo-tab="audit">
+          🛡️ Auditoría & Trazabilidad
+        </button>
         <button type="button" class="bo-tab-btn ${tab === 'database' ? 'active' : ''}" data-bo-tab="database">
           🛠️ Operaciones de Base de Datos
         </button>
@@ -2486,6 +2529,9 @@ async function renderBackoffice(tab = currentBackofficeTab) {
       const gsData = await api('/api/backoffice/guest-spots');
       backofficeCache.guestSpots = gsData;
       container.innerHTML = renderBackofficeGuestSpotsTab(gsData);
+    } else if (tab === 'audit') {
+      const auditData = await api('/api/backoffice/audit-logs');
+      container.innerHTML = renderBackofficeAuditTab(auditData);
     } else if (tab === 'database') {
       container.innerHTML = renderBackofficeDatabaseTab();
     }
@@ -2914,6 +2960,74 @@ function renderBackofficeDatabaseTab() {
           </div>
         </article>
       </div>
+    </div>
+  `;
+}
+
+function renderBackofficeAuditTab(data) {
+  const logs = data.logs || [];
+  return `
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      <div class="terms-intro-box">
+        <p><strong>🛡️ Trazabilidad y Registro de Auditoría:</strong> Historial inmutable de eventos sensibles del sistema (inicios de sesión, cambios de contraseña, transacciones financieras, modificaciones de artistas y purgas de base de datos), conforme a la Ley N° 19.628.</p>
+      </div>
+
+      <section class="panel" style="padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #fff;">Eventos Registrados</h3>
+            <span style="font-size: 12px; color: var(--muted);">Total acumulado: ${data.total || logs.length} eventos</span>
+          </div>
+          <button type="button" class="outline-button small" data-bo-tab="audit">
+            🔄 Actualizar Registro
+          </button>
+        </div>
+
+        <div style="overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 12px;">
+          <table class="bo-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--line-soft); text-align: left;">
+                <th style="padding: 12px 14px;">Fecha y Hora</th>
+                <th style="padding: 12px 14px;">Acción</th>
+                <th style="padding: 12px 14px;">Usuario</th>
+                <th style="padding: 12px 14px;">Estudio</th>
+                <th style="padding: 12px 14px;">Detalles</th>
+                <th style="padding: 12px 14px;">IP / Origen</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${logs.map(l => {
+                const isFail = l.action.includes('failed') || l.action.includes('purge');
+                const isSuccess = l.action.includes('success');
+                return `
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <td style="padding: 10px 14px; white-space: nowrap; color: var(--muted); font-size: 12px;">
+                      ${new Date(l.created_at).toLocaleString('es-CL')}
+                    </td>
+                    <td style="padding: 10px 14px;">
+                      <span class="role-badge" style="background: ${isFail ? 'rgba(239, 68, 68, 0.2)' : isSuccess ? 'rgba(16, 185, 129, 0.2)' : 'rgba(139, 92, 246, 0.2)'}; color: ${isFail ? '#f87171' : isSuccess ? '#34d399' : '#a78bfa'}; font-weight: 700; font-size: 11px;">
+                        ${l.action}
+                      </span>
+                    </td>
+                    <td style="padding: 10px 14px;">
+                      <strong>${l.user_email || l.user_name || 'Sistema / Anónimo'}</strong>
+                    </td>
+                    <td style="padding: 10px 14px; color: var(--muted);">
+                      ${l.studio_name || '-'}
+                    </td>
+                    <td style="padding: 10px 14px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; font-size: 11px; color: #cbd5e1;" title='${JSON.stringify(l.details || {})}'>
+                      ${JSON.stringify(l.details || {})}
+                    </td>
+                    <td style="padding: 10px 14px; color: var(--muted); font-size: 12px;">
+                      ${l.ip_address || '127.0.0.1'}
+                    </td>
+                  </tr>
+                `;
+              }).join('') || '<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--muted);">No hay eventos de auditoría registrados.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   `;
 }
@@ -5341,8 +5455,120 @@ async function userProfileModal() {
   `);
 }
 
+function openForgotPasswordModal() {
+  openModal(`
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      <div style="text-align: center; margin-bottom: 8px;">
+        <span style="font-size: 32px;">🔑</span>
+        <h3 style="margin: 8px 0 4px 0; font-size: 18px;">Recuperar contraseña</h3>
+        <p style="font-size: 13px; color: var(--muted); margin: 0;">Ingresa tu correo electrónico registrado y te enviaremos las instrucciones para restablecer tu clave.</p>
+      </div>
+      <form id="form-forgot-pass" style="display: flex; flex-direction: column; gap: 12px;">
+        <label style="font-size: 13px; font-weight: 600;">Email
+          <input type="email" name="email" placeholder="artist@studio.com" required style="margin-top: 4px;" />
+        </label>
+        <p id="forgot-pass-msg" style="font-size: 13px; margin: 0; min-height: 20px;"></p>
+        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
+          <button type="button" class="secondary" data-action="close-modal">Cancelar</button>
+          <button type="submit" class="primary">Enviar enlace</button>
+        </div>
+      </form>
+    </div>
+  `);
+
+  const form = document.querySelector('#form-forgot-pass');
+  const msg = document.querySelector('#forgot-pass-msg');
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const email = form.email.value.trim();
+      const btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+      try {
+        const res = await api('/api/auth/forgot-password', {
+          method: 'POST',
+          body: JSON.stringify({ email })
+        });
+        msg.style.color = '#34d399';
+        msg.textContent = res.message || 'Enlace enviado si el correo existe.';
+        setTimeout(() => closeModal(), 3500);
+      } catch (err) {
+        msg.style.color = '#f87171';
+        msg.textContent = err.message || 'Error al solicitar recuperación';
+        btn.disabled = false;
+        btn.textContent = 'Enviar enlace';
+      }
+    };
+  }
+}
+
+function openResetPasswordModal(token) {
+  openModal(`
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      <div style="text-align: center; margin-bottom: 8px;">
+        <span style="font-size: 32px;">🔐</span>
+        <h3 style="margin: 8px 0 4px 0; font-size: 18px;">Crea tu nueva contraseña</h3>
+        <p style="font-size: 13px; color: var(--muted); margin: 0;">Ingresa tu nueva clave de acceso de al menos 8 caracteres.</p>
+      </div>
+      <form id="form-reset-pass" style="display: flex; flex-direction: column; gap: 12px;">
+        <label style="font-size: 13px; font-weight: 600;">Nueva Contraseña
+          <input type="password" name="newPassword" placeholder="Mínimo 8 caracteres" minlength="8" required style="margin-top: 4px;" />
+        </label>
+        <label style="font-size: 13px; font-weight: 600;">Confirmar Contraseña
+          <input type="password" name="confirmPassword" placeholder="Repite tu nueva contraseña" minlength="8" required style="margin-top: 4px;" />
+        </label>
+        <p id="reset-pass-msg" style="font-size: 13px; margin: 0; min-height: 20px;"></p>
+        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
+          <button type="submit" class="primary" style="width: 100%;">Restablecer Contraseña</button>
+        </div>
+      </form>
+    </div>
+  `);
+
+  const form = document.querySelector('#form-reset-pass');
+  const msg = document.querySelector('#reset-pass-msg');
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const p1 = form.newPassword.value;
+      const p2 = form.confirmPassword.value;
+      if (p1 !== p2) {
+        msg.style.color = '#f87171';
+        msg.textContent = 'Las contraseñas no coinciden';
+        return;
+      }
+      const btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Actualizando...';
+      try {
+        const res = await api('/api/auth/reset-password', {
+          method: 'POST',
+          body: JSON.stringify({ token, newPassword: p1 })
+        });
+        msg.style.color = '#34d399';
+        msg.textContent = res.message || 'Contraseña actualizada.';
+        setTimeout(() => {
+          closeModal();
+          window.location.hash = '';
+          renderOnboarding(1, 'login');
+        }, 2000);
+      } catch (err) {
+        msg.style.color = '#f87171';
+        msg.textContent = err.message || 'Error al actualizar contraseña';
+        btn.disabled = false;
+        btn.textContent = 'Restablecer Contraseña';
+      }
+    };
+  }
+}
+
 // Global Event Listeners
 document.addEventListener('click', async (event) => {
+  const forgotBtn = event.target.closest('[data-action="open-forgot-password"]');
+  if (forgotBtn) {
+    return openForgotPasswordModal();
+  }
   const switchAuth = event.target.closest('[data-switch-auth]');
   if (switchAuth) {
     return renderOnboarding(1, switchAuth.dataset.switchAuth);
@@ -6501,16 +6727,44 @@ function initDynamicFavicon() {
 // Initialize dynamic animated favicon
 initDynamicFavicon();
 
-// Session verification and bootstrap
-api('/api/auth/me')
-  .then((data) => {
-    if (data?.user) {
-      startApp();
-    } else {
-      renderOnboarding(0);
+function checkUrlHash() {
+  const hash = window.location.hash || '';
+  if (hash.startsWith('#reset-password')) {
+    const params = new URLSearchParams(hash.replace('#reset-password?', ''));
+    const token = params.get('token');
+    if (token) {
+      hideSplash();
+      renderOnboarding(1, 'login');
+      openResetPasswordModal(token);
+      return true;
     }
-  })
-  .catch(() => {
-    renderOnboarding(0);
+  }
+  return false;
+}
+
+window.addEventListener('hashchange', checkUrlHash);
+
+// Service Worker message listener for Background Sync
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type === 'TRIGGER_OFFLINE_SYNC' && window.TatutinOffline?.syncPendingOfflineRequests) {
+      window.TatutinOffline.syncPendingOfflineRequests(api);
+    }
   });
+}
+
+// Session verification and bootstrap
+if (!checkUrlHash()) {
+  api('/api/auth/me')
+    .then((data) => {
+      if (data?.user) {
+        startApp();
+      } else {
+        renderOnboarding(0);
+      }
+    })
+    .catch(() => {
+      renderOnboarding(0);
+    });
+}
 

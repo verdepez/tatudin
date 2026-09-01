@@ -281,8 +281,14 @@
       </section>
     </div>
 
+    <!-- Offline Store & Background Sync Engine -->
+    <script type="module">
+      import * as TatutinOffline from '/offline-store.js';
+      window.TatutinOffline = TatutinOffline;
+      TatutinOffline.updateOfflineBannerUI();
+    </script>
     <!-- Tesseract.js for Receipt OCR scanning -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="/app.js?v=33"></script>
+    <script src="/app.js?v=34"></script>
   </body>
 </html>

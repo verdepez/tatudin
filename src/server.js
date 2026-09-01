@@ -5,6 +5,10 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { seedStudioData } from './seed_studio.js';
+import { loginRateLimiter, passwordResetRateLimiter, publicApiRateLimiter } from './middlewares/rateLimiter.js';
+import { csrfProtection, generateCsrfToken } from './middlewares/csrf.js';
+import { sendPasswordResetEmail } from './services/mailer.js';
+import { logAuditEvent } from './services/auditLogger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const { Pool } = pg;
@@ -69,6 +73,14 @@ function addLog(level, message, details = null) {
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(csrfProtection());
+
+// CSRF Token endpoint
+app.get('/api/auth/csrf-token', (_request, response) => {
+  const token = generateCsrfToken();
+  response.setHeader('Set-Cookie', `tatudin_csrf=${encodeURIComponent(token)}; SameSite=Lax; Path=/`);
+  return response.json({ csrfToken: token });
+});
 
 async function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -533,6 +545,17 @@ app.post('/api/backoffice/purge-production', requireSuperAdmin, async (request, 
     }
 
     await client.query('COMMIT');
+
+    await logAuditEvent({
+      pool,
+      studioId: request.studioId,
+      userId: request.user.id,
+      action: 'backoffice.purge_production',
+      entityType: 'database',
+      details: { purgerEmail: request.user.email },
+      req: request
+    });
+
     return response.json({
       ok: true,
       message: 'Base de datos purgada exitosamente. Todas las tablas quedaron limpias para producción.',
@@ -543,6 +566,41 @@ app.post('/api/backoffice/purge-production', requireSuperAdmin, async (request, 
     return response.status(500).json({ error: error.message });
   } finally {
     client.release();
+  }
+});
+
+app.get('/api/backoffice/audit-logs', requireSuperAdmin, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const limit = Math.min(100, Math.max(10, Number(request.query.limit) || 50));
+  const offset = Math.max(0, Number(request.query.offset) || 0);
+  const actionFilter = request.query.action ? String(request.query.action).trim() : null;
+
+  try {
+    let query = `
+      SELECT al.*, u.email as user_email, u.full_name as user_name, s.name as studio_name
+      FROM audit_logs al
+      LEFT JOIN users u ON u.id = al.user_id
+      LEFT JOIN studios s ON s.id = al.studio_id
+    `;
+    const params = [];
+    if (actionFilter) {
+      params.push(`%${actionFilter}%`);
+      query += ` WHERE al.action ILIKE $1`;
+    }
+    query += ` ORDER BY al.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+
+    const result = await pool.query(query, params);
+    const countRes = await pool.query('SELECT COUNT(*)::int as total FROM audit_logs');
+
+    return response.json({
+      logs: result.rows,
+      total: countRes.rows[0]?.total || 0,
+      limit,
+      offset
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
   }
 });
 
@@ -580,7 +638,7 @@ app.post('/api/auth/register', async (request, response) => {
   } finally { client.release(); }
 });
 
-app.post('/api/auth/login', async (request, response) => {
+app.post('/api/auth/login', loginRateLimiter, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Base de datos no disponible' });
   const { email, password } = request.body;
   if (!email?.trim() || !password) return response.status(400).json({ error: 'Email y contraseña son obligatorios' });
@@ -607,6 +665,13 @@ app.post('/api/auth/login', async (request, response) => {
     }
 
     if (!userResult.rowCount || !userResult.rows[0]) {
+      await logAuditEvent({
+        pool,
+        action: 'auth.login_failed',
+        entityType: 'user',
+        details: { email: cleanEmail, reason: 'user_not_found' },
+        req: request
+      });
       return response.status(401).json({ error: 'Email o contraseña incorrectos' });
     }
 
@@ -618,6 +683,15 @@ app.post('/api/auth/login', async (request, response) => {
         const freshHash = await hashPassword('password123');
         await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [freshHash, user.id]);
       } else {
+        await logAuditEvent({
+          pool,
+          userId: user.id,
+          action: 'auth.login_failed',
+          entityType: 'user',
+          entityId: user.id,
+          details: { email: cleanEmail, reason: 'invalid_password' },
+          req: request
+        });
         return response.status(401).json({ error: 'Email o contraseña incorrectos' });
       }
     }
@@ -679,6 +753,18 @@ app.post('/api/auth/login', async (request, response) => {
 
     setSessionCookie(response, sessionId);
     const isSuper = Boolean(user.is_superadmin || cleanEmail === 'soyelroot@tatudin.cl');
+
+    await logAuditEvent({
+      pool,
+      studioId,
+      userId: user.id,
+      action: 'auth.login_success',
+      entityType: 'user',
+      entityId: user.id,
+      details: { email: user.email, isSuperAdmin: isSuper },
+      req: request
+    });
+
     return response.json({
       user: {
         id: user.id,
@@ -693,8 +779,142 @@ app.post('/api/auth/login', async (request, response) => {
   }
 });
 
+app.post('/api/auth/forgot-password', passwordResetRateLimiter, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Base de datos no disponible' });
+  const { email } = request.body;
+  if (!email?.trim()) return response.status(400).json({ error: 'El email es obligatorio' });
+
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    const userRes = await pool.query('SELECT id, email, full_name FROM users WHERE LOWER(email) = $1', [cleanEmail]);
+
+    // Responding uniformly to avoid user enumeration
+    if (!userRes.rowCount) {
+      return response.json({
+        ok: true,
+        message: 'Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.'
+      });
+    }
+
+    const user = userRes.rows[0];
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await pool.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [user.id]);
+    await pool.query(
+      'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+      [user.id, tokenHash, expiresAt]
+    );
+
+    const protocol = request.headers['x-forwarded-proto'] || request.protocol || 'http';
+    const host = request.headers['x-forwarded-host'] || request.headers.host || 'localhost:3000';
+    const resetUrl = `${protocol}://${host}/#reset-password?token=${encodeURIComponent(rawToken)}`;
+
+    await sendPasswordResetEmail({
+      to: user.email,
+      resetUrl,
+      userName: user.full_name
+    });
+
+    await logAuditEvent({
+      pool,
+      userId: user.id,
+      action: 'auth.forgot_password_requested',
+      entityType: 'user',
+      entityId: user.id,
+      details: { email: user.email },
+      req: request
+    });
+
+    return response.json({
+      ok: true,
+      message: 'Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.'
+    });
+  } catch (error) {
+    console.error('[AUTH] Forgot password error:', error);
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/reset-password', passwordResetRateLimiter, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Base de datos no disponible' });
+  const { token, newPassword } = request.body;
+  if (!token || !newPassword) {
+    return response.status(400).json({ error: 'Token y nueva contraseña son obligatorios' });
+  }
+  if (newPassword.length < 8) {
+    return response.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
+  }
+
+  try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const tokenRes = await pool.query(`
+      SELECT prt.*, u.email, u.full_name 
+      FROM password_reset_tokens prt
+      JOIN users u ON u.id = prt.user_id
+      WHERE prt.token_hash = $1 AND prt.used_at IS NULL AND prt.expires_at > NOW()
+      LIMIT 1
+    `, [tokenHash]);
+
+    if (!tokenRes.rowCount) {
+      return response.status(400).json({ error: 'El enlace de recuperación es inválido o ha expirado' });
+    }
+
+    const resetRow = tokenRes.rows[0];
+    const newHash = await hashPassword(newPassword);
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, resetRow.user_id]);
+      await client.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1', [resetRow.id]);
+      await client.query('DELETE FROM sessions WHERE user_id = $1', [resetRow.user_id]);
+      await client.query('COMMIT');
+    } catch (dbErr) {
+      await client.query('ROLLBACK');
+      throw dbErr;
+    } finally {
+      client.release();
+    }
+
+    await logAuditEvent({
+      pool,
+      userId: resetRow.user_id,
+      action: 'auth.password_reset_success',
+      entityType: 'user',
+      entityId: resetRow.user_id,
+      details: { email: resetRow.email },
+      req: request
+    });
+
+    return response.json({
+      ok: true,
+      message: 'Contraseña actualizada exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.'
+    });
+  } catch (error) {
+    console.error('[AUTH] Reset password error:', error);
+    return response.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/auth/logout', async (request, response) => {
-  if (pool) await pool.query('DELETE FROM sessions WHERE id = $1', [parseCookies(request).tatudin_session]);
+  const sessionId = parseCookies(request).tatudin_session;
+  if (pool && sessionId) {
+    const sess = await pool.query('SELECT user_id, active_studio_id FROM sessions WHERE id = $1', [sessionId]);
+    if (sess.rowCount) {
+      await logAuditEvent({
+        pool,
+        studioId: sess.rows[0].active_studio_id,
+        userId: sess.rows[0].user_id,
+        action: 'auth.logout',
+        entityType: 'user',
+        entityId: sess.rows[0].user_id,
+        req: request
+      });
+    }
+    await pool.query('DELETE FROM sessions WHERE id = $1', [sessionId]);
+  }
   response.setHeader('Set-Cookie', 'tatudin_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
   return response.json({ ok: true });
 });
@@ -1058,7 +1278,7 @@ app.get('/api/public/studios/:id/spaces', async (request, response) => {
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
-app.post('/api/public/guest-spots', async (request, response) => {
+app.post('/api/public/guest-spots', publicApiRateLimiter, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   const { studioId, artistName, artistEmail, artistInstagram = '', spaceId = null, startDate, endDate, notes = '' } = request.body;
   if (!studioId || !artistName?.trim() || !artistEmail?.trim() || !startDate || !endDate) {
@@ -2760,6 +2980,30 @@ async function ensureAuthSchema() {
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
   await safeExec('INSERT system_config feature_microsite_enabled', `INSERT INTO system_config (key, value) VALUES ('feature_microsite_enabled', 'false') ON CONFLICT (key) DO NOTHING`);
+
+  // 17. Password Reset Tokens
+  await safeExec('CREATE TABLE password_reset_tokens', `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+
+  // 18. Audit Logs
+  await safeExec('CREATE TABLE audit_logs', `CREATE TABLE IF NOT EXISTS audit_logs (
+    id SERIAL PRIMARY KEY,
+    studio_id INTEGER REFERENCES studios(id) ON DELETE SET NULL,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    entity_type TEXT,
+    entity_id INTEGER,
+    details JSONB,
+    ip_address TEXT DEFAULT '',
+    user_agent TEXT DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
 
   // Seed default categories
   try {
