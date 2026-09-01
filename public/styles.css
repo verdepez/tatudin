@@ -5708,13 +5708,19 @@ textarea {
 .ocr-processing-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(9, 4, 28, 0.88);
+  background: rgba(9, 4, 28, 0.92);
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-xl);
   z-index: 20;
+}
+
+.ocr-processing-overlay[hidden],
+.scanner-error-overlay[hidden],
+[hidden] {
+  display: none !important;
 }
 
 .ocr-progress-box {

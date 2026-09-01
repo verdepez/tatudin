@@ -3948,8 +3948,14 @@ let scannerCurrentFacingMode = 'environment';
 
 function stopCameraStream() {
   if (scannerMediaStream) {
-    scannerMediaStream.getTracks().forEach((track) => track.stop());
+    try {
+      scannerMediaStream.getTracks().forEach((track) => track.stop());
+    } catch (e) {}
     scannerMediaStream = null;
+  }
+  const videoEl = document.getElementById('scanner-camera-video');
+  if (videoEl) {
+    videoEl.srcObject = null;
   }
 }
 
@@ -4471,9 +4477,9 @@ function openReceiptScannerModal(defaultTarget = 'studio') {
       <div class="scanner-modal-header">
         <div>
           <p class="eyebrow">ESCÁNER OCR DE BOLETAS</p>
-          <h2 id="modal-title">Tomar foto de boleta</h2>
+          <h2 id="modal-title" style="margin: 0; font-size: 18px;">Tomar foto de boleta</h2>
         </div>
-        <button type="button" class="scanner-close-btn" data-close-modal>×</button>
+        <button type="button" class="scanner-close-btn" data-close-modal title="Cerrar">✕</button>
       </div>
 
       <div class="scanner-viewport-box">
@@ -4486,34 +4492,44 @@ function openReceiptScannerModal(defaultTarget = 'studio') {
           <div class="scanner-scan-line"></div>
           <p class="scanner-guideline-text">Encuadra la boleta o ticket de compra aquí</p>
         </div>
-        <div id="scanner-camera-error" class="scanner-error-overlay" hidden></div>
+        <div id="scanner-camera-error" class="scanner-error-overlay" style="display: none;"></div>
         <canvas id="scanner-capture-canvas" style="display:none;"></canvas>
       </div>
 
-      <!-- OCR Progress Bar Overlay -->
-      <div id="ocr-processing-overlay" class="ocr-processing-overlay" hidden>
+      <!-- OCR Progress Bar Overlay (Hidden by default until shutter is clicked) -->
+      <div id="ocr-processing-overlay" class="ocr-processing-overlay" style="display: none;">
         <div class="ocr-progress-box">
           <div class="ocr-spinner"></div>
           <strong id="ocr-status-title">Analizando boleta con OCR...</strong>
-          <p id="ocr-status-subtitle">Extrayendo texto, montos y productos con Tesseract.js</p>
+          <p id="ocr-status-subtitle">Extrayendo texto, montos y productos</p>
           <div class="ocr-progress-bar-wrap">
             <div id="ocr-progress-bar-fill" class="ocr-progress-bar-fill" style="width: 0%;"></div>
           </div>
           <span id="ocr-progress-percent">0%</span>
+          <button type="button" id="btn-cancel-ocr" class="secondary small-btn" style="margin-top: 8px; color: #fff; border-color: rgba(255,255,255,0.4);">
+            Ingresar manualmente
+          </button>
         </div>
       </div>
 
       <div class="scanner-control-bar">
-        <label class="secondary scanner-btn-icon" title="Cargar desde galería">
-          📁 Archivo
+        <label class="secondary scanner-btn-icon" title="Cargar desde galería o archivos">
+          📁 <span>Subir Archivo</span>
           <input type="file" accept="image/*" capture="environment" id="scanner-direct-file-input" style="display: none;" />
         </label>
-        <button type="button" class="scanner-shutter-btn" id="btn-scanner-capture" title="Capturar Foto">
+        <button type="button" class="scanner-shutter-btn" id="btn-scanner-capture" title="Capturar Foto y Leer Boleta">
           <span class="shutter-inner-circle"></span>
         </button>
-        <button type="button" class="secondary scanner-btn-icon" id="btn-scanner-flip" title="Cambiar Cámara">
-          🔄 Voltear
+        <button type="button" class="secondary scanner-btn-icon" id="btn-scanner-flip" title="Cambiar Cámara Frontal / Trasera">
+          🔄 <span>Voltear</span>
         </button>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-soft);">
+        <button type="button" class="secondary small-btn" data-close-modal>
+          Cancelar
+        </button>
+        <span style="font-size: 11px; color: var(--muted);">Presiona el botón blanco central para capturar</span>
       </div>
     </div>
   `);
@@ -4575,8 +4591,28 @@ async function processReceiptWithOcr(imageSource, defaultTarget) {
   const progressFill = document.getElementById('ocr-progress-bar-fill');
   const progressText = document.getElementById('ocr-progress-percent');
   const statusTitle = document.getElementById('ocr-status-title');
+  const cancelOcrBtn = document.getElementById('btn-cancel-ocr');
 
-  if (ocrOverlay) ocrOverlay.hidden = false;
+  if (ocrOverlay) {
+    ocrOverlay.style.display = 'flex';
+    ocrOverlay.hidden = false;
+  }
+
+  let cancelled = false;
+  if (cancelOcrBtn) {
+    cancelOcrBtn.onclick = () => {
+      cancelled = true;
+      if (ocrOverlay) ocrOverlay.style.display = 'none';
+      showReceiptConfirmationModal({
+        text: '',
+        detectedTotal: 0,
+        detectedVendor: 'Compra de Insumos',
+        detectedItems: [],
+        imageSource,
+        defaultTarget
+      });
+    };
+  }
 
   try {
     if (typeof Tesseract === 'undefined') {
@@ -4590,10 +4626,12 @@ async function processReceiptWithOcr(imageSource, defaultTarget) {
       });
     }
 
+    if (cancelled) return;
     if (statusTitle) statusTitle.textContent = 'Escaneando texto y montos...';
 
     const result = await Tesseract.recognize(imageSource, 'spa+eng', {
       logger: (m) => {
+        if (cancelled) return;
         if (m.status === 'recognizing text' && m.progress !== undefined) {
           const pct = Math.round(m.progress * 100);
           if (progressFill) progressFill.style.width = `${pct}%`;
@@ -4602,6 +4640,7 @@ async function processReceiptWithOcr(imageSource, defaultTarget) {
       }
     });
 
+    if (cancelled) return;
     const extractedText = result.data.text || '';
     console.log('[OCR RECEIPT RESULT TEXT]:\n', extractedText);
 
@@ -4611,6 +4650,7 @@ async function processReceiptWithOcr(imageSource, defaultTarget) {
 
     showReceiptConfirmationModal(parsedData);
   } catch (err) {
+    if (cancelled) return;
     console.error('[OCR ERROR]:', err);
     alert('No se pudo extraer el texto de la boleta automáticamente (' + err.message + '). Podrás ingresar los datos manualmente.');
     showReceiptConfirmationModal({

@@ -241,3 +241,4 @@ export function structureMeetingTranscript(rawText = '', kind = 'custom') {
 
   return structured;
 }
+
