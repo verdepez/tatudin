@@ -1474,6 +1474,7 @@ async function renderFinances() {
         <p class="lead">Control consolidado de ingresos esperados, abonos cobrados, liquidación de artistas y margen neto del estudio.</p>
       </div>
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="secondary" data-action="open-upload-screenshot">${icon('image')} <span>Leer Boleta / Captura</span></button>
         <button class="secondary" data-action="export-finances-csv">${icon('download')} <span>Exportar CSV</span></button>
         <button class="primary" data-action="new-transaction">${icon('plus')} <span>Registrar movimiento</span></button>
       </div>
@@ -4002,8 +4003,11 @@ async function renderInventory() {
 
     <!-- Top Action Bar -->
     <section class="actions inventory-top-actions">
-      <button class="primary" data-action="open-receipt-scanner">
-        ${icon('camera')} <span>Tomar foto de boleta (OCR)</span>
+      <button class="primary" data-action="open-upload-screenshot">
+        ${icon('image')} <span>Subir Foto / Captura</span>
+      </button>
+      <button class="secondary" data-action="open-receipt-scanner">
+        ${icon('camera')} <span>Usar Cámara (OCR)</span>
       </button>
       <button class="secondary" data-action="open-new-item-modal">
         ${icon('plus')} <span>Nuevo insumo</span>
@@ -4468,6 +4472,76 @@ async function openCamera(facingMode = 'environment') {
       errorEl.hidden = false;
     }
     if (overlayEl) overlayEl.hidden = true;
+  }
+}
+
+function openUploadScreenshotModal(defaultTarget = 'studio') {
+  openModal(`
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <p class="eyebrow">LECTURA DE BOLETAS Y COMPROBANTES</p>
+          <h2 id="modal-title" style="margin: 0; font-size: 20px;">Cargar Foto o Captura de Pantalla</h2>
+          <p style="font-size: 13px; color: var(--muted); margin: 4px 0 0 0;">
+            Sube o pega una imagen de tu boleta, factura o comprobante de transferencia para leer los montos con OCR.
+          </p>
+        </div>
+        <button type="button" class="scanner-close-btn" data-close-modal title="Cerrar">✕</button>
+      </div>
+
+      <!-- Drag & Drop / File Pick / Paste Area -->
+      <div class="screenshot-dropzone" id="screenshot-dropzone">
+        <div class="screenshot-dropzone-icon">🖼️</div>
+        <h3 class="screenshot-dropzone-title">Haz clic para elegir foto o arrastra tu archivo aquí</h3>
+        <p class="screenshot-dropzone-sub">
+          Formatos compatibles: JPG, PNG, WEBP, capturas de pantalla de celular o computador.
+        </p>
+        <div class="paste-badge-hint">
+          <span>📋 También puedes presionar <strong>Ctrl + V</strong> para pegar una captura</span>
+        </div>
+        <input type="file" accept="image/*" id="screenshot-dropzone-file-input" style="display: none;" />
+      </div>
+
+      <!-- Alternative options -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid var(--line-soft); flex-wrap: wrap; gap: 10px;">
+        <button type="button" class="secondary small-btn" data-action="open-receipt-scanner">
+          ${icon('camera')} <span>Prefiero usar la cámara en vivo</span>
+        </button>
+        <button type="button" class="secondary small-btn" data-close-modal>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  `);
+
+  const dropzone = document.getElementById('screenshot-dropzone');
+  const fileInput = document.getElementById('screenshot-dropzone-file-input');
+
+  if (dropzone && fileInput) {
+    dropzone.onclick = () => fileInput.click();
+
+    fileInput.onchange = (e) => {
+      if (e.target.files && e.target.files.length) {
+        handleFileInputOcr(e.target.files, defaultTarget);
+      }
+    };
+
+    dropzone.ondragover = (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    };
+
+    dropzone.ondragleave = () => {
+      dropzone.classList.remove('dragover');
+    };
+
+    dropzone.ondrop = (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files && e.dataTransfer.files.length) {
+        handleFileInputOcr(e.dataTransfer.files, defaultTarget);
+      }
+    };
   }
 }
 
@@ -6588,9 +6662,12 @@ document.addEventListener('click', async (event) => {
     const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
     return await render(currentActiveView);
   }
-  // Inventory action buttons
+  // Inventory & Finances receipt action buttons
+  if (event.target.closest('[data-action="open-upload-screenshot"]')) {
+    return openUploadScreenshotModal(inventoryCurrentTab === 'personal' ? 'personal' : 'studio');
+  }
   if (event.target.closest('[data-action="open-receipt-scanner"]')) {
-    return openReceiptScannerModal('studio');
+    return openReceiptScannerModal(inventoryCurrentTab === 'personal' ? 'personal' : 'studio');
   }
   if (event.target.closest('[data-action="open-new-item-modal"]')) {
     return openItemModal(null, inventoryCurrentTab === 'personal');
@@ -7095,6 +7172,28 @@ if ('serviceWorker' in navigator) {
     }
   });
 }
+
+// Global Clipboard Paste Listener (Ctrl+V screenshot / photo recognition)
+document.addEventListener('paste', (event) => {
+  const items = event.clipboardData?.items;
+  if (!items) return;
+
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type && items[i].type.indexOf('image') !== -1) {
+      const file = items[i].getAsFile();
+      if (file) {
+        event.preventDefault();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          stopCameraStream();
+          processReceiptWithOcr(e.target.result, inventoryCurrentTab === 'personal' ? 'personal' : 'studio');
+        };
+        reader.readAsDataURL(file);
+      }
+      break;
+    }
+  }
+});
 
 // Session verification and bootstrap
 if (!checkUrlHash()) {
