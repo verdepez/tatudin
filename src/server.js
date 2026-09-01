@@ -1908,6 +1908,112 @@ app.patch('/api/appointments/:id', requireAuth, async (request, response) => {
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
+// ---------------- SESSION TRANSCRIPTS & MEETING NOTES ----------------
+app.get('/api/appointments/:id/transcripts', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const result = await pool.query(`
+      SELECT st.*, u.full_name as author_name, u.email as author_email
+      FROM session_transcripts st
+      LEFT JOIN users u ON u.id = st.author_user_id
+      WHERE st.appointment_id = $1 AND st.studio_id = $2
+      ORDER BY st.created_at DESC
+    `, [Number(request.params.id), request.studioId]);
+    return response.json(result.rows);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/appointments/:id/transcripts', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const { title = 'Apuntes de Sesión', rawTranscript = '', structuredNotes = '', durationSeconds = 0, sessionKind = 'custom' } = request.body;
+  
+  if (!rawTranscript?.trim() && !structuredNotes?.trim()) {
+    return response.status(400).json({ error: 'El contenido de la transcripción o apuntes no puede estar vacío' });
+  }
+
+  try {
+    const apptCheck = await pool.query('SELECT id, category_id, title FROM appointments WHERE id = $1 AND studio_id = $2', [Number(request.params.id), request.studioId]);
+    if (!apptCheck.rowCount) {
+      return response.status(404).json({ error: 'Compromiso o cita no encontrada' });
+    }
+
+    const validKinds = ['custom', 'marketing', 'meeting', 'tattoo', 'space_rental', 'other'];
+    const kind = validKinds.includes(sessionKind) ? sessionKind : 'custom';
+
+    const result = await pool.query(`
+      INSERT INTO session_transcripts (
+        studio_id, appointment_id, author_user_id, session_kind, title, raw_transcript, structured_notes, duration_seconds
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *
+    `, [
+      request.studioId,
+      Number(request.params.id),
+      request.user.id,
+      kind,
+      (title || 'Apuntes de Sesión').trim(),
+      (rawTranscript || '').trim(),
+      (structuredNotes || '').trim(),
+      Math.max(0, Number(durationSeconds) || 0)
+    ]);
+
+    await logAuditEvent({
+      pool,
+      studioId: request.studioId,
+      userId: request.user.id,
+      action: 'appointments.transcript_created',
+      entityType: 'appointment',
+      entityId: Number(request.params.id),
+      details: { transcriptId: result.rows[0].id, title: result.rows[0].title },
+      req: request
+    });
+
+    return response.status(201).json(result.rows[0]);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/transcripts/:id', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const { title, rawTranscript, structuredNotes } = request.body;
+
+  try {
+    const result = await pool.query(`
+      UPDATE session_transcripts SET
+        title = COALESCE($1, title),
+        raw_transcript = COALESCE($2, raw_transcript),
+        structured_notes = COALESCE($3, structured_notes),
+        updated_at = NOW()
+      WHERE id = $4 AND studio_id = $5
+      RETURNING *
+    `, [
+      title !== undefined ? title.trim() : null,
+      rawTranscript !== undefined ? rawTranscript.trim() : null,
+      structuredNotes !== undefined ? structuredNotes.trim() : null,
+      Number(request.params.id),
+      request.studioId
+    ]);
+
+    if (!result.rowCount) return response.status(404).json({ error: 'Transcripción no encontrada' });
+    return response.json(result.rows[0]);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/transcripts/:id', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const result = await pool.query('DELETE FROM session_transcripts WHERE id = $1 AND studio_id = $2 RETURNING id', [Number(request.params.id), request.studioId]);
+    if (!result.rowCount) return response.status(404).json({ error: 'Transcripción no encontrada' });
+    return response.json({ ok: true, id: Number(request.params.id) });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
 // ---------------- CLIENTS ----------------
 app.get('/api/clients', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
@@ -3003,6 +3109,21 @@ async function ensureAuthSchema() {
     ip_address TEXT DEFAULT '',
     user_agent TEXT DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+
+  // 19. Session Transcripts (Voice-to-Text & Meeting Notes)
+  await safeExec('CREATE TABLE session_transcripts', `CREATE TABLE IF NOT EXISTS session_transcripts (
+    id SERIAL PRIMARY KEY,
+    studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+    appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+    author_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    session_kind TEXT NOT NULL DEFAULT 'custom' CHECK (session_kind IN ('custom', 'marketing', 'meeting', 'tattoo', 'space_rental', 'other')),
+    title TEXT NOT NULL DEFAULT 'Apuntes de Sesión',
+    raw_transcript TEXT NOT NULL DEFAULT '',
+    structured_notes TEXT NOT NULL DEFAULT '',
+    duration_seconds INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
 
   // Seed default categories

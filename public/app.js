@@ -683,6 +683,17 @@ function appointmentCard(item) {
         <p class="service-title">${secondaryTitle}</p>
       </div>
       <div class="appointment-actions">
+        <button type="button" class="voice-mic-btn"
+          data-action="open-voice-modal"
+          data-appt-id="${item.id}"
+          data-title="${encodeURIComponent(item.title || 'Sesión')}"
+          data-kind="${item.category_kind || 'custom'}"
+          data-cat-name="${encodeURIComponent(catName)}"
+          data-client-name="${encodeURIComponent(item.client_name || '')}"
+          title="Tomar apuntes / dictado de voz de la sesión">
+          <span>🎙️</span>
+        </button>
+
         ${cleanPhone ? `
           <button class="whatsapp-btn" data-action="whatsapp-reminder"
             data-phone="${cleanPhone}"
@@ -1199,6 +1210,18 @@ function openAppointmentOutcomeModal(appt) {
       <div style="font-size: 12px; font-weight: 700; color: var(--ink); margin-top: 4px;">
         Valor: ${money(price)} ${deposit > 0 ? `· Abono pagado: ${money(deposit)}` : ''}
       </div>
+    </div>
+
+    <div style="margin-bottom: 14px;">
+      <button type="button" class="voice-mic-btn" style="width: 100%; justify-content: center; padding: 9px 14px;"
+        data-action="open-voice-modal"
+        data-appt-id="${appt.id}"
+        data-title="${encodeURIComponent(appt.title || 'Sesión')}"
+        data-kind="${appt.category_kind || 'custom'}"
+        data-cat-name="${encodeURIComponent(appt.category_name || 'Compromiso')}"
+        data-client-name="${encodeURIComponent(appt.client_name || '')}">
+        <span>🎙️</span> <span>Tomar / Grabar Apuntes de Voz de esta Sesión</span>
+      </button>
     </div>
 
     <div class="outcome-options-list">
@@ -5563,8 +5586,288 @@ function openResetPasswordModal(token) {
   }
 }
 
+let activeSpeechTranscriber = null;
+
+async function openVoiceTranscriptModal({ apptId, title, kind, catName, clientName }) {
+  const decodedTitle = decodeURIComponent(title || 'Sesión');
+  const decodedCatName = decodeURIComponent(catName || 'Compromiso');
+  const decodedClientName = decodeURIComponent(clientName || '');
+  const sessionKind = kind || 'custom';
+
+  // Fetch past transcripts for this appointment
+  let pastTranscripts = [];
+  try {
+    pastTranscripts = await api(`/api/appointments/${apptId}/transcripts`);
+  } catch (e) {
+    console.warn('Could not fetch past transcripts:', e);
+  }
+
+  const isSupported = Boolean(window.TatutinSpeech?.SpeechTranscriber?.isSupported?.());
+
+  openModal(`
+    <div class="voice-session-container">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+        <div>
+          <p class="eyebrow">DICTADO & MINUTAS DE VOZ</p>
+          <h2 id="modal-title" style="margin: 0 0 4px 0; font-size: 20px;">Apuntes: ${decodedTitle}</h2>
+          <p style="font-size: 13px; color: var(--muted); margin: 0;">
+            ${decodedCatName} ${decodedClientName ? `· Cliente: <strong>${decodedClientName}</strong>` : ''}
+          </p>
+        </div>
+      </div>
+
+      <!-- Live Recording Control Bar -->
+      <div class="voice-recording-bar">
+        <div class="voice-status-pill">
+          <span class="voice-status-dot" id="voice-status-dot"></span>
+          <span id="voice-status-label" style="font-size: 13px;">Listo para grabar</span>
+        </div>
+
+        <div class="voice-timer" id="voice-timer">00:00</div>
+
+        <div class="voice-controls-group">
+          ${isSupported ? `
+            <button type="button" class="primary small-btn" id="btn-voice-start" style="background: #ef4444; border-color: #ef4444;">
+              <span>🎙️ Iniciar Dictado</span>
+            </button>
+            <button type="button" class="secondary small-btn" id="btn-voice-pause" style="display: none;">
+              <span>⏸️ Pausar</span>
+            </button>
+            <button type="button" class="secondary small-btn" id="btn-voice-stop" style="display: none; color: #dc2626;">
+              <span>⏹️ Detener</span>
+            </button>
+          ` : `
+            <span style="font-size: 12px; color: #f59e0b;">(Web Speech no soportado en este navegador; puedes escribir apuntes directamente)</span>
+          `}
+        </div>
+      </div>
+
+      <!-- Real-time Text Area -->
+      <div class="transcript-textarea-wrap">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <label style="font-size: 12px; font-weight: 700; color: var(--muted); margin: 0;">
+            Texto de la Sesión / Minuta
+          </label>
+          <span class="interim-live-badge" id="interim-live-badge"></span>
+        </div>
+        <textarea id="voice-transcript-input" class="transcript-textarea" placeholder="Presiona 'Iniciar Dictado' y habla con naturalidad sobre el diseño, cambios, acuerdos o tareas... o escribe tus apuntes directamente aquí."></textarea>
+      </div>
+
+      <!-- Quick Actions Row -->
+      <div class="voice-tools-row">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="secondary small-btn" id="btn-structure-notes" title="Formatear como minuta con temas, acuerdos y tareas">
+            <span>⚡ Estructurar en Minuta</span>
+          </button>
+          <button type="button" class="secondary small-btn" id="btn-copy-transcript" title="Copiar texto al portapapeles">
+            <span>📋 Copiar</span>
+          </button>
+          <button type="button" class="secondary small-btn" id="btn-clear-transcript" style="color: var(--muted);" title="Limpiar texto">
+            <span>🗑️ Limpiar</span>
+          </button>
+        </div>
+
+        <button type="button" class="primary small-btn" id="btn-save-transcript" style="font-weight: 700;">
+          <span>💾 Guardar Apuntes</span>
+        </button>
+      </div>
+
+      <!-- Past Transcripts History for this appointment -->
+      <div style="margin-top: 14px; border-top: 1px solid var(--line-soft); padding-top: 14px;">
+        <h3 style="font-size: 14px; margin: 0 0 10px 0; color: var(--ink);">📜 Historial de Apuntes de esta Cita</h3>
+        <div id="past-transcripts-list">
+          ${pastTranscripts.length > 0 ? pastTranscripts.map((t) => `
+            <article class="transcript-history-card">
+              <div class="transcript-history-header">
+                <h4 class="transcript-history-title">${t.title || 'Apuntes de Sesión'}</h4>
+                <span class="transcript-history-date">${new Date(t.created_at).toLocaleString('es-CL')} ${t.author_name ? `· Por ${t.author_name}` : ''}</span>
+              </div>
+              <div class="transcript-history-content">${t.structured_notes || t.raw_transcript}</div>
+              <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
+                <button type="button" class="secondary small" data-action="load-past-transcript" data-content="${encodeURIComponent(t.structured_notes || t.raw_transcript)}">Cargar en editor</button>
+                <button type="button" class="secondary small" data-action="delete-past-transcript" data-id="${t.id}" style="color: #dc2626;">Eliminar</button>
+              </div>
+            </article>
+          `).join('') : '<p style="font-size: 13px; color: var(--muted); margin: 0;">No hay apuntes o minutas guardadas previamente para este compromiso.</p>'}
+        </div>
+      </div>
+    </div>
+  `);
+
+  const textarea = document.querySelector('#voice-transcript-input');
+  const interimBadge = document.querySelector('#interim-live-badge');
+  const statusDot = document.querySelector('#voice-status-dot');
+  const statusLabel = document.querySelector('#voice-status-label');
+  const timerEl = document.querySelector('#voice-timer');
+  const btnStart = document.querySelector('#btn-voice-start');
+  const btnPause = document.querySelector('#btn-voice-pause');
+  const btnStop = document.querySelector('#btn-voice-stop');
+
+  // Initialize Speech Transcriber instance
+  if (isSupported && window.TatutinSpeech?.SpeechTranscriber) {
+    if (activeSpeechTranscriber) {
+      activeSpeechTranscriber.stop();
+    }
+    activeSpeechTranscriber = new window.TatutinSpeech.SpeechTranscriber();
+
+    btnStart?.addEventListener('click', () => {
+      activeSpeechTranscriber.start({
+        initialText: textarea.value,
+        onResult: (finalText) => {
+          textarea.value = finalText;
+          if (interimBadge) interimBadge.textContent = '';
+        },
+        onInterim: (interimText) => {
+          if (interimBadge) interimBadge.textContent = interimText ? `Escuchando: "${interimText}..."` : '';
+        },
+        onTimerTick: (secs, formatted) => {
+          if (timerEl) timerEl.textContent = formatted;
+        },
+        onStatusChange: (status) => {
+          if (status === 'recording') {
+            statusDot.className = 'voice-status-dot active';
+            statusLabel.textContent = '🔴 Grabando / Dictando...';
+            btnStart.style.display = 'none';
+            btnPause.style.display = 'inline-flex';
+            btnStop.style.display = 'inline-flex';
+          } else if (status === 'paused') {
+            statusDot.className = 'voice-status-dot paused';
+            statusLabel.textContent = '⏸️ En pausa';
+            btnPause.textContent = '▶️ Reanudar';
+          } else {
+            statusDot.className = 'voice-status-dot';
+            statusLabel.textContent = 'Listo para grabar';
+            btnStart.style.display = 'inline-flex';
+            btnPause.style.display = 'none';
+            btnStop.style.display = 'none';
+            btnPause.textContent = '⏸️ Pausar';
+            if (interimBadge) interimBadge.textContent = '';
+          }
+        },
+        onError: (err) => {
+          statusLabel.textContent = `Aviso: ${err}`;
+        }
+      });
+    });
+
+    btnPause?.addEventListener('click', () => {
+      if (activeSpeechTranscriber.isPaused) {
+        activeSpeechTranscriber.resume();
+      } else {
+        activeSpeechTranscriber.pause();
+      }
+    });
+
+    btnStop?.addEventListener('click', () => {
+      activeSpeechTranscriber.stop();
+    });
+  }
+
+  // Structuring button
+  document.querySelector('#btn-structure-notes')?.addEventListener('click', () => {
+    const raw = textarea.value.trim();
+    if (!raw) return;
+    const structured = window.TatutinSpeech?.structureMeetingTranscript
+      ? window.TatutinSpeech.structureMeetingTranscript(raw, sessionKind)
+      : raw;
+    textarea.value = structured;
+  });
+
+  // Copy button
+  document.querySelector('#btn-copy-transcript')?.addEventListener('click', async () => {
+    const text = textarea.value.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      const btn = document.querySelector('#btn-copy-transcript');
+      if (btn) {
+        const prev = btn.innerHTML;
+        btn.innerHTML = '<span>✓ Copiado</span>';
+        setTimeout(() => { btn.innerHTML = prev; }, 2000);
+      }
+    } catch (e) {
+      alert('Texto copiado');
+    }
+  });
+
+  // Clear button
+  document.querySelector('#btn-clear-transcript')?.addEventListener('click', () => {
+    if (confirm('¿Limpiar el texto actual?')) {
+      textarea.value = '';
+      if (activeSpeechTranscriber) activeSpeechTranscriber.setText('');
+    }
+  });
+
+  // Save button
+  document.querySelector('#btn-save-transcript')?.addEventListener('click', async () => {
+    const content = textarea.value.trim();
+    if (!content) {
+      alert('Por favor ingresa o dicta apuntes antes de guardar.');
+      return;
+    }
+
+    if (activeSpeechTranscriber?.isRecording) {
+      activeSpeechTranscriber.stop();
+    }
+
+    const saveBtn = document.querySelector('#btn-save-transcript');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Guardando...';
+
+    try {
+      await api(`/api/appointments/${apptId}/transcripts`, {
+        method: 'POST',
+        body: JSON.stringify({
+          title: `Minuta de ${decodedTitle}`,
+          rawTranscript: content,
+          structuredNotes: content,
+          durationSeconds: activeSpeechTranscriber?.elapsedSeconds || 0,
+          sessionKind
+        })
+      });
+
+      // Update past transcripts UI
+      openVoiceTranscriptModal({ apptId, title, kind, catName, clientName });
+    } catch (err) {
+      alert('Error al guardar apuntes: ' + err.message);
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Guardar Apuntes';
+    }
+  });
+
+  // Past transcripts action handlers
+  document.querySelectorAll('[data-action="load-past-transcript"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const pastContent = decodeURIComponent(btn.dataset.content || '');
+      textarea.value = pastContent;
+      if (activeSpeechTranscriber) activeSpeechTranscriber.setText(pastContent);
+    });
+  });
+
+  document.querySelectorAll('[data-action="delete-past-transcript"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const transcriptId = btn.dataset.id;
+      if (confirm('¿Eliminar este apunte guardado?')) {
+        await api(`/api/transcripts/${transcriptId}`, { method: 'DELETE' });
+        openVoiceTranscriptModal({ apptId, title, kind, catName, clientName });
+      }
+    });
+  });
+}
+
 // Global Event Listeners
 document.addEventListener('click', async (event) => {
+  const voiceBtn = event.target.closest('[data-action="open-voice-modal"]');
+  if (voiceBtn) {
+    const { apptId, title, kind, catName, clientName } = voiceBtn.dataset;
+    return openVoiceTranscriptModal({
+      apptId,
+      title,
+      kind,
+      catName,
+      clientName
+    });
+  }
   const forgotBtn = event.target.closest('[data-action="open-forgot-password"]');
   if (forgotBtn) {
     return openForgotPasswordModal();

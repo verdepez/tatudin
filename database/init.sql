@@ -153,6 +153,20 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS session_transcripts (
+  id SERIAL PRIMARY KEY,
+  studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+  appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+  author_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  session_kind TEXT NOT NULL DEFAULT 'custom' CHECK (session_kind IN ('custom', 'marketing', 'meeting', 'tattoo', 'space_rental', 'other')),
+  title TEXT NOT NULL DEFAULT 'Apuntes de Sesión',
+  raw_transcript TEXT NOT NULL DEFAULT '',
+  structured_notes TEXT NOT NULL DEFAULT '',
+  duration_seconds INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Demo studio
 INSERT INTO studios (id, name)
 VALUES (1, 'Ink Sanctuary')

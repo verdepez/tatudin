@@ -442,4 +442,58 @@ test('Public Portfolio: Fetch public landing page by handle /api/public/portfoli
   assert.ok(Array.isArray(res.data.gallery));
 });
 
+let createdTranscriptId = null;
+
+test('Session Transcripts: Create transcript /api/appointments/:id/transcripts', async () => {
+  assert.ok(firstAppointmentId, 'Appointment must exist');
+  const res = await request(`/api/appointments/${firstAppointmentId}/transcripts`, {
+    method: 'POST',
+    body: JSON.stringify({
+      title: 'Minuta Reunión Diseño Dragón',
+      rawTranscript: 'El cliente solicita dragón oriental en antebrazo izquierdo con sombras suaves',
+      structuredNotes: '📌 Temas: Dragón oriental.\n🤝 Acuerdos: Sombras suaves.\n⚡ Pasos: Boceto para el viernes.',
+      durationSeconds: 120,
+      sessionKind: 'custom'
+    })
+  });
+
+  assert.equal(res.status, 201);
+  assert.ok(res.data.id);
+  assert.equal(res.data.appointment_id, firstAppointmentId);
+  assert.equal(res.data.title, 'Minuta Reunión Diseño Dragón');
+  createdTranscriptId = res.data.id;
+});
+
+test('Session Transcripts: List transcripts for appointment', async () => {
+  const res = await request(`/api/appointments/${firstAppointmentId}/transcripts`);
+  assert.equal(res.status, 200);
+  assert.ok(Array.isArray(res.data));
+  assert.ok(res.data.length >= 1);
+  assert.equal(res.data[0].id, createdTranscriptId);
+  assert.ok(res.data[0].author_name);
+});
+
+test('Session Transcripts: Patch transcript /api/transcripts/:id', async () => {
+  const res = await request(`/api/transcripts/${createdTranscriptId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      title: 'Minuta Reunión Diseño Dragón Actualizada',
+      structuredNotes: '📌 Temas: Dragón oriental neo.\n🤝 Acuerdos: Escamas oscuras.\n⚡ Pasos: Listo para agendar.'
+    })
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.data.title, 'Minuta Reunión Diseño Dragón Actualizada');
+});
+
+test('Session Transcripts: Delete transcript /api/transcripts/:id', async () => {
+  const res = await request(`/api/transcripts/${createdTranscriptId}`, {
+    method: 'DELETE'
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.data.ok, true);
+});
+
+
 
