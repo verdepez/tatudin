@@ -208,10 +208,10 @@ export function structureMeetingTranscript(rawText = '', kind = 'custom') {
     }
   });
 
-  let structured = `📋 **Minuta de Sesión: ${categoryTitle}**\n\n`;
+  let structured = `**Minuta de Sesión: ${categoryTitle}**\n\n`;
 
   if (generalNotes.length > 0) {
-    structured += `📌 **Temas Tratados:**\n`;
+    structured += `**Temas Tratados:**\n`;
     generalNotes.forEach(item => {
       structured += `• ${item}.\n`;
     });
@@ -219,7 +219,7 @@ export function structureMeetingTranscript(rawText = '', kind = 'custom') {
   }
 
   if (agreements.length > 0) {
-    structured += `🤝 **Acuerdos & Decisiones:**\n`;
+    structured += `**Acuerdos & Decisiones:**\n`;
     agreements.forEach(item => {
       structured += `• ${item}.\n`;
     });
@@ -227,7 +227,7 @@ export function structureMeetingTranscript(rawText = '', kind = 'custom') {
   }
 
   if (nextSteps.length > 0) {
-    structured += `⚡ **Próximos Pasos & Acciones:**\n`;
+    structured += `**Próximos Pasos & Acciones:**\n`;
     nextSteps.forEach(item => {
       structured += `• [ ] ${item}.\n`;
     });
@@ -236,7 +236,7 @@ export function structureMeetingTranscript(rawText = '', kind = 'custom') {
 
   // If no specific category split was triggered, output organized bullets
   if (agreements.length === 0 && nextSteps.length === 0) {
-    structured = `📋 **Minuta de ${categoryTitle}**\n\n📌 **Puntos Clave:**\n` + sentences.map(s => `• ${s}.`).join('\n') + `\n\n🤝 **Acuerdos:**\n• (Sin acuerdos explícitos registrados)\n\n⚡ **Próximos Pasos:**\n• [ ] Revisar requerimientos.\n`;
+    structured = `**Minuta de ${categoryTitle}**\n\n**Puntos Clave:**\n` + sentences.map(s => `• ${s}.`).join('\n') + `\n\n**Acuerdos:**\n• (Sin acuerdos explícitos registrados)\n\n**Próximos Pasos:**\n• [ ] Revisar requerimientos.\n`;
   }
 
   return structured;

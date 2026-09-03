@@ -114,7 +114,9 @@ const ICONS = {
   alert: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
   package: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
   link2: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
-  mail: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>'
+  mail: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>',
+  key: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3"/></svg>'
 };
 
 const icon = (name) => ICONS[name] || '';
@@ -1199,8 +1201,8 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                       <div class="event-block-header">
                         <span class="event-time">${formatTime(a.starts_at)}</span>
                         <div style="display: flex; align-items: center; gap: 4px;">
-                          ${a.external_source ? `<span class="event-sync-badge" title="Enlazado con ${a.external_calendar_name || 'calendario externo'}">🔗</span>` : ''}
-                          ${a.status === 'completed' ? `<span class="event-status-tag">✓</span>` : ''}
+                          ${a.external_source ? `<span class="event-sync-badge" title="Enlazado con ${a.external_calendar_name || 'calendario externo'}">${icon('link')}</span>` : ''}
+                          ${a.status === 'completed' ? `<span class="event-status-tag" style="display: inline-flex; align-items: center; justify-content: center;">${icon('check')}</span>` : ''}
                         </div>
                       </div>
                       <strong class="event-block-title">${a.title}</strong>
@@ -1257,8 +1259,8 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                     <div class="event-block-header">
                       <span class="event-time">${formatTime(a.starts_at)}</span>
                       <div style="display: flex; align-items: center; gap: 4px;">
-                        ${a.external_source ? `<span class="event-sync-badge" title="Enlazado">🔗</span>` : ''}
-                        ${a.status === 'completed' ? `<span class="event-status-tag">✓</span>` : ''}
+                        ${a.external_source ? `<span class="event-sync-badge" title="Enlazado">${icon('link')}</span>` : ''}
+                        ${a.status === 'completed' ? `<span class="event-status-tag" style="display: inline-flex; align-items: center; justify-content: center;">${icon('check')}</span>` : ''}
                       </div>
                     </div>
                     <strong class="event-block-title">${a.title}</strong>
@@ -1311,8 +1313,8 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                     <div class="event-block-header">
                       <span class="event-time">${formatTime(a.starts_at)}</span>
                       <div style="display: flex; align-items: center; gap: 4px;">
-                        ${a.external_source ? `<span class="event-sync-badge" title="Enlazado">🔗</span>` : ''}
-                        ${a.status === 'completed' ? `<span class="event-status-tag">✓</span>` : ''}
+                        ${a.external_source ? `<span class="event-sync-badge" title="Enlazado">${icon('link')}</span>` : ''}
+                        ${a.status === 'completed' ? `<span class="event-status-tag" style="display: inline-flex; align-items: center; justify-content: center;">${icon('check')}</span>` : ''}
                       </div>
                     </div>
                     <strong class="event-block-title">${a.title}</strong>
@@ -1853,11 +1855,11 @@ async function openCalendarSyncModal() {
         const count = (text.match(/BEGIN:VEVENT/gi) || []).length;
         if (count > 0) {
           previewBox.style.display = 'block';
-          previewText.textContent = `✓ ${count} evento(s) detectados listos para importar y enlazar con Tatudin.`;
+          previewText.textContent = `${count} evento(s) detectados listos para importar y enlazar con Tatudin.`;
           submitBtn.disabled = false;
         } else {
           previewBox.style.display = 'block';
-          previewText.textContent = `⚠ No se detectaron bloques VEVENT en el archivo.`;
+          previewText.textContent = 'No se detectaron bloques VEVENT en el archivo.';
           submitBtn.disabled = true;
         }
       };
@@ -2646,7 +2648,7 @@ async function renderAgenda() {
             <div class="cal-selected-day-banner">
               <span style="display: inline-flex; align-items: center; gap: 6px;">${icon('calendar')} Filtrando por día seleccionado: <strong>${agendaFilter.date}</strong></span>
               <button class="text-button" data-clear-date style="color: #6D28D9; font-size: 11.5px; font-weight: 800;">
-                ✕ Ver todo el período
+                Ver todo el período
               </button>
             </div>
           ` : ''}
@@ -2699,7 +2701,7 @@ async function renderAgenda() {
                 <strong>${activeFiltersLabels.join(' · ')}</strong>
               </div>
               <button class="text-button" data-clear-all-filters style="color: var(--accent); font-size: 11.5px; font-weight: 800;">
-                ✕ Quitar filtros
+                Quitar filtros
               </button>
             </div>
           ` : ''}
@@ -2780,7 +2782,7 @@ function openAgendaFilterModal() {
 
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
         <button type="button" class="text-button" data-action="reset-agenda-filter-form" style="color: var(--red); font-size: 13px; font-weight: 700;">
-          ✕ Restablecer filtros
+          Restablecer filtros
         </button>
         <div style="display: flex; gap: 8px;">
           <button type="button" class="secondary" data-close-modal>Cerrar</button>
@@ -2855,8 +2857,8 @@ function openAppointmentOutcomeModal(appt) {
       <!-- Opción 1: Listo / Efectuada -->
       <div class="outcome-option-card card-completed ${currentStatus === 'completed' ? 'active' : ''}">
         <div class="outcome-option-header">
-          <div class="outcome-option-title" style="color: #059669;">
-            <span style="display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #d1fae5; color: #059669;">✓</span>
+          <div class="outcome-option-title" style="color: #059669; display: flex; align-items: center; gap: 6px;">
+            <span style="display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #d1fae5; color: #059669;">${icon('check')}</span>
             Listo / Efectuada
           </div>
           ${currentStatus === 'completed' ? `<span class="badge" style="background: #10b981; color: #fff;">Actual</span>` : ''}
@@ -2872,8 +2874,8 @@ function openAppointmentOutcomeModal(appt) {
       <!-- Opción 2: Reprogramada -->
       <div class="outcome-option-card card-rescheduled ${currentStatus === 'rescheduled' ? 'active' : ''}">
         <div class="outcome-option-header">
-          <div class="outcome-option-title" style="color: #0284c7;">
-            <span style="display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #e0f2fe; color: #0284c7;">${icon('calendar')}</span>
+          <div class="outcome-option-title" style="color: #0284c7; display: flex; align-items: center; gap: 6px;">
+            <span style="display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #e0f2fe; color: #0284c7;">${icon('calendar')}</span>
             Reprogramada
           </div>
           ${currentStatus === 'rescheduled' ? `<span class="badge" style="background: #0284c7; color: #fff;">Actual</span>` : ''}
@@ -2892,8 +2894,8 @@ function openAppointmentOutcomeModal(appt) {
       <!-- Opción 3: Cancelada / No llegó -->
       <div class="outcome-option-card card-cancelled ${currentStatus === 'cancelled' || currentStatus === 'no_show' ? 'active' : ''}">
         <div class="outcome-option-header">
-          <div class="outcome-option-title" style="color: #dc2626;">
-            <span style="display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #fee2e2; color: #dc2626;">✕</span>
+          <div class="outcome-option-title" style="color: #dc2626; display: flex; align-items: center; gap: 6px;">
+            <span style="display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #fee2e2; color: #dc2626;">${icon('alert')}</span>
             Cancelada / No llegó
           </div>
           ${currentStatus === 'cancelled' || currentStatus === 'no_show' ? `<span class="badge" style="background: #ef4444; color: #fff;">Actual</span>` : ''}
@@ -3334,7 +3336,7 @@ async function renderSettings() {
                       <h3>${m.full_name}</h3>
                       <span class="artist-chip ${rInfo.class}">${rInfo.label}</span>
                       <span class="member-status ${m.status}">${m.status === 'active' ? 'Activo' : 'Inactivo'}</span>
-                      ${m.has_app_access ? '<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 11px; font-weight: 700;">📱 Acceso App</span>' : '<span class="badge" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; font-size: 11px; font-weight: 700;">🔒 Sin acceso app</span>'}
+                      ${m.has_app_access ? `<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">${icon('phone')} <span>Acceso App</span></span>` : `<span class="badge" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">${icon('lock')} <span>Sin acceso app</span></span>`}
                     </div>
                     <div class="setting-item-action" style="display: flex; gap: 6px; align-items: center;">
                       ${m.role === 'nomad' ? `
@@ -3353,8 +3355,9 @@ async function renderSettings() {
                     <button class="edit-commission-tag" data-action="edit-agreement" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-agreement-type="${agreeType}" data-commission="${m.commission_percent || 70}" data-fixed-amount="${m.fixed_amount || 0}" data-has-app-access="${m.has_app_access !== false}" data-responsible-id="${m.responsible_user_id || ''}" title="Editar modalidad de acuerdo y permisos">
                       ${agreementIcon} ${agreementLabel}
                     </button>
-                    ${m.responsible_name ? `<span class="member-meta" style="color: var(--ink); font-size: 11.5px;">👤 A cargo: <strong>${m.responsible_name}</strong></span>` : ''}
-                    <span class="member-meta">${m.email} · ${m.appointment_count || 0} citas</span>
+                    ${m.responsible_name ? `<span class="member-meta" style="color: var(--ink); font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px;">${icon('user')} A cargo: <strong>${m.responsible_name}</strong></span>` : ''}
+                    <span class="member-meta" style="display: inline-flex; align-items: center; gap: 4px;">${icon('mail')} <span>${m.email}</span></span>
+                    <span class="member-meta" style="display: inline-flex; align-items: center; gap: 4px;">${icon('calendar')} <span>${m.appointment_count || 0} citas</span></span>
                   </div>
                 </div>
               </article>
@@ -3636,7 +3639,7 @@ async function renderCommunications() {
         </div>
         <div class="form-grid">
           <div class="portfolio-banner-card" style="margin-bottom: 0;">
-            <strong style="color: var(--ink); font-size: 14.5px; display: block; margin-bottom: 6px;">📅 1. Confirmación de Cita & Seña</strong>
+            <strong style="color: var(--ink); font-size: 14.5px; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">${icon('calendar')} <span>1. Confirmación de Cita & Seña</span></strong>
             <p class="lead" style="font-size: 12.5px; margin-bottom: 10px;">"¡Hola [Cliente]! Tu cita para [Servicio] en ${studioName} el [Fecha] ha sido confirmada. Recuerda que tu abono asegura tu bloque."</p>
             <button class="secondary small-btn" data-copy-text="¡Hola! Tu cita en ${studioName} ha sido confirmada. Te esperamos con la mejor energía para tu sesión.">
               ${icon('link')} <span>Copiar plantilla</span>
@@ -3644,7 +3647,7 @@ async function renderCommunications() {
           </div>
 
           <div class="portfolio-banner-card" style="margin-bottom: 0;">
-            <strong style="color: var(--ink); font-size: 14.5px; display: block; margin-bottom: 6px;">⏰ 2. Recordatorio 24 Horas Antes</strong>
+            <strong style="color: var(--ink); font-size: 14.5px; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">${icon('clock')} <span>2. Recordatorio 24 Horas Antes</span></strong>
             <p class="lead" style="font-size: 12.5px; margin-bottom: 10px;">"¡Hola [Cliente]! Te recordamos que mañana es tu sesión de tatuaje. Recomendaciones: hidratarse bien, comer antes y no consumir alcohol."</p>
             <button class="secondary small-btn" data-copy-text="¡Hola! Te recordamos que mañana es tu cita de tatuaje en ${studioName}. Recuerda comer bien y descansar adecuadamente.">
               ${icon('link')} <span>Copiar plantilla</span>
@@ -3652,7 +3655,7 @@ async function renderCommunications() {
           </div>
 
           <div class="portfolio-banner-card" style="margin-bottom: 0;">
-            <strong style="color: var(--ink); font-size: 14.5px; display: block; margin-bottom: 6px;">🩹 3. Cuidados Posteriores (Aftercare)</strong>
+            <strong style="color: var(--ink); font-size: 14.5px; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">${icon('shield')} <span>3. Cuidados Posteriores (Aftercare)</span></strong>
             <p class="lead" style="font-size: 12.5px; margin-bottom: 10px;">"¡Gracias por tatuarte con nosotros! Para curar tu pieza: lavar 3 veces al día con jabón neutro, aplicar crema cicatrizante y no exponer al sol."</p>
             <button class="secondary small-btn" data-copy-text="¡Gracias por tatuarte en ${studioName}! Cuida tu tatuaje lavando con jabón neutro y crema cicatrizante 3 veces al día.">
               ${icon('link')} <span>Copiar plantilla</span>
@@ -3673,21 +3676,21 @@ async function renderCommunications() {
         
         <div class="members-list">
           <div class="setting-item">
-            <div class="setting-item-icon space-icon-bubble">✓</div>
+            <div class="setting-item-icon space-icon-bubble" style="display: grid; place-items: center;">${icon('check')}</div>
             <div class="setting-item-body">
               <div class="setting-item-top"><div class="setting-item-title"><h3>Alergias a pigmentos, tintas o látex</h3></div></div>
               <div class="setting-item-sub"><span class="member-meta">Identifica reactividad previa a tintas rojas o insumos médicos.</span></div>
             </div>
           </div>
           <div class="setting-item">
-            <div class="setting-item-icon space-icon-bubble">✓</div>
+            <div class="setting-item-icon space-icon-bubble" style="display: grid; place-items: center;">${icon('check')}</div>
             <div class="setting-item-body">
               <div class="setting-item-top"><div class="setting-item-title"><h3>Trastornos de coagulación y medicamentos</h3></div></div>
               <div class="setting-item-sub"><span class="member-meta">Registro de consumo de anticoagulantes, aspirina o hemofilia.</span></div>
             </div>
           </div>
           <div class="setting-item">
-            <div class="setting-item-icon space-icon-bubble">✓</div>
+            <div class="setting-item-icon space-icon-bubble" style="display: grid; place-items: center;">${icon('check')}</div>
             <div class="setting-item-body">
               <div class="setting-item-top"><div class="setting-item-title"><h3>Condiciones de la piel y cicatrización</h3></div></div>
               <div class="setting-item-sub"><span class="member-meta">Historial de queloides, psoriasis, eczemas o dermatitis en la zona.</span></div>
@@ -3893,7 +3896,7 @@ async function renderManagers() {
                       <h3>${m.full_name}</h3>
                       <span class="artist-chip ${rInfo.class}">${rInfo.label}</span>
                       <span class="member-status ${m.status}">${m.status === 'active' ? 'Activo' : 'Inactivo'}</span>
-                      ${m.has_app_access ? '<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 11px; font-weight: 700;">📱 Acceso App</span>' : '<span class="badge" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; font-size: 11px; font-weight: 700;">🔒 Sin acceso app</span>'}
+                      ${m.has_app_access ? `<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">${icon('phone')} <span>Acceso App</span></span>` : `<span class="badge" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">${icon('lock')} <span>Sin acceso app</span></span>`}
                     </div>
                     <div class="setting-item-action" style="display: flex; gap: 6px; align-items: center;">
                       ${m.role === 'nomad' ? `
@@ -3912,8 +3915,9 @@ async function renderManagers() {
                     <button class="edit-commission-tag" data-action="edit-agreement" data-membership-id="${m.membership_id}" data-artist-name="${m.full_name}" data-agreement-type="${agreeType}" data-commission="${m.commission_percent || 70}" data-fixed-amount="${m.fixed_amount || 0}" data-has-app-access="${m.has_app_access !== false}" data-responsible-id="${m.responsible_user_id || ''}" title="Editar modalidad de acuerdo y permisos">
                       ${agreementIcon} ${agreementLabel}
                     </button>
-                    ${m.responsible_name ? `<span class="member-meta" style="color: var(--ink); font-size: 11.5px;">👤 A cargo: <strong>${m.responsible_name}</strong></span>` : ''}
-                    <span class="member-meta">${m.email} · ${m.appointment_count || 0} citas registradas</span>
+                    ${m.responsible_name ? `<span class="member-meta" style="color: var(--ink); font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px;">${icon('user')} A cargo: <strong>${m.responsible_name}</strong></span>` : ''}
+                    <span class="member-meta" style="display: inline-flex; align-items: center; gap: 4px;">${icon('mail')} <span>${m.email}</span></span>
+                    <span class="member-meta" style="display: inline-flex; align-items: center; gap: 4px;">${icon('calendar')} <span>${m.appointment_count || 0} citas registradas</span></span>
                   </div>
                 </div>
               </article>
@@ -4634,11 +4638,11 @@ function renderBackofficeUIKitTab() {
           <div class="uikit-sandbox-block">
             <h4 class="uikit-sandbox-title">5. Disparadores de Prueba</h4>
             <div class="uikit-components-flow">
-              <button type="button" class="secondary" id="btn-uikit-test-modal">
-                🪟 Probar Modal con Nuevo Tema
+              <button type="button" class="secondary" id="btn-uikit-test-modal" style="display: inline-flex; align-items: center; gap: 6px;">
+                ${icon('eye')} <span>Probar Modal con Nuevo Tema</span>
               </button>
-              <button type="button" class="secondary" id="btn-uikit-test-alert">
-                🔔 Probar Notificación / Alerta
+              <button type="button" class="secondary" id="btn-uikit-test-alert" style="display: inline-flex; align-items: center; gap: 6px;">
+                ${icon('bell')} <span>Probar Notificación / Alerta</span>
               </button>
             </div>
           </div>
@@ -4768,7 +4772,7 @@ function attachUIKitEventListeners() {
 }`;
       navigator.clipboard.writeText(css).then(() => {
         const orig = btnExport.textContent;
-        btnExport.textContent = '✓ ¡CSS Copiado!';
+        btnExport.textContent = '¡CSS Copiado!';
         setTimeout(() => { btnExport.textContent = orig; }, 2000);
       });
     };
@@ -4783,7 +4787,7 @@ function attachUIKitEventListeners() {
           method: 'PATCH',
           body: JSON.stringify({ theme: activeThemeTokens })
         });
-        alert('🎉 ¡Tema maestro guardado con éxito! Se aplicará de forma global en la plataforma.');
+        alert('¡Tema maestro guardado con éxito! Se aplicará de forma global en la plataforma.');
       } catch (err) {
         alert('Tema guardado localmente en este navegador (' + err.message + ')');
       }
@@ -4813,7 +4817,7 @@ function attachUIKitEventListeners() {
   const btnTestAlert = document.getElementById('btn-uikit-test-alert');
   if (btnTestAlert) {
     btnTestAlert.onclick = () => {
-      alert('🔔 Notificación de prueba: El sistema de diseño se encuentra 100% reactivo.');
+      alert('Notificación de prueba: El sistema de diseño se encuentra 100% reactivo.');
     };
   }
 
@@ -4825,7 +4829,7 @@ function attachUIKitEventListeners() {
       const span = item.querySelector('span');
       if (span) {
         const orig = span.textContent;
-        span.textContent = '✓ Copiado';
+        span.textContent = 'Copiado';
         setTimeout(() => { span.textContent = orig; }, 1500);
       }
     };
@@ -4944,7 +4948,7 @@ function renderBackofficeStatsTab(data) {
                   <div class="setting-item-top">
                     <div class="setting-item-title">
                       <h3>${u.full_name}</h3>
-                      ${u.is_superadmin ? '<span class="bo-badge root">⚡ ROOT</span>' : '<span class="bo-badge independent">Usuario</span>'}
+                      ${u.is_superadmin ? `<span class="bo-badge root" style="display: inline-flex; align-items: center; gap: 4px;">${icon('zap')} <span>ROOT</span></span>` : '<span class="bo-badge independent">Usuario</span>'}
                     </div>
                   </div>
                   <div class="setting-item-sub">
@@ -6141,7 +6145,7 @@ function openPublicPortfolioLanding(customData = null) {
         <h1 class="public-artist-name">${artistName}</h1>
         <p class="public-artist-tagline">${portfolio.tagline || 'Fine Line & Micro-realism Specialist'}</p>
         <p class="public-artist-bio">${portfolio.bio || 'Transforming stories into permanent art. Especialista en piezas personalizadas con los más altos estándares de bioseguridad.'}</p>
-        <p class="public-artist-location">${portfolio.location ? `📍 ${portfolio.location}` : '📍 Santiago, Chile'}</p>
+        <p class="public-artist-location" style="display: flex; align-items: center; gap: 5px;">${icon('mapPin')} <span>${portfolio.location || 'Santiago, Chile'}</span></p>
 
         <!-- Public Action CTA Buttons matching Screen 4 from Figma -->
         <div class="public-cta-buttons-stack">
@@ -6472,7 +6476,7 @@ function renderInventoryMovementsTab(movements) {
           </thead>
           <tbody>
             ${movements.map((m) => {
-              const typeMeta = MOVEMENT_TYPES[m.movement_type] || { label: m.movement_type, icon: '📦', class: 'mov-default', badge: m.movement_type };
+              const typeMeta = MOVEMENT_TYPES[m.movement_type] || { label: m.movement_type, class: 'mov-default', badge: m.movement_type };
               const dateFormatted = new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(m.created_at));
               const unit = INVENTORY_UNITS[m.item_unit] || m.item_unit || 'u';
 
@@ -6489,8 +6493,8 @@ function renderInventoryMovementsTab(movements) {
                 <tr>
                   <td class="cell-date">${dateFormatted}</td>
                   <td>
-                    <span class="movement-pill ${typeMeta.class}">
-                      <span>${typeMeta.icon}</span>
+                    <span class="movement-pill ${typeMeta.class}" style="display: inline-flex; align-items: center; gap: 5px;">
+                      ${icon('package')}
                       <span>${typeMeta.badge}</span>
                     </span>
                   </td>
@@ -6504,7 +6508,7 @@ function renderInventoryMovementsTab(movements) {
                   <td class="cell-party">${partyDesc}</td>
                   <td class="cell-amount">${Number(m.total_amount) > 0 ? money(m.total_amount) : '—'}</td>
                   <td class="cell-notes">
-                    ${m.appointment_title ? `<span class="appointment-tag">📅 ${m.appointment_title}</span>` : ''}
+                    ${m.appointment_title ? `<span class="appointment-tag" style="display: inline-flex; align-items: center; gap: 4px;">${icon('calendar')} <span>${m.appointment_title}</span></span>` : ''}
                     ${m.notes ? `<span>${m.notes}</span>` : ''}
                   </td>
                 </tr>
@@ -6715,10 +6719,10 @@ async function openCamera(facingMode = 'environment') {
     if (errorEl) {
       errorEl.innerHTML = `
         <div class="camera-fallback-msg">
-          <p>⚠️ Tu navegador o dispositivo no soporta acceso directo a la cámara por WebRTC.</p>
-          <label class="primary camera-file-upload-btn">
-            📁 Seleccionar o tomar foto de boleta
-            <input type="file" accept="image/*" capture="environment" id="scanner-file-fallback" style="display:none;" />
+          <p style="display: flex; align-items: center; justify-content: center; gap: 6px;">${icon('alert')} <span>Tu navegador o dispositivo no soporta acceso directo a la cámara por WebRTC.</span></p>
+          <label class="primary camera-file-upload-btn" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+            ${icon('camera')} <span>Seleccionar o tomar foto de boleta</span>
+            <input type="file" accept="image/*" id="scanner-file-fallback" style="display:none;" />
           </label>
         </div>
       `;
@@ -6749,10 +6753,10 @@ async function openCamera(facingMode = 'environment') {
     if (errorEl) {
       errorEl.innerHTML = `
         <div class="camera-fallback-msg">
-          <p>⚠️ No se pudo acceder a la cámara (${err.message || 'Permiso denegado'}).</p>
-          <label class="primary camera-file-upload-btn">
-            📁 Cargar foto desde tu galería o cámara
-            <input type="file" accept="image/*" capture="environment" id="scanner-file-fallback" style="display:none;" />
+          <p style="display: flex; align-items: center; justify-content: center; gap: 6px;">${icon('alert')} <span>No se pudo acceder a la cámara (${err.message || 'Permiso denegado'}).</span></p>
+          <label class="primary camera-file-upload-btn" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+            ${icon('camera')} <span>Cargar foto desde tu galería o cámara</span>
+            <input type="file" accept="image/*" id="scanner-file-fallback" style="display:none;" />
           </label>
         </div>
       `;
@@ -7556,8 +7560,8 @@ function editAgreementModal(membershipId, artistName, currentAgreementType = 'co
       </div>
 
       <details style="background: var(--surface-high); border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 10px 14px; margin-top: 10px;">
-        <summary style="font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--ink);">
-          📋 Instrucciones de Onboarding y Guía de Guest
+        <summary style="font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--ink); display: flex; align-items: center; gap: 6px;">
+          ${icon('clipboard')} <span>Instrucciones de Onboarding y Guía de Guest</span>
         </summary>
         <div style="display: grid; gap: 10px; margin-top: 10px;">
           <label style="font-size: 12px;">Insumos incluidos en el arriendo
@@ -7809,7 +7813,7 @@ async function userProfileModal() {
     <!-- Active Guest Agreements section if subscribed/registered -->
     ${guestAgreements.length > 0 ? `
       <div style="background: var(--surface-high); border: 1.5px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; margin: 12px 0 16px;">
-        <p class="eyebrow" style="margin-bottom: 6px; color: var(--ink);">💼 MIS PACTOS Y ACUERDOS CON ESTUDIOS</p>
+        <p class="eyebrow" style="margin-bottom: 6px; color: var(--ink); display: flex; align-items: center; gap: 6px;">${icon('fileText')} <span>MIS PACTOS Y ACUERDOS CON ESTUDIOS</span></p>
         <div style="display: grid; gap: 10px;">
           ${guestAgreements.map((ag) => {
             let agreeBadge = '';
@@ -7834,8 +7838,8 @@ async function userProfileModal() {
                   ${ag.responsible_name ? ` · Persona a cargo: <strong>${ag.responsible_name}</strong>` : ''}
                 </div>
                 ${ag.supplies_included ? `
-                  <div style="font-size: 11px; color: var(--muted); margin-top: 4px; border-top: 1px dashed var(--line-soft); padding-top: 4px;">
-                    🧴 Insumos incluidos: ${ag.supplies_included}
+                  <div style="font-size: 11px; color: var(--muted); margin-top: 4px; border-top: 1px dashed var(--line-soft); padding-top: 4px; display: flex; align-items: center; gap: 5px;">
+                    ${icon('box')} <span>Insumos incluidos: ${ag.supplies_included}</span>
                   </div>
                 ` : ''}
               </div>
@@ -7885,7 +7889,7 @@ function openForgotPasswordModal() {
   openModal(`
     <div style="display: flex; flex-direction: column; gap: 14px;">
       <div style="text-align: center; margin-bottom: 8px;">
-        <span style="font-size: 32px;">🔑</span>
+        <div style="display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; background: var(--surface-high); margin: 0 auto 8px; color: var(--ink);">${icon('key')}</div>
         <h3 style="margin: 8px 0 4px 0; font-size: 18px;">Recuperar contraseña</h3>
         <p style="font-size: 13px; color: var(--muted); margin: 0;">Ingresa tu correo electrónico registrado y te enviaremos las instrucciones para restablecer tu clave.</p>
       </div>
@@ -7933,7 +7937,7 @@ function openResetPasswordModal(token) {
   openModal(`
     <div style="display: flex; flex-direction: column; gap: 14px;">
       <div style="text-align: center; margin-bottom: 8px;">
-        <span style="font-size: 32px;">🔐</span>
+        <div style="display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; background: var(--surface-high); margin: 0 auto 8px; color: var(--ink);">${icon('lock')}</div>
         <h3 style="margin: 8px 0 4px 0; font-size: 18px;">Crea tu nueva contraseña</h3>
         <p style="font-size: 13px; color: var(--muted); margin: 0;">Ingresa tu nueva clave de acceso de al menos 8 caracteres.</p>
       </div>
@@ -8131,21 +8135,21 @@ async function openVoiceTranscriptModal({ apptId, title, kind, catName, clientNa
         onStatusChange: (status) => {
           if (status === 'recording') {
             statusDot.className = 'voice-status-dot active';
-            statusLabel.textContent = '🔴 Grabando / Dictando...';
+            statusLabel.textContent = 'Grabando / Dictando...';
             btnStart.style.display = 'none';
             btnPause.style.display = 'inline-flex';
             btnStop.style.display = 'inline-flex';
           } else if (status === 'paused') {
             statusDot.className = 'voice-status-dot paused';
-            statusLabel.textContent = '⏸️ En pausa';
-            btnPause.textContent = '▶️ Reanudar';
+            statusLabel.textContent = 'En pausa';
+            btnPause.textContent = 'Reanudar';
           } else {
             statusDot.className = 'voice-status-dot';
             statusLabel.textContent = 'Listo para grabar';
             btnStart.style.display = 'inline-flex';
             btnPause.style.display = 'none';
             btnStop.style.display = 'none';
-            btnPause.textContent = '⏸️ Pausar';
+            btnPause.textContent = 'Pausar';
             if (interimBadge) interimBadge.textContent = '';
           }
         },
@@ -8187,7 +8191,7 @@ async function openVoiceTranscriptModal({ apptId, title, kind, catName, clientNa
       const btn = document.querySelector('#btn-copy-transcript');
       if (btn) {
         const prev = btn.innerHTML;
-        btn.innerHTML = '<span>✓ Copiado</span>';
+        btn.innerHTML = '<span>Copiado</span>';
         setTimeout(() => { btn.innerHTML = prev; }, 2000);
       }
     } catch (e) {
@@ -8236,7 +8240,7 @@ async function openVoiceTranscriptModal({ apptId, title, kind, catName, clientNa
     } catch (err) {
       alert('Error al guardar apuntes: ' + err.message);
       saveBtn.disabled = false;
-      saveBtn.textContent = '💾 Guardar Apuntes';
+      saveBtn.textContent = 'Guardar Apuntes';
     }
   });
 
@@ -8441,7 +8445,7 @@ document.addEventListener('click', async (event) => {
   // Backoffice trigger purge production
   const boPurgeBtn = event.target.closest('[data-action="bo-trigger-purge"]');
   if (boPurgeBtn) {
-    const confirmInput = prompt('⚠️ ADVERTENCIA CRÍTICA:\nEsta acción eliminará permanentemente todas las citas, clientes, transacciones, boxes y usuarios de prueba, dejando la base de datos limpia para PRODUCCIÓN.\n\nEscribe exactamente "LIMPIAR" para confirmar:');
+    const confirmInput = prompt('ADVERTENCIA CRÍTICA:\nEsta acción eliminará permanentemente todas las citas, clientes, transacciones, boxes y usuarios de prueba, dejando la base de datos limpia para PRODUCCIÓN.\n\nEscribe exactamente "LIMPIAR" para confirmar:');
     if (confirmInput !== 'LIMPIAR') {
       alert('Operación cancelada. No se modificó ningún dato.');
       return;
@@ -8475,7 +8479,7 @@ document.addEventListener('click', async (event) => {
     const dateFormatted = new Date(startsAt).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
     const timeFormatted = formatTime(startsAt);
     const studio = activeStudio?.name || 'nuestro estudio';
-    const text = `¡Hola ${clientName}! 👋 Te recordamos tu cita de tatuaje "${title}" en ${studio} agendada para el ${dateFormatted} a las ${timeFormatted} hrs${artistName ? ` con ${artistName}` : ''}${spaceName ? ` en ${spaceName}` : ''}. ¡Nos vemos pronto! Por favor confirma tu asistencia. ✨`;
+    const text = `¡Hola ${clientName}! Te recordamos tu cita de tatuaje "${title}" en ${studio} agendada para el ${dateFormatted} a las ${timeFormatted} hrs${artistName ? ` con ${artistName}` : ''}${spaceName ? ` en ${spaceName}` : ''}. ¡Nos vemos pronto! Por favor confirma tu asistencia.`;
     const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
     return;
@@ -8500,7 +8504,7 @@ document.addEventListener('click', async (event) => {
     const text = decodeURIComponent(copyGuideBtn.dataset.text || '');
     navigator.clipboard?.writeText(text);
     const orig = copyGuideBtn.innerHTML;
-    copyGuideBtn.innerHTML = '✓ ¡Copiado!';
+    copyGuideBtn.innerHTML = '¡Copiado!';
     setTimeout(() => { copyGuideBtn.innerHTML = orig; }, 2000);
     return;
   }
@@ -8601,7 +8605,7 @@ document.addEventListener('click', async (event) => {
   if (event.target.closest('[data-action="test-consent-form"]')) {
     openModal(`
       <div class="client-detail-header">
-        <div class="initials large">📋</div>
+        <div class="initials large" style="display: flex; align-items: center; justify-content: center;">${icon('clipboard')}</div>
         <div>
           <p class="eyebrow">CONSENTIMIENTO INFORMADO</p>
           <h2>Cuestionario de Salud</h2>
