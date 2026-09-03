@@ -7636,22 +7636,31 @@ textarea {
 .cal-inject-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  justify-content: center;
+  padding: 3px 6px;
+  min-width: 30px;
+  height: 28px;
   border-radius: 6px;
-  font-size: 11px;
-  font-weight: 700;
   background: var(--surface);
   border: 1px solid var(--line-soft);
-  color: var(--ink);
   cursor: pointer;
   transition: all 0.14s ease;
+  flex-shrink: 0;
+  line-height: 0;
 }
 
 .cal-inject-btn:hover {
   background: var(--surface-high);
   border-color: var(--line-mid, #cbd5e1);
   transform: translateY(-1px);
+}
+
+.cal-inject-icon-img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
 }
 
 .event-sync-badge {

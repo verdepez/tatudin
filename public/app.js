@@ -751,8 +751,8 @@ function appointmentCard(item) {
           data-starts-at="${item.starts_at}"
           data-duration="${item.duration_minutes || 120}"
           data-notes="${encodeURIComponent(item.notes || '')}"
-          title="Inyectar / añadir a Google Calendar" style="display: inline-flex; align-items: center; gap: 4px;">
-          ${icon('calendar')} <span>Google</span>
+          title="Inyectar / añadir a Google Calendar">
+          <img src="https://www.uc3m.es/sdic/media/sdic/img/mediana/original/im_icono-google-calendar/google_calendar_icon-300.png" onerror="this.src='/assets/google-calendar.png'" alt="Google Calendar" class="cal-inject-icon-img" />
         </button>
         <button type="button" class="cal-inject-btn"
           data-action="download-appt-ics"
@@ -760,8 +760,8 @@ function appointmentCard(item) {
           data-starts-at="${item.starts_at}"
           data-duration="${item.duration_minutes || 120}"
           data-notes="${encodeURIComponent(item.notes || '')}"
-          title="Añadir a Apple Calendar (.ics)" style="display: inline-flex; align-items: center; gap: 4px;">
-          ${icon('calendar')} <span>Apple</span>
+          title="Añadir a Apple Calendar (.ics)">
+          <img src="https://cdn.sanity.io/images/tia9na8b/production/01469f8fdc249a006e5c1ae1baccb775fc125cae-400x400.png" onerror="this.src='/assets/apple-calendar.png'" alt="Apple Calendar" class="cal-inject-icon-img" />
         </button>
 
         <button type="button" class="voice-mic-btn"
@@ -1742,7 +1742,9 @@ async function openCalendarSyncModal() {
             <!-- Apple Calendar card -->
             <div class="sync-service-card">
               <div class="sync-service-info">
-                <div class="sync-service-icon" style="background: #111827; color: #ffffff;">${icon('calendar')}</div>
+                <div class="sync-service-icon" style="background: transparent;">
+                  <img src="https://cdn.sanity.io/images/tia9na8b/production/01469f8fdc249a006e5c1ae1baccb775fc125cae-400x400.png" onerror="this.src='/assets/apple-calendar.png'" alt="Apple Calendar" style="width: 32px; height: 32px; object-fit: contain;" />
+                </div>
                 <div>
                   <strong style="font-size: 13.5px;">Apple Calendar (Mac, iPhone, iPad)</strong>
                   <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--muted);">Suscripción nativa con 1 clic en la app Calendario de iOS y macOS.</p>
@@ -1756,7 +1758,9 @@ async function openCalendarSyncModal() {
             <!-- Google Calendar card -->
             <div class="sync-service-card">
               <div class="sync-service-info">
-                <div class="sync-service-icon" style="background: #4285F4; color: #ffffff;">${icon('calendar')}</div>
+                <div class="sync-service-icon" style="background: transparent;">
+                  <img src="https://www.uc3m.es/sdic/media/sdic/img/mediana/original/im_icono-google-calendar/google_calendar_icon-300.png" onerror="this.src='/assets/google-calendar.png'" alt="Google Calendar" style="width: 32px; height: 32px; object-fit: contain;" />
+                </div>
                 <div>
                   <strong style="font-size: 13.5px;">Google Calendar (Web y Android)</strong>
                   <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--muted);">Añade tu agenda de Tatudin directamente a tus calendarios de Google.</p>
