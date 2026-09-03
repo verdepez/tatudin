@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tatudin-shell-v21';
+const CACHE_NAME = 'tatudin-shell-v22';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',

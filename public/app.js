@@ -1486,7 +1486,7 @@ function newQuickTaskModal() {
         method: 'POST',
         body: JSON.stringify({
           title: fd.get('title'),
-          startsAt: fd.get('startsAt'),
+          startsAt: fd.get('startsAt') ? new Date(fd.get('startsAt')).toISOString() : null,
           durationMinutes: Number(fd.get('durationMinutes') || 60),
           notes: fd.get('notes') || 'Tarea / Bloqueo personal',
           categoryId: blockCat?.id || null,
@@ -1625,7 +1625,7 @@ async function openPublicBookingModal(slug) {
         const formData = new FormData(form);
         const bDate = formData.get('bookingDate');
         const bTime = formData.get('bookingTime');
-        const startsAt = `${bDate}T${bTime}:00`;
+        const startsAt = new Date(`${bDate}T${bTime}:00`).toISOString();
 
         await api(`/api/public/schedules/${slug}/book`, {
           method: 'POST',
@@ -9298,6 +9298,7 @@ document.addEventListener('submit', async (event) => {
         method: 'POST',
         body: JSON.stringify({
           ...body,
+          startsAt: body.startsAt ? new Date(body.startsAt).toISOString() : null,
           categoryId: body.categoryId ? Number(body.categoryId) : null,
           clientId: body.clientId ? Number(body.clientId) : null,
           artistId: body.artistId ? Number(body.artistId) : null,

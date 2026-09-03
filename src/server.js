@@ -1289,8 +1289,8 @@ async function checkAppointmentConflict(studioId, startsAt, durationMinutes, art
     LEFT JOIN spaces sp ON sp.id = a.space_id
     WHERE a.studio_id = $1
       AND a.status <> 'cancelled'
-      AND a.starts_at < ($2::timestamptz + $3::interval)
-      AND (a.starts_at + (a.duration_minutes || ' minutes')::interval) > $2::timestamptz
+      AND a.starts_at < ((CASE WHEN $2 ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $2::timestamptz ELSE ($2::timestamp AT TIME ZONE 'America/Santiago') END) + $3::interval)
+      AND (a.starts_at + (a.duration_minutes || ' minutes')::interval) > (CASE WHEN $2 ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $2::timestamptz ELSE ($2::timestamp AT TIME ZONE 'America/Santiago') END)
   `;
   if (excludeAppointmentId) {
     params.push(Number(excludeAppointmentId));
@@ -1896,7 +1896,9 @@ app.post('/api/appointments', requireAuth, async (request, response) => {
     const result = await pool.query(`
       INSERT INTO appointments
       (studio_id, category_id, client_id, artist_id, space_id, title, notes, starts_at, duration_minutes, status, price, deposit)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 
+        CASE WHEN $8 ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $8::timestamptz ELSE ($8::timestamp AT TIME ZONE 'America/Santiago') END,
+        $9, $10, $11, $12)
       RETURNING *
     `, [request.studioId, catId, validClientId, artistId ? Number(artistId) : null, spaceId ? Number(spaceId) : null, title.trim(), notes.trim(), startsAt, Math.max(15, Number(durationMinutes || 60)), status, Number(price || 0), Number(deposit || 0)]);
     
@@ -1928,7 +1930,11 @@ app.patch('/api/appointments/:id', requireAuth, async (request, response) => {
       space_id = CASE WHEN $4::integer IS NOT NULL THEN (CASE WHEN $4 = -1 THEN NULL ELSE $4 END) ELSE space_id END,
       title = COALESCE($5, title),
       notes = COALESCE($6, notes),
-      starts_at = COALESCE($7::timestamptz, starts_at),
+      starts_at = CASE 
+        WHEN $7 IS NULL THEN starts_at 
+        WHEN $7 ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $7::timestamptz 
+        ELSE ($7::timestamp AT TIME ZONE 'America/Santiago') 
+      END,
       duration_minutes = COALESCE($8::integer, duration_minutes),
       status = COALESCE($9, status),
       price = COALESCE($10::numeric, price),
@@ -2321,7 +2327,9 @@ app.post('/api/public/schedules/:slug/book', publicApiRateLimiter, async (reques
     const newAppt = await pool.query(`
       INSERT INTO appointments
         (studio_id, category_id, client_id, artist_id, title, notes, starts_at, duration_minutes, status, price, deposit)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'confirmed', 0, 0)
+      VALUES ($1, $2, $3, $4, $5, $6, 
+        CASE WHEN $7 ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $7::timestamptz ELSE ($7::timestamp AT TIME ZONE 'America/Santiago') END,
+        $8, 'confirmed', 0, 0)
       RETURNING *
     `, [
       schedule.studio_id,
