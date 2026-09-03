@@ -144,6 +144,11 @@ function getCsrfCookie() {
   return match ? decodeURIComponent(match[2]) : '';
 }
 
+const apiCache = new Map();
+function clearApiCache() {
+  apiCache.clear();
+}
+
 const api = async (url, options = {}) => {
   const method = (options.method || 'GET').toUpperCase();
   const csrfToken = getCsrfCookie();
@@ -152,6 +157,16 @@ const api = async (url, options = {}) => {
     ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     ...(options.headers || {})
   };
+
+  // Instant in-memory micro-cache for zero-waiting view switching
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    apiCache.clear();
+  } else if (method === 'GET' && !options.skipCache) {
+    const cached = apiCache.get(url);
+    if (cached && (Date.now() - cached.time < 12000)) {
+      return JSON.parse(JSON.stringify(cached.data));
+    }
+  }
 
   if (!navigator.onLine && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     if (window.TatutinOffline?.enqueueOfflineRequest) {
@@ -174,6 +189,9 @@ const api = async (url, options = {}) => {
       throw new Error(text || `Error ${response.status}: No se pudo procesar la solicitud`);
     }
     if (!response.ok) throw new Error(data.error || 'No se pudo completar la operación');
+    if (method === 'GET' && !options.skipCache) {
+      apiCache.set(url, { time: Date.now(), data: JSON.parse(JSON.stringify(data)) });
+    }
     return data;
   } catch (err) {
     if (!navigator.onLine && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && window.TatutinOffline?.enqueueOfflineRequest) {
@@ -814,29 +832,98 @@ function emptyState(title, text) {
   return `<div class="empty"><h3>${title}</h3><p>${text}</p></div>`;
 }
 
+// ==========================================================================
+// Fluid Screen Micro-Transitions & Nano-Progress Bar
+// ==========================================================================
+
+function startRouteProgress() {
+  let bar = document.getElementById('route-progress-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'route-progress-bar';
+    document.body.appendChild(bar);
+  }
+  bar.classList.remove('done');
+  void bar.offsetWidth; // force reflow
+  bar.classList.add('active');
+}
+
+function finishRouteProgress() {
+  const bar = document.getElementById('route-progress-bar');
+  if (bar) {
+    bar.classList.remove('active');
+    bar.classList.add('done');
+    setTimeout(() => {
+      bar.classList.remove('done');
+    }, 320);
+  }
+}
+
+async function transitionView(updateCallback, options = {}) {
+  startRouteProgress();
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const supportsVT = typeof document.startViewTransition === 'function' && !prefersReduced && options.animate !== false;
+
+  try {
+    if (supportsVT) {
+      const transition = document.startViewTransition(async () => {
+        await updateCallback();
+      });
+      await transition.updateCallbackDone;
+      finishRouteProgress();
+      await transition.finished;
+    } else {
+      if (!prefersReduced && app) {
+        app.classList.remove('view-enter-transition');
+        void app.offsetWidth;
+      }
+      await updateCallback();
+      if (!prefersReduced && app) {
+        app.classList.add('view-enter-transition');
+      }
+      finishRouteProgress();
+    }
+  } catch (err) {
+    console.warn('[VIEW-TRANSITION] Fallback:', err);
+    await updateCallback();
+    finishRouteProgress();
+  }
+}
+
 let currentAppView = 'dashboard';
 
-async function render(view = 'dashboard') {
+async function render(view = 'dashboard', options = {}) {
   closeMobileDrawer();
+  const prevView = currentAppView;
   currentAppView = view;
+
+  // Immediate 0ms visual feedback on navigation links
   document.querySelectorAll('[data-view]').forEach((link) => {
     link.classList.toggle('active', link.dataset.view === view);
   });
 
-  try {
-    if (view === 'agenda') return await renderAgenda();
-    if (view === 'schedule-configurator') return await renderScheduleConfigurator();
-    if (view === 'clientes') return await renderClients();
-    if (view === 'comunicaciones') return await renderCommunications();
-    if (view === 'finanzas') return await renderFinances();
-    if (view === 'inventario' || view === 'inventory') return await renderInventory();
-    if (view === 'artistas' || view === 'artists') return await renderArtists();
-    if (view === 'portafolio') return await renderPortfolio();
-    if (view === 'integraciones') return await renderIntegrations();
-    if (view === 'managers') return await renderManagers();
-    if (view === 'ajustes') return await renderSettings();
-    if (view === 'terminos') return renderTermsAndConditions(false);
-    if (view === 'backoffice') return await renderBackoffice();
+  return await transitionView(async () => {
+    // Reset scroll smoothly on view change
+    if (prevView !== view) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      const canvas = document.querySelector('.canvas');
+      if (canvas) canvas.scrollTop = 0;
+    }
+
+    try {
+      if (view === 'agenda') return await renderAgenda();
+      if (view === 'schedule-configurator') return await renderScheduleConfigurator();
+      if (view === 'clientes') return await renderClients();
+      if (view === 'comunicaciones') return await renderCommunications();
+      if (view === 'finanzas') return await renderFinances();
+      if (view === 'inventario' || view === 'inventory') return await renderInventory();
+      if (view === 'artistas' || view === 'artists') return await renderArtists();
+      if (view === 'portafolio') return await renderPortfolio();
+      if (view === 'integraciones') return await renderIntegrations();
+      if (view === 'managers') return await renderManagers();
+      if (view === 'ajustes') return await renderSettings();
+      if (view === 'terminos') return renderTermsAndConditions(false);
+      if (view === 'backoffice') return await renderBackoffice();
 
     const data = await api('/api/dashboard');
     activeStudio = data.studio || activeStudio;
@@ -996,6 +1083,7 @@ async function render(view = 'dashboard') {
       </section>
     `;
   }
+  }, options);
 }
 
 function renderDayIndicators(dayData, isMonthView = false) {
@@ -8370,7 +8458,9 @@ document.addEventListener('click', async (event) => {
   // Backoffice tab navigation
   const boTabBtn = event.target.closest('[data-bo-tab]');
   if (boTabBtn) {
-    return await renderBackoffice(boTabBtn.dataset.boTab);
+    return await transitionView(async () => {
+      await renderBackoffice(boTabBtn.dataset.boTab);
+    });
   }
 
   // Backoffice toggle feature microsite
@@ -8679,9 +8769,11 @@ document.addEventListener('click', async (event) => {
     });
     const content = document.querySelector('#portfolio-tab-view-container');
     if (content && portfolioData) {
-      content.innerHTML = portfolioCurrentTab === 'profile' 
-        ? renderPortfolioProfileTab(portfolioData.portfolio) 
-        : renderPortfolioGalleryTab(portfolioData.portfolio, portfolioData.gallery);
+      return await transitionView(async () => {
+        content.innerHTML = portfolioCurrentTab === 'profile' 
+          ? renderPortfolioProfileTab(portfolioData.portfolio) 
+          : renderPortfolioGalleryTab(portfolioData.portfolio, portfolioData.gallery);
+      });
     }
     return;
   }
@@ -8937,12 +9029,12 @@ document.addEventListener('click', async (event) => {
   if (event.target.closest('[data-action="open-agenda-filter-modal"]')) return openAgendaFilterModal();
   if (event.target.closest('[data-close-modal]') || event.target === modal) return closeModal();
 
-  // Calendar View mode toggle (week / month)
+  // Calendar View switcher
   const calViewBtn = event.target.closest('[data-cal-view]');
   if (calViewBtn) {
     agendaFilter.viewMode = calViewBtn.dataset.calView;
     agendaFilter.date = null;
-    return await renderAgenda();
+    return await transitionView(() => renderAgenda());
   }
 
   // Calendar Navigation controls
@@ -8955,7 +9047,7 @@ document.addEventListener('click', async (event) => {
       agendaFilter.currentDate = d;
     }
     agendaFilter.date = null;
-    return await renderAgenda();
+    return await transitionView(() => renderAgenda());
   }
   if (event.target.closest('[data-action="cal-next"]')) {
     if (agendaFilter.viewMode === 'month') {
@@ -8966,12 +9058,12 @@ document.addEventListener('click', async (event) => {
       agendaFilter.currentDate = d;
     }
     agendaFilter.date = null;
-    return await renderAgenda();
+    return await transitionView(() => renderAgenda());
   }
   if (event.target.closest('[data-action="cal-today"]')) {
     agendaFilter.currentDate = new Date();
     agendaFilter.date = formatDateISO(new Date());
-    return await renderAgenda();
+    return await transitionView(() => renderAgenda());
   }
 
   // Category filter in agenda
@@ -8979,7 +9071,7 @@ document.addEventListener('click', async (event) => {
   if (catBtn) {
     const targetCatId = catBtn.dataset.selectCategory;
     agendaFilter.categoryId = String(agendaFilter.categoryId) === String(targetCatId) ? 'all' : targetCatId;
-    return await renderAgenda();
+    return await transitionView(() => renderAgenda());
   }
 
   // Delete custom category
@@ -8997,11 +9089,11 @@ document.addEventListener('click', async (event) => {
   if (dateBtn) {
     const selectedDate = dateBtn.dataset.selectDate;
     agendaFilter.date = agendaFilter.date === selectedDate ? null : selectedDate;
-    return await renderAgenda();
+    return await transitionView(() => renderAgenda());
   }
   if (event.target.closest('[data-clear-date]')) {
     agendaFilter.date = null;
-    return await renderAgenda();
+    return await transitionView(() => renderAgenda());
   }
   if (event.target.closest('[data-clear-all-filters]')) {
     agendaFilter.artistId = 'all';
@@ -9009,7 +9101,7 @@ document.addEventListener('click', async (event) => {
     agendaFilter.categoryId = 'all';
     agendaFilter.status = 'all';
     agendaFilter.date = null;
-    return await renderAgenda();
+    return await transitionView(() => renderAgenda());
   }
 
   // Toggle member status
@@ -9080,14 +9172,14 @@ document.addEventListener('click', async (event) => {
   const invTabBtn = event.target.closest('[data-inv-tab]');
   if (invTabBtn) {
     inventoryCurrentTab = invTabBtn.dataset.invTab;
-    return renderInventory();
+    return await transitionView(() => renderInventory());
   }
 
   // Inventory category filter
   const invCatBtn = event.target.closest('[data-inv-cat-filter]');
   if (invCatBtn) {
     inventoryCategoryFilter = invCatBtn.dataset.invCatFilter;
-    return renderInventory();
+    return await transitionView(() => renderInventory());
   }
 
   // Quick item action buttons

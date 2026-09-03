@@ -7823,4 +7823,128 @@ textarea {
   flex-wrap: wrap;
 }
 
+/* ==========================================================================
+   Fluid Screen Micro-Transitions & Nano-Progress Bar
+   ========================================================================== */
+
+:root {
+  /* Isolate view transitions strictly to #app so sidebar, topbar & mobile nav stay fixed */
+  view-transition-name: none;
+}
+
+#app {
+  view-transition-name: app-screen;
+  min-height: 100%;
+}
+
+/* 1. Ultra-thin Nano Route Progress Bar for Instant 0ms Visual Confirmation */
+#route-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  background: linear-gradient(90deg, #7C3AED, #9333EA, #C026D3, #EC4899);
+  box-shadow: 0 0 10px rgba(147, 51, 234, 0.55);
+  z-index: 999999;
+  pointer-events: none;
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 220ms cubic-bezier(0.1, 0.9, 0.2, 1), opacity 140ms ease;
+  view-transition-name: none;
+}
+
+#route-progress-bar.active {
+  opacity: 1;
+  transform: scaleX(0.72);
+}
+
+#route-progress-bar.done {
+  transform: scaleX(1);
+  opacity: 0;
+  transition: transform 120ms ease-out, opacity 180ms ease 80ms;
+}
+
+/* 2. Native View Transitions API Specifications (Chrome 111+, Edge 111+, Safari 18+, Firefox 144+) */
+::view-transition-group(app-screen) {
+  animation-duration: 220ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+::view-transition-old(app-screen) {
+  animation: 110ms cubic-bezier(0.4, 0, 1, 1) both tatudinScreenExit;
+}
+
+::view-transition-new(app-screen) {
+  animation: 220ms cubic-bezier(0.16, 1, 0.3, 1) both tatudinScreenEnter;
+}
+
+@keyframes tatudinScreenExit {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.996);
+  }
+}
+
+@keyframes tatudinScreenEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 3. Universal CSS Microanimation Fallback for standard DOM updates */
+.view-enter-transition {
+  animation: tatudinScreenEnter 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}
+
+/* Modal Card Fluid Scale Micro-Transition */
+.modal-card {
+  position: relative;
+  width: min(100%, 520px);
+  max-height: min(90vh, 90dvh);
+  overflow-y: auto;
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  background: var(--canvas);
+  box-shadow: 0 20px 50px rgba(9, 4, 28, 0.25);
+  animation: modalPopIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes modalPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Strict User Accessibility & Reduced Motion Respect */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  .view-enter-transition,
+  .modal-card,
+  #route-progress-bar {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+
 
