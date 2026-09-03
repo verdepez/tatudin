@@ -4006,3 +4006,20 @@ ensureAuthSchema()
   .catch((error) => {
     console.warn('[DB] Database initialization notice (server is online):', error.message || error);
   });
+
+// Graceful shutdown handling for Railway & Docker SIGTERM / SIGINT
+function gracefulShutdown(signal) {
+  console.log(`[SERVER] Recibida señal ${signal}. Apagando servidor de forma ordenada...`);
+  server.close(async () => {
+    if (pool) {
+      await pool.end().catch(() => {});
+    }
+    console.log('[SERVER] Conexiones cerradas. Proceso finalizado limpiamente.');
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(0), 4000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
