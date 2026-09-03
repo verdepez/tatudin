@@ -7030,9 +7030,8 @@ textarea {
 
 .timegrid-scroll-body {
   display: flex;
-  max-height: 650px;
   min-width: 560px;
-  overflow-y: auto;
+  overflow-y: visible;
   overflow-x: hidden;
   position: relative;
 }
@@ -7048,9 +7047,9 @@ textarea {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 4px;
+  padding-top: 2px;
   border-bottom: 1px solid var(--line-soft);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--muted);
   box-sizing: border-box;
@@ -7229,19 +7228,19 @@ textarea {
 /* Event block in timegrid */
 .timegrid-event-block {
   position: absolute;
-  left: 4px;
-  right: 4px;
-  border-radius: 6px;
+  left: 3px;
+  right: 3px;
+  border-radius: 5px;
   background: var(--event-color, #7C3AED);
   color: #ffffff;
-  padding: 4px 6px;
+  padding: 2px 4px;
   z-index: 6;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   transition: transform 0.14s ease, box-shadow 0.14s ease;
   box-sizing: border-box;
 }
@@ -7256,23 +7255,25 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 9px;
   opacity: 0.9;
   font-weight: 700;
+  line-height: 1;
 }
 
 .event-block-title {
-  font-size: 11.5px;
-  font-weight: 800;
-  line-height: 1.2;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .event-client-name {
-  font-size: 10px;
+  font-size: 9px;
   opacity: 0.85;
+  line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

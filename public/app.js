@@ -1135,7 +1135,7 @@ function renderDayIndicators(dayData, isMonthView = false) {
 
 const TIMEGRID_START_HOUR = 7;
 const TIMEGRID_END_HOUR = 22;
-const TIMEGRID_HOUR_HEIGHT = 54;
+const TIMEGRID_HOUR_HEIGHT = 28;
 
 function parseTimeToMinutes(timeStr) {
   if (!timeStr) return 0;
@@ -1278,7 +1278,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                   const apptMin = apptDate.getHours() * 60 + apptDate.getMinutes();
                   const duration = Math.max(20, Number(a.duration_minutes || 60));
                   const top = Math.max(0, ((apptMin - TIMEGRID_START_HOUR * 60) / 60) * TIMEGRID_HOUR_HEIGHT);
-                  const height = Math.max(26, (duration / 60) * TIMEGRID_HOUR_HEIGHT);
+                  const height = Math.max(18, (duration / 60) * TIMEGRID_HOUR_HEIGHT);
                   const color = a.category_color || '#7C3AED';
                   return `
                     <div class="timegrid-event-block"
@@ -1336,7 +1336,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                 const apptMin = apptDate.getHours() * 60 + apptDate.getMinutes();
                 const duration = Math.max(20, Number(a.duration_minutes || 60));
                 const top = Math.max(0, ((apptMin - TIMEGRID_START_HOUR * 60) / 60) * (TIMEGRID_HOUR_HEIGHT * 0.5));
-                const height = Math.max(20, (duration / 60) * (TIMEGRID_HOUR_HEIGHT * 0.5));
+                const height = Math.max(14, (duration / 60) * (TIMEGRID_HOUR_HEIGHT * 0.5));
                 const color = a.category_color || '#7C3AED';
                 return `
                   <div class="timegrid-event-block weekend-event-block"
@@ -1390,7 +1390,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                 const apptMin = apptDate.getHours() * 60 + apptDate.getMinutes();
                 const duration = Math.max(20, Number(a.duration_minutes || 60));
                 const top = Math.max(0, ((apptMin - TIMEGRID_START_HOUR * 60) / 60) * (TIMEGRID_HOUR_HEIGHT * 0.5));
-                const height = Math.max(20, (duration / 60) * (TIMEGRID_HOUR_HEIGHT * 0.5));
+                const height = Math.max(14, (duration / 60) * (TIMEGRID_HOUR_HEIGHT * 0.5));
                 const color = a.category_color || '#7C3AED';
                 return `
                   <div class="timegrid-event-block weekend-event-block"
