@@ -60,7 +60,11 @@ const ICONS = {
   instagram: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>',
   share: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>',
   cloudUpload: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>',
-  sliders: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><circle cx="8" cy="6" r="3" fill="#ffffff" stroke="currentColor"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="16" cy="12" r="3" fill="#ffffff" stroke="currentColor"/><line x1="3" y1="18" x2="21" y2="18"/><circle cx="11" cy="18" r="3" fill="#ffffff" stroke="currentColor"/></svg>'
+  sliders: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><circle cx="8" cy="6" r="3" fill="#ffffff" stroke="currentColor"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="16" cy="12" r="3" fill="#ffffff" stroke="currentColor"/><line x1="3" y1="18" x2="21" y2="18"/><circle cx="11" cy="18" r="3" fill="#ffffff" stroke="currentColor"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+  unlock: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>',
+  chevronDown: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+  calendarCheck: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>'
 };
 
 const icon = (name) => ICONS[name] || '';
@@ -136,17 +140,20 @@ let clients = [];
 let members = [];
 let spaces = [];
 let categories = [];
+let appointmentSchedules = [];
+let activeEditingSchedule = null;
 let userStudios = [];
 let activeStudio = null;
 let currentUser = null;
 let agendaFilter = {
-  viewMode: 'week', // 'week' | 'month'
+  viewMode: 'timegrid', // 'timegrid' | 'week' | 'month'
   currentDate: new Date(),
   date: null,
   artistId: 'all',
   spaceId: 'all',
   categoryId: 'all',
-  status: 'all'
+  status: 'all',
+  hiddenCategories: []
 };
 let onboarding = JSON.parse(localStorage.getItem('tatudin_onboarding') || '{}');
 
@@ -742,6 +749,7 @@ async function render(view = 'dashboard') {
 
   try {
     if (view === 'agenda') return await renderAgenda();
+    if (view === 'schedule-configurator') return await renderScheduleConfigurator();
     if (view === 'clientes') return await renderClients();
     if (view === 'comunicaciones') return await renderCommunications();
     if (view === 'finanzas') return await renderFinances();
@@ -914,9 +922,878 @@ async function render(view = 'dashboard') {
   }
 }
 
+function renderDayIndicators(dayData, isMonthView = false) {
+  if (!dayData || dayData.count === 0) {
+    return isMonthView ? '' : '<span class="day-badge-placeholder"></span>';
+  }
+
+  const { count, categories: dayCats } = dayData;
+  const badgeClass = isMonthView ? 'month-day-badge' : 'day-badge-dot';
+
+  // Build descriptive tooltip for accessibility & hover
+  const tooltip = dayCats.length === 1
+    ? `${count} ${count === 1 ? 'compromiso' : 'compromisos'} (${dayCats[0].name})`
+    : `${count} compromisos: ${dayCats.map((c) => `${c.name} (${c.count})`).join(', ')}`;
+
+  // Determine badge background and color based on appointment categories
+  let badgeStyle = '';
+  if (dayCats.length === 1) {
+    const catColor = dayCats[0].color || '#7C3AED';
+    badgeStyle = `background: ${catColor}; color: #ffffff;`;
+  } else if (dayCats.length > 1) {
+    const stops = dayCats.map((c, idx) => {
+      const pct = Math.round((idx / (dayCats.length - 1)) * 100);
+      return `${c.color || '#7C3AED'} ${pct}%`;
+    }).join(', ');
+    badgeStyle = `background: linear-gradient(135deg, ${stops}); color: #ffffff;`;
+  } else {
+    badgeStyle = 'background: #7C3AED; color: #ffffff;';
+  }
+
+  // Row of colored dots representing the category of appointments on this day
+  const dotsHtml = `
+    <span class="day-cat-dots" aria-hidden="true">
+      ${dayCats.slice(0, 4).map((c) => `
+        <span class="day-cat-dot" style="background: ${c.color || '#7C3AED'};" title="${c.name} (${c.count})"></span>
+      `).join('')}
+    </span>
+  `;
+
+  return `
+    <div class="day-indicator-wrap ${isMonthView ? 'is-month' : ''}" title="${tooltip}">
+      ${dotsHtml}
+      <span class="${badgeClass}" style="${badgeStyle}">
+        ${count}
+      </span>
+    </div>
+  `;
+}
+
+const TIMEGRID_START_HOUR = 7;
+const TIMEGRID_END_HOUR = 22;
+const TIMEGRID_HOUR_HEIGHT = 54;
+
+function parseTimeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, interactive = true) {
+  const hours = [];
+  for (let h = TIMEGRID_START_HOUR; h <= TIMEGRID_END_HOUR; h++) {
+    hours.push(h);
+  }
+
+  const now = new Date();
+  const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowOffsetTop = ((currentTotalMinutes - TIMEGRID_START_HOUR * 60) / 60) * TIMEGRID_HOUR_HEIGHT;
+  const isNowInRange = currentTotalMinutes >= TIMEGRID_START_HOUR * 60 && currentTotalMinutes <= (TIMEGRID_END_HOUR + 1) * 60;
+
+  const visibleAppointments = (appointments || []).filter((a) => {
+    if (a.category_id && (agendaFilter.hiddenCategories || []).includes(String(a.category_id))) {
+      return false;
+    }
+    return true;
+  });
+
+  return `
+    <div class="weekly-timegrid-container">
+      <div class="timegrid-header-row">
+        <div class="timegrid-time-corner">
+          <span class="tz-label">GMT-4</span>
+        </div>
+        ${rangeInfo.days.map((d) => {
+          const dateISO = formatDateISO(d);
+          const isToday = dateISO === todayISO;
+          const isSelected = agendaFilter.date === dateISO;
+          const weekday = d.toLocaleDateString('es-CL', { weekday: 'short' });
+          return `
+            <div class="timegrid-day-header-cell ${isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}" data-select-date="${dateISO}">
+              <span class="day-header-weekday">${weekday}</span>
+              <span class="day-header-num-bubble ${isToday ? 'today-bubble' : ''}">${d.getDate()}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <div class="timegrid-scroll-body">
+        <div class="timegrid-hours-col">
+          ${hours.map((h) => `
+            <div class="timegrid-hour-marker" style="height: ${TIMEGRID_HOUR_HEIGHT}px;">
+              <span>${h.toString().padStart(2, '0')}:00</span>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="timegrid-days-columns">
+          ${rangeInfo.days.map((d) => {
+            const dateISO = formatDateISO(d);
+            const isToday = dateISO === todayISO;
+            const dayOfWeek = d.getDay();
+
+            const availBlocks = [];
+            (schedules || []).forEach((sched) => {
+              if (sched.is_active === false) return;
+              (sched.rules || []).forEach((rule) => {
+                const ruleDow = Number(rule.day_of_week);
+                if (ruleDow === dayOfWeek) {
+                  const startMin = parseTimeToMinutes(rule.start_time);
+                  const endMin = parseTimeToMinutes(rule.end_time);
+                  if (endMin > startMin) {
+                    const top = Math.max(0, ((startMin - TIMEGRID_START_HOUR * 60) / 60) * TIMEGRID_HOUR_HEIGHT);
+                    const height = ((endMin - startMin) / 60) * TIMEGRID_HOUR_HEIGHT;
+                    availBlocks.push({
+                      schedule: sched,
+                      rule,
+                      top,
+                      height
+                    });
+                  }
+                }
+              });
+            });
+
+            const dayAppts = visibleAppointments.filter((a) => {
+              if (!a.starts_at) return false;
+              return formatDateISO(a.starts_at) === dateISO && a.status !== 'cancelled';
+            });
+
+            return `
+              <div class="timegrid-day-column ${isToday ? 'today-col' : ''}" data-column-date="${dateISO}">
+                ${hours.map((h) => `
+                  <div class="timegrid-slot-cell" data-slot-hour="${h}" data-slot-date="${dateISO}" style="height: ${TIMEGRID_HOUR_HEIGHT}px;"></div>
+                `).join('')}
+
+                ${availBlocks.map((b) => `
+                  <div class="timegrid-avail-window ${b.schedule.is_locked ? 'is-locked-window' : ''}"
+                       style="top: ${b.top}px; height: ${b.height}px; --avail-color: ${b.schedule.color || '#7C3AED'};"
+                       title="${b.schedule.title} (${b.rule.start_time} - ${b.rule.end_time}) ${b.schedule.is_locked ? '· BLOQUEADA' : '· DISPONIBLE'}">
+                    <div class="avail-window-label">
+                      <span class="avail-pill-dot" style="background: ${b.schedule.color || '#7C3AED'};"></span>
+                      <strong class="avail-sched-name">${b.schedule.title}</strong>
+                      ${b.schedule.is_locked ? `<span class="avail-locked-badge">${icon('lock')} Bloqueada</span>` : ''}
+                    </div>
+                  </div>
+                `).join('')}
+
+                ${dayAppts.map((a) => {
+                  const apptDate = new Date(a.starts_at);
+                  const apptMin = apptDate.getHours() * 60 + apptDate.getMinutes();
+                  const duration = Math.max(20, Number(a.duration_minutes || 60));
+                  const top = Math.max(0, ((apptMin - TIMEGRID_START_HOUR * 60) / 60) * TIMEGRID_HOUR_HEIGHT);
+                  const height = Math.max(26, (duration / 60) * TIMEGRID_HOUR_HEIGHT);
+                  const color = a.category_color || '#7C3AED';
+                  return `
+                    <div class="timegrid-event-block"
+                         style="top: ${top}px; height: ${height}px; --event-color: ${color};"
+                         data-action="view-appointment-detail" data-appointment-id="${a.id}"
+                         title="${a.title} · ${formatTime(a.starts_at)} (${duration} min)">
+                      <div class="event-block-header">
+                        <span class="event-time">${formatTime(a.starts_at)}</span>
+                        ${a.status === 'completed' ? `<span class="event-status-tag">✓</span>` : ''}
+                      </div>
+                      <strong class="event-block-title">${a.title}</strong>
+                      ${a.client_name ? `<span class="event-client-name">${a.client_name}</span>` : ''}
+                    </div>
+                  `;
+                }).join('')}
+
+                ${isToday && isNowInRange ? `
+                  <div class="timegrid-current-time-line" style="top: ${nowOffsetTop}px;">
+                    <span class="timegrid-now-circle"></span>
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function newQuickTaskModal() {
+  const defaultDateTime = getNextDefaultDateTime();
+  openModal(`
+    <p class="eyebrow">TAREA / BLOQUEO RÁPIDO</p>
+    <h2 id="modal-title">Nuevo bloqueo o tarea</h2>
+    <form id="quick-task-form" style="display: grid; gap: 14px;">
+      <div class="field">
+        <label>Título o motivo:</label>
+        <input name="title" required placeholder="Ej: Bloqueo personal, Pedido de agujas, Pausa almuerzo..." />
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Fecha y hora de inicio:</label>
+          <input name="startsAt" type="datetime-local" value="${defaultDateTime}" required />
+        </div>
+        <div class="field">
+          <label>Duración (minutos):</label>
+          <input name="durationMinutes" type="number" value="60" min="15" step="15" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Notas adicionales:</label>
+        <textarea name="notes" rows="2" placeholder="Detalles, recordatorios o contexto..."></textarea>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+        <button type="button" class="secondary" data-close-modal>Cancelar</button>
+        <button type="submit" class="primary">${icon('check')} Guardar bloqueo</button>
+      </div>
+    </form>
+  `);
+
+  const form = document.querySelector('#quick-task-form');
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    try {
+      let blockCat = categories.find(c => c.kind === 'personal' || c.name.toLowerCase().includes('personal') || c.name.toLowerCase().includes('bloqueo'));
+      if (!blockCat) blockCat = categories[0];
+
+      await api('/api/appointments', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: fd.get('title'),
+          startsAt: fd.get('startsAt'),
+          durationMinutes: Number(fd.get('durationMinutes') || 60),
+          notes: fd.get('notes') || 'Tarea / Bloqueo personal',
+          categoryId: blockCat?.id || null,
+          status: 'confirmed'
+        })
+      });
+      closeModal();
+      await renderAgenda();
+    } catch (err) {
+      alert(`Error al guardar tarea: ${err.message}`);
+    }
+  });
+}
+
+async function openPublicBookingModal(slug) {
+  try {
+    const data = await api(`/api/public/schedules/${slug}`);
+    const { schedule, rules } = data;
+    const bookingUrl = `${window.location.origin}/#reservar-${schedule.slug}`;
+
+    if (schedule.isLocked) {
+      openModal(`
+        <div style="text-align: center; padding: 12px 6px;">
+          <div style="width: 52px; height: 52px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+            ${icon('lock')}
+          </div>
+          <h2 style="margin: 0 0 6px;">Agenda en pausa</h2>
+          <p style="color: var(--muted); font-size: 14px; max-width: 360px; margin: 0 auto 16px;">
+            La agenda <strong>${schedule.title}</strong> se encuentra temporalmente bloqueada por el estudio y no está recibiendo nuevas reservas en este momento.
+          </p>
+          <div style="padding: 10px 14px; background: var(--surface-high); border-radius: 12px; font-size: 12px; margin-bottom: 16px;">
+            <span>Enlace público: <code>${bookingUrl}</code></span>
+          </div>
+          <button type="button" class="secondary" data-close-modal>Entendido</button>
+        </div>
+      `);
+      return;
+    }
+
+    const activeDows = rules.map(r => Number(r.day_of_week));
+    const availableDates = [];
+    const today = new Date();
+    for (let i = 1; i <= 28; i++) {
+      const nextD = new Date(today);
+      nextD.setDate(today.getDate() + i);
+      if (activeDows.includes(nextD.getDay())) {
+        availableDates.push(nextD);
+        if (availableDates.length >= 10) break;
+      }
+    }
+
+    openModal(`
+      <p class="eyebrow">RESERVA ONLINE · ${schedule.studioName || 'Tatudin'}</p>
+      <h2 style="margin: 2px 0 6px; display: flex; align-items: center; gap: 8px;">
+        <span style="width: 14px; height: 14px; border-radius: 50%; background: ${schedule.color};"></span>
+        ${schedule.title}
+      </h2>
+      <p style="color: var(--muted); font-size: 13.5px; margin-bottom: 14px;">
+        Duración: <strong>${schedule.durationMinutes} minutos</strong> ${schedule.artistName ? `· Artista: <strong>${schedule.artistName}</strong>` : ''}
+      </p>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: var(--surface-high); border-radius: 10px; margin-bottom: 16px;">
+        <span style="font-size: 12px; font-weight: 700; color: var(--ink);">Enlace para clientes:</span>
+        <button type="button" class="primary small-btn" data-action="copy-raw-link" data-url="${bookingUrl}">
+          ${icon('copy')} Copiar enlace
+        </button>
+      </div>
+
+      ${schedule.instructions ? `
+        <div style="padding: 10px 12px; background: #F5F3FF; border-left: 3px solid ${schedule.color}; border-radius: 8px; font-size: 12.5px; color: #4C1D95; margin-bottom: 16px;">
+          ${schedule.instructions}
+        </div>
+      ` : ''}
+
+      <form id="public-booking-form" data-slug="${schedule.slug}" style="display: grid; gap: 12px;">
+        <div class="field">
+          <label>1. Elige una fecha disponible:</label>
+          <select name="bookingDate" required id="public-booking-date-sel">
+            ${availableDates.map(d => `
+              <option value="${formatDateISO(d)}">
+                ${d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>2. Elige un horario de inicio:</label>
+          <select name="bookingTime" required id="public-booking-time-sel">
+            <option value="09:00">09:00 hrs</option>
+            <option value="10:30">10:30 hrs</option>
+            <option value="12:00">12:00 hrs</option>
+            <option value="14:30">14:30 hrs</option>
+            <option value="16:00">16:00 hrs</option>
+            <option value="17:30">17:30 hrs</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>3. Tu nombre completo:</label>
+          <input name="clientName" required placeholder="Ej. Camila Navarro" />
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Teléfono (WhatsApp):</label>
+            <input name="clientPhone" placeholder="+56 9 1234 5678" />
+          </div>
+          <div class="field">
+            <label>Correo electrónico:</label>
+            <input name="clientEmail" type="email" placeholder="cliente@correo.com" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Detalles de la idea o notas:</label>
+          <textarea name="notes" rows="2" placeholder="Zona del cuerpo, tamaño aprox, dudas..."></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+          <button type="button" class="secondary" data-close-modal>Cancelar</button>
+          <button type="submit" class="primary" style="background: ${schedule.color};">
+            ${icon('check')} Confirmar reserva
+          </button>
+        </div>
+      </form>
+    `);
+
+    const form = document.querySelector('#public-booking-form');
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Reservando...';
+      try {
+        const formData = new FormData(form);
+        const bDate = formData.get('bookingDate');
+        const bTime = formData.get('bookingTime');
+        const startsAt = `${bDate}T${bTime}:00`;
+
+        await api(`/api/public/schedules/${slug}/book`, {
+          method: 'POST',
+          body: JSON.stringify({
+            clientName: formData.get('clientName'),
+            clientEmail: formData.get('clientEmail'),
+            clientPhone: formData.get('clientPhone'),
+            notes: formData.get('notes'),
+            startsAt
+          })
+        });
+
+        openModal(`
+          <div style="text-align: center; padding: 16px 8px;">
+            <div style="width: 56px; height: 56px; border-radius: 50%; background: #D1FAE5; color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+              ${icon('check')}
+            </div>
+            <h2 style="margin: 0 0 6px;">¡Reserva confirmada!</h2>
+            <p style="color: var(--muted); font-size: 14px; margin-bottom: 14px;">
+              Tu cita para <strong>${schedule.title}</strong> ha sido agendada con éxito para el <strong>${bDate} a las ${bTime} hrs</strong>.
+            </p>
+            <button type="button" class="primary" data-close-modal>Finalizar</button>
+          </div>
+        `);
+        if (currentAppView === 'agenda') renderAgenda();
+      } catch (err) {
+        alert(`Error al reservar: ${err.message}`);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirmar reserva';
+      }
+    });
+  } catch (err) {
+    alert(`No se pudo cargar la agenda: ${err.message}`);
+  }
+}
+
+async function renderScheduleConfigurator(scheduleId = null) {
+  closeMobileDrawer();
+  currentAppView = 'schedule-configurator';
+  document.querySelectorAll('[data-view]').forEach((link) => {
+    link.classList.toggle('active', link.dataset.view === 'agenda');
+  });
+
+  let schedule = null;
+  if (scheduleId) {
+    schedule = await api(`/api/schedules/${scheduleId}`).catch(() => null);
+  }
+
+  const PALETTE = ['#7C3AED', '#0284C7', '#D97706', '#059669', '#E11D48', '#4F46E5', '#6B7280'];
+
+  const DAYS = [
+    { dow: 1, name: 'Lunes', short: 'Lun' },
+    { dow: 2, name: 'Martes', short: 'Mar' },
+    { dow: 3, name: 'Miércoles', short: 'Mié' },
+    { dow: 4, name: 'Jueves', short: 'Jue' },
+    { dow: 5, name: 'Viernes', short: 'Vie' },
+    { dow: 6, name: 'Sábado', short: 'Sáb' },
+    { dow: 0, name: 'Domingo', short: 'Dom' }
+  ];
+
+  let currentRules = schedule?.rules ? JSON.parse(JSON.stringify(schedule.rules)) : [
+    { day_of_week: 1, start_time: '09:00', end_time: '17:00' },
+    { day_of_week: 2, start_time: '09:00', end_time: '17:00' },
+    { day_of_week: 3, start_time: '09:00', end_time: '17:00' },
+    { day_of_week: 4, start_time: '09:00', end_time: '17:00' },
+    { day_of_week: 5, start_time: '09:00', end_time: '17:00' }
+  ];
+
+  activeEditingSchedule = {
+    id: schedule?.id || null,
+    title: schedule?.title || 'Citas de Tatuaje',
+    color: schedule?.color || '#7C3AED',
+    durationMinutes: schedule?.duration_minutes || 60,
+    isLocked: schedule?.is_locked || false,
+    minLeadHours: schedule?.min_lead_hours || 4,
+    maxAdvanceDays: schedule?.max_advance_days || 60,
+    instructions: schedule?.instructions || '',
+    rules: currentRules
+  };
+
+  const weekRange = getWeekRange(new Date());
+  const todayISO = formatDateISO(new Date());
+  const rangeParams = new URLSearchParams({
+    startDate: weekRange.startDateISO,
+    endDate: weekRange.endDateISO
+  });
+  const weekAppts = await api(`/api/appointments?${rangeParams.toString()}`).catch(() => []);
+
+  function getPreviewSchedules() {
+    return [{
+      id: activeEditingSchedule.id || 'preview',
+      title: activeEditingSchedule.title || 'Agenda de citas',
+      color: activeEditingSchedule.color || '#7C3AED',
+      duration_minutes: activeEditingSchedule.durationMinutes,
+      is_locked: activeEditingSchedule.isLocked,
+      is_active: true,
+      rules: activeEditingSchedule.rules
+    }];
+  }
+
+  function renderDaysHtml() {
+    return DAYS.map((d) => {
+      const dayRules = activeEditingSchedule.rules.filter((r) => Number(r.day_of_week) === d.dow);
+      const isAvailable = dayRules.length > 0;
+      return `
+        <div class="sched-day-editor-item ${isAvailable ? 'is-enabled' : 'is-disabled'}" data-dow="${d.dow}">
+          <div class="sched-day-head">
+            <span class="sched-day-title">${d.name}</span>
+            ${!isAvailable ? `
+              <span class="sched-not-avail-tag">No disponible</span>
+              <button type="button" class="icon-circle-btn micro-btn" data-action="enable-day" data-dow="${d.dow}" title="Habilitar día">
+                ${icon('plus')}
+              </button>
+            ` : `
+              <button type="button" class="icon-circle-btn micro-btn" data-action="disable-day" data-dow="${d.dow}" title="Deshabilitar día">
+                ${icon('trash')}
+              </button>
+            `}
+          </div>
+
+          ${isAvailable ? `
+            <div class="sched-slots-container">
+              ${dayRules.map((rule, idx) => `
+                <div class="sched-slot-row">
+                  <input type="time" class="sched-time-input" data-dow="${d.dow}" data-rule-idx="${idx}" data-field="start" value="${rule.start_time || '09:00'}" />
+                  <span class="sched-time-sep">–</span>
+                  <input type="time" class="sched-time-input" data-dow="${d.dow}" data-rule-idx="${idx}" data-field="end" value="${rule.end_time || '17:00'}" />
+                  ${dayRules.length > 1 ? `
+                    <button type="button" class="sched-remove-slot-btn" data-action="remove-slot" data-dow="${d.dow}" data-rule-idx="${idx}" title="Eliminar franja">
+                      ✕
+                    </button>
+                  ` : ''}
+                  ${idx === 0 ? `
+                    <button type="button" class="sched-copy-all-btn" data-action="copy-to-all" data-dow="${d.dow}" title="Copiar este horario a lunes-viernes">
+                      ${icon('copy')}
+                    </button>
+                  ` : ''}
+                </div>
+              `).join('')}
+              <button type="button" class="text-button sched-add-extra-btn" data-action="add-extra-slot" data-dow="${d.dow}">
+                + Añadir otro tramo
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  app.innerHTML = `
+    <section class="schedule-configurator-shell">
+      <div class="configurator-topbar">
+        <div class="config-topbar-left">
+          <button type="button" class="back-link-btn" data-action="back-to-agenda">
+            ${icon('back')} <span>Volver a la agenda</span>
+          </button>
+          <span class="config-topbar-badge">CONFIGURAR CITAS DISPONIBLES</span>
+        </div>
+        <div class="config-topbar-right">
+          <button type="button" class="secondary" data-action="back-to-agenda">Cancelar</button>
+          <button type="button" class="primary" data-action="save-schedule-config">
+            ${icon('check')} <span>Guardar agenda</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="schedule-split-layout">
+        <aside class="schedule-config-sidebar panel">
+          <div class="config-section-title">
+            <p class="eyebrow" style="margin: 0; font-size: 10.5px;">AGENDA DE CITAS</p>
+            <h2 style="margin: 2px 0 0; font-size: 18px; font-weight: 800;">Detalles y Disponibilidad</h2>
+          </div>
+
+          <div class="config-field">
+            <label class="config-label">Título de la agenda</label>
+            <input type="text" id="sched-title-input" class="config-input-title" placeholder="Añade un título (Ej. Citas de Tatuaje)" value="${activeEditingSchedule.title}" />
+          </div>
+
+          <div class="config-field">
+            <label class="config-label">Color distintivo de la agenda</label>
+            <div class="config-palette-row">
+              ${PALETTE.map((col) => `
+                <button type="button" class="palette-swatch ${col === activeEditingSchedule.color ? 'is-selected' : ''}" style="background: ${col};" data-action="select-palette-color" data-color="${col}"></button>
+              `).join('')}
+              <input type="color" id="sched-custom-color" value="${activeEditingSchedule.color}" title="Color personalizado" style="width: 32px; height: 32px; padding: 0; border: none; border-radius: 50%; cursor: pointer;" />
+            </div>
+          </div>
+
+          <div class="config-field">
+            <label class="config-label">Duración de la cita</label>
+            <select id="sched-duration-select" class="config-select">
+              <option value="30" ${activeEditingSchedule.durationMinutes === 30 ? 'selected' : ''}>30 minutos</option>
+              <option value="45" ${activeEditingSchedule.durationMinutes === 45 ? 'selected' : ''}>45 minutos</option>
+              <option value="60" ${activeEditingSchedule.durationMinutes === 60 ? 'selected' : ''}>1 hora</option>
+              <option value="90" ${activeEditingSchedule.durationMinutes === 90 ? 'selected' : ''}>1.5 horas</option>
+              <option value="120" ${activeEditingSchedule.durationMinutes === 120 ? 'selected' : ''}>2 horas</option>
+              <option value="180" ${activeEditingSchedule.durationMinutes === 180 ? 'selected' : ''}>3 horas</option>
+              <option value="240" ${activeEditingSchedule.durationMinutes === 240 ? 'selected' : ''}>4 horas</option>
+            </select>
+          </div>
+
+          <div class="config-field sched-lock-card ${activeEditingSchedule.isLocked ? 'is-locked-state' : ''}">
+            <div class="sched-lock-info">
+              <strong style="font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                ${activeEditingSchedule.isLocked ? `${icon('lock')} Agenda bloqueada` : `${icon('unlock')} Agenda activa`}
+              </strong>
+              <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--muted);">
+                ${activeEditingSchedule.isLocked ? 'Pausada: no acepta reservas de clientes.' : 'Habilitada: visible y abierta para clientes.'}
+              </p>
+            </div>
+            <button type="button" class="secondary sched-lock-toggle-btn" data-action="toggle-sched-lock-edit">
+              ${activeEditingSchedule.isLocked ? 'Desbloquear' : 'Bloquear'}
+            </button>
+          </div>
+
+          <div class="config-divider"></div>
+
+          <div class="config-field">
+            <label class="config-label" style="margin-bottom: 2px;">Disponibilidad general</label>
+            <p style="margin: 0 0 10px; font-size: 12px; color: var(--muted);">
+              Indica qué disponibilidad sueles tener para citas cada semana.
+            </p>
+            <div class="sched-days-editor-list" id="sched-days-editor-list">
+              ${renderDaysHtml()}
+            </div>
+          </div>
+
+          <div class="config-note-box">
+            <span>Zona horaria: <strong>(GMT-04:00) Hora de Chile</strong></span>
+          </div>
+
+          <div class="config-field">
+            <label class="config-label">Franja de programación</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <label style="font-size: 11.5px; color: var(--muted);">
+                Antelación mínima
+                <select id="sched-lead-hours" class="config-select" style="margin-top: 4px;">
+                  <option value="2" ${activeEditingSchedule.minLeadHours === 2 ? 'selected' : ''}>2 horas</option>
+                  <option value="4" ${activeEditingSchedule.minLeadHours === 4 ? 'selected' : ''}>4 horas</option>
+                  <option value="12" ${activeEditingSchedule.minLeadHours === 12 ? 'selected' : ''}>12 horas</option>
+                  <option value="24" ${activeEditingSchedule.minLeadHours === 24 ? 'selected' : ''}>24 horas (1 día)</option>
+                  <option value="48" ${activeEditingSchedule.minLeadHours === 48 ? 'selected' : ''}>48 horas (2 días)</option>
+                </select>
+              </label>
+              <label style="font-size: 11.5px; color: var(--muted);">
+                Antelación máxima
+                <select id="sched-advance-days" class="config-select" style="margin-top: 4px;">
+                  <option value="14" ${activeEditingSchedule.maxAdvanceDays === 14 ? 'selected' : ''}>14 días</option>
+                  <option value="30" ${activeEditingSchedule.maxAdvanceDays === 30 ? 'selected' : ''}>30 días</option>
+                  <option value="60" ${activeEditingSchedule.maxAdvanceDays === 60 ? 'selected' : ''}>60 días (2 meses)</option>
+                  <option value="90" ${activeEditingSchedule.maxAdvanceDays === 90 ? 'selected' : ''}>90 días (3 meses)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="config-field">
+            <label class="config-label">Instrucciones para el cliente (opcional)</label>
+            <textarea id="sched-instructions" rows="2" class="config-textarea" placeholder="Ej: Venir descansado, con ropa cómoda y sin acompañantes.">${activeEditingSchedule.instructions}</textarea>
+          </div>
+
+          <div style="margin-top: 14px;">
+            <button type="button" class="primary" style="width: 100%; justify-content: center;" data-action="save-schedule-config">
+              ${icon('check')} Guardar agenda de citas
+            </button>
+          </div>
+        </aside>
+
+        <main class="schedule-preview-area panel">
+          <div class="preview-area-header">
+            <div>
+              <strong style="font-size: 14.5px; font-weight: 800;">Vista previa de disponibilidad en tiempo real</strong>
+              <p style="margin: 2px 0 0; font-size: 12px; color: var(--muted);">
+                Semana actual (${weekRange.label}): los bloques coloreados representan los horarios abiertos para citas.
+              </p>
+            </div>
+            <div class="preview-color-pill" id="sched-preview-pill" style="--live-color: ${activeEditingSchedule.color};">
+              <span class="live-dot" style="background: ${activeEditingSchedule.color};"></span>
+              <span class="live-title-preview">${activeEditingSchedule.title || 'Agenda de citas'}</span>
+            </div>
+          </div>
+
+          <div class="live-timegrid-wrap" id="sched-live-timegrid-wrap">
+            ${renderWeeklyTimeGrid(weekRange, weekAppts, getPreviewSchedules(), todayISO, false)}
+          </div>
+        </main>
+      </div>
+    </section>
+  `;
+
+  const titleInput = document.querySelector('#sched-title-input');
+  titleInput?.addEventListener('input', (e) => {
+    activeEditingSchedule.title = e.target.value;
+    const pillTitle = document.querySelector('.live-title-preview');
+    if (pillTitle) pillTitle.textContent = e.target.value || 'Agenda de citas';
+    updatePreviewGridOnly();
+  });
+
+  const durationSelect = document.querySelector('#sched-duration-select');
+  durationSelect?.addEventListener('change', (e) => {
+    activeEditingSchedule.durationMinutes = Number(e.target.value);
+    updatePreviewGridOnly();
+  });
+
+  const customColor = document.querySelector('#sched-custom-color');
+  customColor?.addEventListener('input', (e) => {
+    activeEditingSchedule.color = e.target.value;
+    document.querySelectorAll('.palette-swatch').forEach(s => s.classList.remove('is-selected'));
+    updatePreviewGridOnly();
+  });
+
+  function updatePreviewGridOnly() {
+    const previewContainer = document.querySelector('#sched-live-timegrid-wrap');
+    if (previewContainer) {
+      previewContainer.innerHTML = renderWeeklyTimeGrid(weekRange, weekAppts, getPreviewSchedules(), todayISO, false);
+    }
+    const colorPill = document.querySelector('#sched-preview-pill');
+    if (colorPill) {
+      colorPill.style.setProperty('--live-color', activeEditingSchedule.color);
+      const dot = colorPill.querySelector('.live-dot');
+      if (dot) dot.style.background = activeEditingSchedule.color;
+      const titleEl = colorPill.querySelector('.live-title-preview');
+      if (titleEl) titleEl.textContent = activeEditingSchedule.title || 'Agenda de citas';
+    }
+  }
+
+  const configShell = document.querySelector('.schedule-configurator-shell');
+  configShell?.addEventListener('input', (e) => {
+    const timeInput = e.target.closest('.sched-time-input');
+    if (timeInput) {
+      const dow = Number(timeInput.dataset.dow);
+      const ruleIdx = Number(timeInput.dataset.ruleIdx);
+      const field = timeInput.dataset.field;
+      const matched = activeEditingSchedule.rules.filter(r => Number(r.day_of_week) === dow);
+      if (matched[ruleIdx]) {
+        if (field === 'start') matched[ruleIdx].start_time = timeInput.value;
+        if (field === 'end') matched[ruleIdx].end_time = timeInput.value;
+      }
+      updatePreviewGridOnly();
+    }
+  });
+
+  configShell?.addEventListener('click', async (e) => {
+    const paletteBtn = e.target.closest('[data-action="select-palette-color"]');
+    if (paletteBtn) {
+      const color = paletteBtn.dataset.color;
+      activeEditingSchedule.color = color;
+      document.querySelectorAll('.palette-swatch').forEach(s => {
+        s.classList.toggle('is-selected', s.dataset.color === color);
+      });
+      const customCol = document.querySelector('#sched-custom-color');
+      if (customCol) customCol.value = color;
+      updatePreviewGridOnly();
+      return;
+    }
+
+    if (e.target.closest('[data-action="toggle-sched-lock-edit"]')) {
+      activeEditingSchedule.isLocked = !activeEditingSchedule.isLocked;
+      const lockCard = document.querySelector('.sched-lock-card');
+      if (lockCard) {
+        lockCard.classList.toggle('is-locked-state', activeEditingSchedule.isLocked);
+        const lockInfo = lockCard.querySelector('.sched-lock-info');
+        if (lockInfo) {
+          lockInfo.innerHTML = `
+            <strong style="font-size: 13px; display: flex; align-items: center; gap: 6px;">
+              ${activeEditingSchedule.isLocked ? `${icon('lock')} Agenda bloqueada` : `${icon('unlock')} Agenda activa`}
+            </strong>
+            <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--muted);">
+              ${activeEditingSchedule.isLocked ? 'Pausada: no acepta reservas de clientes.' : 'Habilitada: visible y abierta para clientes.'}
+            </p>
+          `;
+        }
+        const lockBtn = lockCard.querySelector('.sched-lock-toggle-btn');
+        if (lockBtn) lockBtn.textContent = activeEditingSchedule.isLocked ? 'Desbloquear' : 'Bloquear';
+      }
+      updatePreviewGridOnly();
+      return;
+    }
+
+    const enableBtn = e.target.closest('[data-action="enable-day"]');
+    if (enableBtn) {
+      const dow = Number(enableBtn.dataset.dow);
+      activeEditingSchedule.rules.push({ day_of_week: dow, start_time: '09:00', end_time: '17:00' });
+      const daysContainer = document.querySelector('#sched-days-editor-list');
+      if (daysContainer) daysContainer.innerHTML = renderDaysHtml();
+      updatePreviewGridOnly();
+      return;
+    }
+
+    const disableBtn = e.target.closest('[data-action="disable-day"]');
+    if (disableBtn) {
+      const dow = Number(disableBtn.dataset.dow);
+      activeEditingSchedule.rules = activeEditingSchedule.rules.filter(r => Number(r.day_of_week) !== dow);
+      const daysContainer = document.querySelector('#sched-days-editor-list');
+      if (daysContainer) daysContainer.innerHTML = renderDaysHtml();
+      updatePreviewGridOnly();
+      return;
+    }
+
+    const addSlotBtn = e.target.closest('[data-action="add-extra-slot"]');
+    if (addSlotBtn) {
+      const dow = Number(addSlotBtn.dataset.dow);
+      activeEditingSchedule.rules.push({ day_of_week: dow, start_time: '14:00', end_time: '18:00' });
+      const daysContainer = document.querySelector('#sched-days-editor-list');
+      if (daysContainer) daysContainer.innerHTML = renderDaysHtml();
+      updatePreviewGridOnly();
+      return;
+    }
+
+    const removeSlotBtn = e.target.closest('[data-action="remove-slot"]');
+    if (removeSlotBtn) {
+      const dow = Number(removeSlotBtn.dataset.dow);
+      const ruleIdx = Number(removeSlotBtn.dataset.ruleIdx);
+      const matched = activeEditingSchedule.rules.filter(r => Number(r.day_of_week) === dow);
+      const targetRule = matched[ruleIdx];
+      if (targetRule) {
+        activeEditingSchedule.rules = activeEditingSchedule.rules.filter(r => r !== targetRule);
+      }
+      const daysContainer = document.querySelector('#sched-days-editor-list');
+      if (daysContainer) daysContainer.innerHTML = renderDaysHtml();
+      updatePreviewGridOnly();
+      return;
+    }
+
+    const copyBtn = e.target.closest('[data-action="copy-to-all"]');
+    if (copyBtn) {
+      const dow = Number(copyBtn.dataset.dow);
+      const dayRules = activeEditingSchedule.rules.filter(r => Number(r.day_of_week) === dow);
+      if (dayRules.length > 0) {
+        activeEditingSchedule.rules = activeEditingSchedule.rules.filter(r => Number(r.day_of_week) === 0 || Number(r.day_of_week) === 6);
+        for (let targetDow = 1; targetDow <= 5; targetDow++) {
+          dayRules.forEach(dr => {
+            activeEditingSchedule.rules.push({
+              day_of_week: targetDow,
+              start_time: dr.start_time || '09:00',
+              end_time: dr.end_time || '17:00'
+            });
+          });
+        }
+        const daysContainer = document.querySelector('#sched-days-editor-list');
+        if (daysContainer) daysContainer.innerHTML = renderDaysHtml();
+        updatePreviewGridOnly();
+      }
+      return;
+    }
+
+    if (e.target.closest('[data-action="save-schedule-config"]')) {
+      const titleVal = (document.querySelector('#sched-title-input')?.value || '').trim();
+      if (!titleVal) {
+        alert('Por favor añade un título a la agenda.');
+        return;
+      }
+      activeEditingSchedule.title = titleVal;
+      activeEditingSchedule.instructions = document.querySelector('#sched-instructions')?.value || '';
+      activeEditingSchedule.minLeadHours = Number(document.querySelector('#sched-lead-hours')?.value || 4);
+      activeEditingSchedule.maxAdvanceDays = Number(document.querySelector('#sched-advance-days')?.value || 60);
+
+      const payload = {
+        title: activeEditingSchedule.title,
+        color: activeEditingSchedule.color,
+        durationMinutes: activeEditingSchedule.durationMinutes,
+        isLocked: activeEditingSchedule.isLocked,
+        minLeadHours: activeEditingSchedule.minLeadHours,
+        maxAdvanceDays: activeEditingSchedule.maxAdvanceDays,
+        instructions: activeEditingSchedule.instructions,
+        rules: activeEditingSchedule.rules
+      };
+
+      try {
+        if (activeEditingSchedule.id && activeEditingSchedule.id !== 'preview') {
+          await api(`/api/schedules/${activeEditingSchedule.id}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+          });
+        } else {
+          await api('/api/schedules', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+        }
+        await renderAgenda();
+      } catch (err) {
+        alert(`Error al guardar agenda: ${err.message}`);
+      }
+      return;
+    }
+
+    if (e.target.closest('[data-action="back-to-agenda"]')) {
+      return await renderAgenda();
+    }
+  });
+}
+
 async function renderAgenda() {
-  const isWeekView = agendaFilter.viewMode !== 'month';
-  const rangeInfo = isWeekView ? getWeekRange(agendaFilter.currentDate) : getMonthMatrix(agendaFilter.currentDate);
+  const isTimeGrid = agendaFilter.viewMode === 'timegrid';
+  const isWeekView = agendaFilter.viewMode === 'week';
+  const isMonthView = agendaFilter.viewMode === 'month';
+  const rangeInfo = isMonthView ? getMonthMatrix(agendaFilter.currentDate) : getWeekRange(agendaFilter.currentDate);
 
   // Range parameters to get all appointments within the visible calendar period for date badges
   const rangeParams = new URLSearchParams();
@@ -935,22 +1812,50 @@ async function renderAgenda() {
     listParams.append('date', agendaFilter.date);
   }
 
-  const [rangeAppointments, appointmentsList, membersList, spacesList, categoriesList] = await Promise.all([
+  const [rangeAppointments, appointmentsList, membersList, spacesList, categoriesList, schedulesList] = await Promise.all([
     api(`/api/appointments?${rangeParams.toString()}`).catch(() => []),
     api(`/api/appointments?${listParams.toString()}`).catch(() => []),
     api('/api/members').catch(() => []),
     api('/api/spaces').catch(() => []),
-    api('/api/categories').catch(() => [])
+    api('/api/categories').catch(() => []),
+    api('/api/schedules').catch(() => [])
   ]);
   members = membersList;
   spaces = spacesList;
   categories = categoriesList;
+  appointmentSchedules = schedulesList || [];
 
-  // Build appointments count map per day for dots/badges
-  const apptsPerDay = {};
+  // Build appointments count and categories map per day for colored indicators
+  const dayApptsMap = {};
   rangeAppointments.forEach((a) => {
-    const dayISO = a.starts_at?.slice(0, 10);
-    if (dayISO) apptsPerDay[dayISO] = (apptsPerDay[dayISO] || 0) + 1;
+    if (!a.starts_at) return;
+    const dayISO = formatDateISO(a.starts_at);
+    if (!dayApptsMap[dayISO]) {
+      dayApptsMap[dayISO] = {
+        count: 0,
+        categories: [],
+        categoriesMap: {}
+      };
+    }
+    dayApptsMap[dayISO].count += 1;
+
+    const matchedCat = categories.find((c) => String(c.id) === String(a.category_id));
+    const catColor = a.category_color || matchedCat?.color || '#7C3AED';
+    const catName = a.category_name || matchedCat?.name || 'Compromiso';
+    const catId = a.category_id ? String(a.category_id) : (a.category_kind || catName);
+
+    if (!dayApptsMap[dayISO].categoriesMap[catId]) {
+      const catObj = {
+        id: catId,
+        name: catName,
+        color: catColor,
+        count: 1
+      };
+      dayApptsMap[dayISO].categories.push(catObj);
+      dayApptsMap[dayISO].categoriesMap[catId] = catObj;
+    } else {
+      dayApptsMap[dayISO].categoriesMap[catId].count += 1;
+    }
   });
 
   const todayISO = formatDateISO(new Date());
@@ -978,121 +1883,250 @@ async function renderAgenda() {
   app.innerHTML = `
     <section class="page-heading">
       <div>
-        <p class="eyebrow">AGENDA & CALENDARIO</p>
+        <p class="eyebrow">AGENDA & DISPONIBILIDAD</p>
         <h1>Tu calendario<span class="dot">.</span></h1>
-        <p class="lead">Navega por semanas o meses y gestiona tus compromisos con filtros avanzados.</p>
-      </div>
-      <button class="primary" data-action="new-booking">${icon('plus')} <span>Nuevo compromiso</span></button>
-    </section>
-
-    <!-- Calendar Card with View Toggle, Filter Button & Navigation -->
-    <section class="panel calendar-card">
-      <div class="calendar-header-bar">
-        <!-- View Toggle (Semana vs Mes) & Filter Trigger Button -->
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <div class="calendar-view-toggle">
-            <button class="cal-view-btn ${isWeekView ? 'active' : ''}" data-cal-view="week">
-              Semanal (7 días)
-            </button>
-            <button class="cal-view-btn ${!isWeekView ? 'active' : ''}" data-cal-view="month">
-              Mensual
-            </button>
-          </div>
-
-          <button type="button" class="cal-filter-trigger-btn ${hasActiveFilters ? 'has-active' : ''}" data-action="open-agenda-filter-modal" title="Filtrar agenda" aria-label="Filtrar agenda">
-            ${icon('sliders')}
-            ${hasActiveFilters ? `<span class="filter-badge-dot"></span>` : ''}
-          </button>
-        </div>
-
-        <!-- Navigation Controls (<, Hoy, >) -->
-        <div class="calendar-nav-controls">
-          <button class="cal-nav-btn" data-action="cal-prev" title="Anterior" aria-label="Anterior">
-            ${icon('back')}
-          </button>
-          <button class="cal-today-btn" data-action="cal-today">
-            Hoy
-          </button>
-          <button class="cal-nav-btn" data-action="cal-next" title="Siguiente" aria-label="Siguiente">
-            ${icon('arrowRight')}
-          </button>
-          <strong class="cal-current-label">${rangeInfo.label}</strong>
-        </div>
+        <p class="lead">Gestiona tus compromisos, disponibilidad semanal y páginas de reserva con clientes.</p>
       </div>
 
-      ${agendaFilter.date ? `
-        <div class="cal-selected-day-banner">
-          <span>📅 Filtrando por día seleccionado: <strong>${agendaFilter.date}</strong></span>
-          <button class="text-button" data-clear-date style="color: #6D28D9; font-size: 11.5px; font-weight: 800;">
-            ✕ Ver todo el período (${isWeekView ? '7 días' : 'Mes'})
+      <!-- Google Calendar Style + Crear Dropdown Menu -->
+      <div class="create-menu-wrapper">
+        <button type="button" class="primary create-menu-btn" data-action="toggle-create-menu">
+          ${icon('plus')} <span>Crear</span> ${icon('chevronDown')}
+        </button>
+        <div class="create-menu-dropdown hidden" id="create-menu-dropdown">
+          <button type="button" class="create-menu-item" data-action="new-booking">
+            <span class="menu-item-icon" style="color: #7C3AED;">${icon('calendar')}</span>
+            <div class="menu-item-text">
+              <strong>Compromiso / Cita</strong>
+              <small>Agendar sesión con cliente</small>
+            </div>
+          </button>
+          <button type="button" class="create-menu-item" data-action="new-quick-task">
+            <span class="menu-item-icon" style="color: #0284C7;">${icon('check')}</span>
+            <div class="menu-item-text">
+              <strong>Tarea / Bloqueo</strong>
+              <small>Bloqueo de horario personal</small>
+            </div>
+          </button>
+          <div class="create-menu-divider"></div>
+          <button type="button" class="create-menu-item highlight-sched" data-action="open-schedule-configurator">
+            <span class="menu-item-icon" style="color: #10B981;">${icon('calendarCheck')}</span>
+            <div class="menu-item-text">
+              <strong>Agenda de citas</strong>
+              <small>Configurar disponibilidad y reservas</small>
+            </div>
           </button>
         </div>
-      ` : ''}
-
-      ${isWeekView ? `
-        <!-- Week Days Grid (7 days) -->
-        <div class="week-days">
-          ${rangeInfo.days.map((d) => {
-            const dateISO = formatDateISO(d);
-            const isSelected = agendaFilter.date === dateISO;
-            const isToday = dateISO === todayISO;
-            const count = apptsPerDay[dateISO] || 0;
-            const weekday = d.toLocaleDateString('es-CL', { weekday: 'short' });
-            return `
-              <button class="day ${isSelected ? 'selected' : ''} ${isToday ? 'is-today' : ''}" data-select-date="${dateISO}" title="${d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}">
-                <span class="day-name">${weekday}</span>
-                <strong class="day-num">${d.getDate()}</strong>
-                ${count > 0 ? `<span class="day-badge-dot" title="${count} ${count === 1 ? 'compromiso' : 'compromisos'}">${count}</span>` : '<span class="day-badge-placeholder"></span>'}
-              </button>
-            `;
-          }).join('')}
-        </div>
-      ` : `
-        <!-- Month Calendar Grid -->
-        <div class="month-calendar-grid">
-          ${['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(w => `<div class="month-weekday-header">${w}</div>`).join('')}
-          ${rangeInfo.matrix.map((d) => {
-            const dateISO = formatDateISO(d);
-            const isSelected = agendaFilter.date === dateISO;
-            const isToday = dateISO === todayISO;
-            const isOtherMonth = d.getMonth() !== rangeInfo.month;
-            const count = apptsPerDay[dateISO] || 0;
-            return `
-              <button class="month-day-cell ${isOtherMonth ? 'other-month' : ''} ${isToday ? 'is-today' : ''} ${isSelected ? 'selected' : ''}" data-select-date="${dateISO}" title="${d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}">
-                <span class="month-day-num">${d.getDate()}</span>
-                ${count > 0 ? `<span class="month-day-badge" title="${count} citas">${count}</span>` : ''}
-              </button>
-            `;
-          }).join('')}
-        </div>
-      `}
-
-      ${hasActiveFilters ? `
-        <div class="agenda-active-filters-pill">
-          <div>
-            <span style="color: var(--muted); font-weight: 700; margin-right: 6px;">Filtros activos:</span>
-            <strong>${activeFiltersLabels.join(' · ')}</strong>
-          </div>
-          <button class="text-button" data-clear-all-filters style="color: var(--accent); font-size: 11.5px; font-weight: 800;">
-            ✕ Quitar filtros
-          </button>
-        </div>
-      ` : ''}
+      </div>
     </section>
 
-    <!-- Appointment List Heading & Count -->
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; padding: 0 4px;">
-      <h2 style="font-size: 17px; margin: 0; font-weight: 800;">
-        ${agendaFilter.date ? `Compromisos del día (${agendaFilter.date})` : 'Compromisos programados'}
-      </h2>
-      <span class="count" style="font-weight: 700;">
-        ${appointmentsList.length} ${appointmentsList.length === 1 ? 'compromiso' : 'compromisos'}
-      </span>
+    <!-- Liquid Two-Panel Layout (Sidebar + Calendar) -->
+    <div class="agenda-liquid-layout">
+      <!-- Left: Sidebar with Booking Pages & Calendars (Captura 1) -->
+      <aside class="agenda-sidebar-bar">
+        <!-- 1. Páginas de reserva / Agendas de citas -->
+        <div class="panel sidebar-block">
+          <div class="sidebar-block-header">
+            <div>
+              <p class="eyebrow" style="margin: 0; font-size: 10px;">PÁGINAS DE RESERVA</p>
+              <h4 style="margin: 2px 0 0; font-size: 13.5px; font-weight: 800;">Agendas de citas</h4>
+            </div>
+            <button type="button" class="icon-circle-btn" data-action="open-schedule-configurator" title="Crear nueva agenda de citas">
+              ${icon('plus')}
+            </button>
+          </div>
+          
+          <div class="schedules-sidebar-list">
+            ${appointmentSchedules.length > 0 ? appointmentSchedules.map((sched) => `
+              <div class="sched-sidebar-card ${sched.is_locked ? 'is-locked' : ''}">
+                <div class="sched-card-top">
+                  <span class="sched-swatch" style="background: ${sched.color || '#7C3AED'};"></span>
+                  <div class="sched-info">
+                    <strong class="sched-name" title="${sched.title}">${sched.title}</strong>
+                    <div class="sched-meta">
+                      <span>${sched.duration_minutes} min</span>
+                      <span class="sched-status-badge ${sched.is_locked ? 'locked' : 'active'}">
+                        ${sched.is_locked ? 'Bloqueada' : 'Activa'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="sched-card-actions">
+                  <button type="button" class="sched-btn ${sched.is_locked ? 'unlock-style' : 'lock-style'}" data-action="toggle-schedule-lock" data-schedule-id="${sched.id}" title="${sched.is_locked ? 'Desbloquear agenda para permitir reservas' : 'Bloquear agenda para pausar reservas'}">
+                    ${sched.is_locked ? `${icon('unlock')} Desbloquear` : `${icon('lock')} Bloquear`}
+                  </button>
+                  <button type="button" class="sched-btn" data-action="edit-schedule" data-schedule-id="${sched.id}" title="Editar horarios y disponibilidad">
+                    ${icon('edit')} Editar
+                  </button>
+                  <button type="button" class="sched-btn" data-action="open-public-booking" data-schedule-slug="${sched.slug}" title="Ver página de reserva y copiar enlace">
+                    ${icon('link')} Link
+                  </button>
+                </div>
+              </div>
+            `).join('') : `
+              <div class="sched-empty-box">
+                <p style="margin: 0; font-size: 12px; color: var(--muted);">No hay agendas de citas creadas.</p>
+                <button type="button" class="text-button" data-action="open-schedule-configurator" style="color: var(--accent); font-weight: 800; font-size: 12px; margin-top: 6px;">
+                  + Crear primera agenda
+                </button>
+              </div>
+            `}
+          </div>
+        </div>
+
+        <!-- 2. Mis Calendarios / Categorías (Capas estilo Google Calendar) -->
+        <div class="panel sidebar-block">
+          <p class="eyebrow" style="margin: 0 0 10px; font-size: 10px;">MIS CALENDARIOS</p>
+          <div class="calendar-layers-list">
+            ${categories.map((c) => {
+              const isHidden = (agendaFilter.hiddenCategories || []).includes(String(c.id));
+              return `
+                <label class="cal-layer-item">
+                  <input type="checkbox" class="cal-layer-input" data-category-layer="${c.id}" ${isHidden ? '' : 'checked'} />
+                  <span class="cal-layer-box" style="--cat-layer-color: ${c.color};"></span>
+                  <span class="cal-layer-title">${c.name}</span>
+                </label>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </aside>
+
+      <!-- Right: Main Calendar Area -->
+      <main class="agenda-main-calendar">
+        <section class="panel calendar-card">
+          <div class="calendar-header-bar">
+            <!-- View Toggle: Horaria | Semana | Mes -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="calendar-view-toggle">
+                <button class="cal-view-btn ${isTimeGrid ? 'active' : ''}" data-cal-view="timegrid">
+                  Horaria (Timeline)
+                </button>
+                <button class="cal-view-btn ${isWeekView ? 'active' : ''}" data-cal-view="week">
+                  Semanal (7 días)
+                </button>
+                <button class="cal-view-btn ${isMonthView ? 'active' : ''}" data-cal-view="month">
+                  Mensual
+                </button>
+              </div>
+
+              <button type="button" class="cal-filter-trigger-btn ${hasActiveFilters ? 'has-active' : ''}" data-action="open-agenda-filter-modal" title="Filtrar agenda" aria-label="Filtrar agenda">
+                ${icon('sliders')}
+                ${hasActiveFilters ? `<span class="filter-badge-dot"></span>` : ''}
+              </button>
+            </div>
+
+            <!-- Navigation Controls (<, Hoy, >) -->
+            <div class="calendar-nav-controls">
+              <button class="cal-nav-btn" data-action="cal-prev" title="Anterior" aria-label="Anterior">
+                ${icon('back')}
+              </button>
+              <button class="cal-today-btn" data-action="cal-today">
+                Hoy
+              </button>
+              <button class="cal-nav-btn" data-action="cal-next" title="Siguiente" aria-label="Siguiente">
+                ${icon('arrowRight')}
+              </button>
+              <strong class="cal-current-label">${rangeInfo.label}</strong>
+            </div>
+          </div>
+
+          <!-- Category Color Legend Bar -->
+          ${categories && categories.length > 0 ? `
+            <div class="calendar-category-legend-bar" aria-label="Leyenda de categorías">
+              <span class="cal-legend-title">Categorías:</span>
+              <div class="cal-legend-items">
+                ${categories.map((c) => {
+                  const isActive = String(agendaFilter.categoryId) === String(c.id);
+                  return `
+                    <button type="button" class="cal-legend-chip ${isActive ? 'active' : ''}" data-select-category="${c.id}" title="Filtrar por ${c.name}">
+                      <span class="cal-legend-dot" style="background: ${c.color}"></span>
+                      <span class="cal-legend-label">${c.name}</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${agendaFilter.date ? `
+            <div class="cal-selected-day-banner">
+              <span>📅 Filtrando por día seleccionado: <strong>${agendaFilter.date}</strong></span>
+              <button class="text-button" data-clear-date style="color: #6D28D9; font-size: 11.5px; font-weight: 800;">
+                ✕ Ver todo el período
+              </button>
+            </div>
+          ` : ''}
+
+          <!-- Dynamic Calendar View -->
+          ${isTimeGrid ? renderWeeklyTimeGrid(rangeInfo, rangeAppointments, appointmentSchedules, todayISO) : ''}
+          ${isWeekView ? `
+            <!-- Week Days Grid (7 days) -->
+            <div class="week-days">
+              ${rangeInfo.days.map((d) => {
+                const dateISO = formatDateISO(d);
+                const isSelected = agendaFilter.date === dateISO;
+                const isToday = dateISO === todayISO;
+                const dayData = dayApptsMap[dateISO];
+                const weekday = d.toLocaleDateString('es-CL', { weekday: 'short' });
+                return `
+                  <button class="day ${isSelected ? 'selected' : ''} ${isToday ? 'is-today' : ''}" data-select-date="${dateISO}" title="${d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}">
+                    <span class="day-name">${weekday}</span>
+                    <strong class="day-num">${d.getDate()}</strong>
+                    ${renderDayIndicators(dayData, false)}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          ` : ''}
+          ${isMonthView ? `
+            <!-- Month Calendar Grid -->
+            <div class="month-calendar-grid">
+              ${['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(w => `<div class="month-weekday-header">${w}</div>`).join('')}
+              ${rangeInfo.matrix.map((d) => {
+                const dateISO = formatDateISO(d);
+                const isSelected = agendaFilter.date === dateISO;
+                const isToday = dateISO === todayISO;
+                const isOtherMonth = d.getMonth() !== rangeInfo.month;
+                const dayData = dayApptsMap[dateISO];
+                return `
+                  <button class="month-day-cell ${isOtherMonth ? 'other-month' : ''} ${isToday ? 'is-today' : ''} ${isSelected ? 'selected' : ''}" data-select-date="${dateISO}" title="${d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}">
+                    <span class="month-day-num">${d.getDate()}</span>
+                    ${renderDayIndicators(dayData, true)}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          ` : ''}
+
+          ${hasActiveFilters ? `
+            <div class="agenda-active-filters-pill">
+              <div>
+                <span style="color: var(--muted); font-weight: 700; margin-right: 6px;">Filtros activos:</span>
+                <strong>${activeFiltersLabels.join(' · ')}</strong>
+              </div>
+              <button class="text-button" data-clear-all-filters style="color: var(--accent); font-size: 11.5px; font-weight: 800;">
+                ✕ Quitar filtros
+              </button>
+            </div>
+          ` : ''}
+        </section>
+
+        <!-- Appointment List Heading & Count -->
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 18px 0 12px; padding: 0 4px;">
+          <h2 style="font-size: 17px; margin: 0; font-weight: 800;">
+            ${agendaFilter.date ? `Compromisos del día (${agendaFilter.date})` : 'Compromisos programados'}
+          </h2>
+          <span class="count" style="font-weight: 700;">
+            ${appointmentsList.length} ${appointmentsList.length === 1 ? 'compromiso' : 'compromisos'}
+          </span>
+        </div>
+
+        <section class="agenda-list">
+          ${appointmentsList.map(appointmentCard).join('') || emptyState('Agenda despejada', 'No hay compromisos registrados para los filtros o período seleccionado.')}
+        </section>
+      </main>
     </div>
-
-    <section class="agenda-list">
-      ${appointmentsList.map(appointmentCard).join('') || emptyState('Agenda despejada', 'No hay compromisos registrados para los filtros o período seleccionado.')}
-    </section>
   `;
 }
 
@@ -7164,8 +8198,57 @@ document.addEventListener('click', async (event) => {
     return openBookingConsultationModal(artist, handle, color);
   }
 
+  // Create Dropdown Menu
+  const createMenuBtn = event.target.closest('[data-action="toggle-create-menu"]');
+  if (createMenuBtn) {
+    const dropdown = document.querySelector('#create-menu-dropdown');
+    if (dropdown) dropdown.classList.toggle('hidden');
+    return;
+  }
+  const createMenuDropdown = document.querySelector('#create-menu-dropdown');
+  if (createMenuDropdown && !createMenuDropdown.classList.contains('hidden') && !event.target.closest('.create-menu-wrapper')) {
+    createMenuDropdown.classList.add('hidden');
+  }
+
+  // Google Calendar style schedule actions
+  if (event.target.closest('[data-action="new-quick-task"]')) {
+    if (createMenuDropdown) createMenuDropdown.classList.add('hidden');
+    return newQuickTaskModal();
+  }
+  if (event.target.closest('[data-action="open-schedule-configurator"]')) {
+    if (createMenuDropdown) createMenuDropdown.classList.add('hidden');
+    return await renderScheduleConfigurator();
+  }
+  const editSchedBtn = event.target.closest('[data-action="edit-schedule"]');
+  if (editSchedBtn) {
+    return await renderScheduleConfigurator(editSchedBtn.dataset.scheduleId);
+  }
+  const lockSchedBtn = event.target.closest('[data-action="toggle-schedule-lock"]');
+  if (lockSchedBtn) {
+    const schedId = lockSchedBtn.dataset.scheduleId;
+    await api(`/api/schedules/${schedId}/lock`, { method: 'PATCH' });
+    return await renderAgenda();
+  }
+  const pubBookingBtn = event.target.closest('[data-action="open-public-booking"]');
+  if (pubBookingBtn) {
+    return await openPublicBookingModal(pubBookingBtn.dataset.scheduleSlug);
+  }
+  const copyRawBtn = event.target.closest('[data-action="copy-raw-link"]');
+  if (copyRawBtn) {
+    const url = copyRawBtn.dataset.url;
+    navigator.clipboard?.writeText(url);
+    copyRawBtn.innerHTML = `${icon('check')} ¡Copiado!`;
+    setTimeout(() => {
+      copyRawBtn.innerHTML = `${icon('copy')} Copiar enlace`;
+    }, 2000);
+    return;
+  }
+
   // Modals trigger buttons
-  if (event.target.closest('[data-action="new-booking"]')) return await newBookingModal();
+  if (event.target.closest('[data-action="new-booking"]')) {
+    if (createMenuDropdown) createMenuDropdown.classList.add('hidden');
+    return await newBookingModal();
+  }
   if (event.target.closest('[data-action="new-category"]')) return newCategoryModal();
   if (event.target.closest('[data-action="new-client"]')) return newClientModal();
   if (event.target.closest('[data-action="new-member"]')) return newMemberModal();
@@ -7211,10 +8294,11 @@ document.addEventListener('click', async (event) => {
     return await renderAgenda();
   }
 
-  // Category filter in agenda (if any legacy trigger is used)
+  // Category filter in agenda
   const catBtn = event.target.closest('[data-select-category]');
   if (catBtn) {
-    agendaFilter.categoryId = catBtn.dataset.selectCategory;
+    const targetCatId = catBtn.dataset.selectCategory;
+    agendaFilter.categoryId = String(agendaFilter.categoryId) === String(targetCatId) ? 'all' : targetCatId;
     return await renderAgenda();
   }
 
@@ -7715,6 +8799,18 @@ document.addEventListener('change', async (event) => {
       await handleGalleryFilesUpload(files);
       event.target.value = '';
     }
+  }
+
+  // Calendar category layer toggle (Google Calendar style layer switcher)
+  if (event.target.classList.contains('cal-layer-input')) {
+    const catId = String(event.target.dataset.categoryLayer);
+    if (!agendaFilter.hiddenCategories) agendaFilter.hiddenCategories = [];
+    if (!event.target.checked) {
+      if (!agendaFilter.hiddenCategories.includes(catId)) agendaFilter.hiddenCategories.push(catId);
+    } else {
+      agendaFilter.hiddenCategories = agendaFilter.hiddenCategories.filter((id) => id !== catId);
+    }
+    return await renderAgenda();
   }
 });
 

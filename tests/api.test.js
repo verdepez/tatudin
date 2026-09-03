@@ -495,5 +495,9 @@ test('Session Transcripts: Delete transcript /api/transcripts/:id', async () => 
   assert.equal(res.data.ok, true);
 });
 
+test.after(() => {
+  setTimeout(() => process.exit(0), 100);
+});
+
 
 

@@ -1405,6 +1405,77 @@ svg {
   margin-bottom: 12px;
 }
 
+/* Calendar Category Legend Bar */
+.calendar-category-legend-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  background: var(--surface-high, #faf9fd);
+  border: 1px solid var(--line-soft, #ebe7f5);
+  border-radius: var(--radius-md, 12px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.calendar-category-legend-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.cal-legend-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #666);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cal-legend-items {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.cal-legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  background: #ffffff;
+  border: 1px solid var(--line-soft, #e2e0ed);
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink, #221c35);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast, 0.15s ease);
+}
+
+.cal-legend-chip:hover {
+  border-color: var(--accent, #7c3aed);
+  background: #fbfaff;
+  transform: translateY(-1px);
+}
+
+.cal-legend-chip.active {
+  background: var(--ink, #221c35);
+  border-color: var(--ink, #221c35);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(9, 4, 28, 0.15);
+}
+
+.cal-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* Week Days Grid */
 .week-days {
   display: grid;
@@ -1453,6 +1524,50 @@ svg {
   color: #ffffff;
 }
 
+/* Day Category Indicators & Badges */
+.day-indicator-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 25px;
+  max-width: 100%;
+}
+
+.day-indicator-wrap.is-month {
+  margin-top: 4px;
+}
+
+.day-cat-dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 6px;
+  max-width: 100%;
+}
+
+.day-cat-dot {
+  display: inline-block;
+  width: 5.5px;
+  height: 5.5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: transform var(--transition-fast, 0.15s ease);
+}
+
+.day:hover .day-cat-dot,
+.month-day-cell:hover .day-cat-dot {
+  transform: scale(1.25);
+}
+
+.day.selected .day-cat-dot,
+.month-day-cell.selected .day-cat-dot {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
+}
+
 .day-badge-dot {
   display: inline-flex;
   align-items: center;
@@ -1465,15 +1580,18 @@ svg {
   border-radius: 9999px;
   font-size: 10px;
   font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 1.5px 4px rgba(0, 0, 0, 0.12);
+  transition: all var(--transition-fast, 0.15s ease);
 }
 
 .day.selected .day-badge-dot {
-  background: #ffffff;
-  color: var(--ink);
+  box-shadow: 0 0 0 1.5px #ffffff, 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
 .day-badge-placeholder {
-  height: 17px;
+  display: block;
+  height: 25px;
 }
 
 /* Month Calendar Grid */
@@ -1559,11 +1677,13 @@ svg {
   border-radius: 9999px;
   font-size: 10px;
   font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 1.5px 4px rgba(0, 0, 0, 0.12);
+  transition: all var(--transition-fast, 0.15s ease);
 }
 
 .month-day-cell.selected .month-day-badge {
-  background: #ffffff;
-  color: var(--ink);
+  box-shadow: 0 0 0 1.5px #ffffff, 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
 /* Filter Trigger Button & Active Filters Pill */
@@ -6367,4 +6487,926 @@ textarea {
   color: var(--muted);
   font-weight: 600;
   text-align: center;
+}
+
+/* ==========================================================================
+   GOOGLE CALENDAR STYLE APPOINTMENT SCHEDULES & LIQUID TIME GRID
+   ========================================================================== */
+
+/* 1. Create Dropdown Menu */
+.create-menu-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.create-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+  transition: all 0.18s ease;
+}
+
+.create-menu-btn:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+
+.create-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 250px;
+  background: var(--surface-high);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 120;
+  animation: createMenuDrop 0.16s ease-out;
+}
+
+@keyframes createMenuDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.create-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.14s ease;
+  width: 100%;
+}
+
+.create-menu-item:hover {
+  background: var(--surface);
+}
+
+.create-menu-item.highlight-sched {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.create-menu-item.highlight-sched:hover {
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.menu-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.menu-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menu-item-text strong {
+  font-size: 13px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.menu-item-text small {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.create-menu-divider {
+  height: 1px;
+  background: var(--line-soft);
+  margin: 4px 0;
+}
+
+/* 2. Liquid Agenda Layout (Sidebar + Calendar) */
+.agenda-liquid-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, 280px) 1fr;
+  gap: 20px;
+  align-items: start;
+  width: 100%;
+  margin-top: 16px;
+}
+
+@media (max-width: 991px) {
+  .agenda-liquid-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.agenda-sidebar-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sidebar-block {
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+}
+
+.sidebar-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.schedules-sidebar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sched-sidebar-card {
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface-high);
+  border: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.16s ease;
+}
+
+.sched-sidebar-card:hover {
+  border-color: var(--line-mid, #cbd5e1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.sched-sidebar-card.is-locked {
+  opacity: 0.85;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--surface-high),
+    var(--surface-high) 10px,
+    rgba(243, 244, 246, 0.4) 10px,
+    rgba(243, 244, 246, 0.4) 20px
+  );
+}
+
+.sched-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.sched-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.sched-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sched-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sched-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sched-status-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sched-status-badge.active {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.sched-status-badge.locked {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.sched-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sched-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.sched-btn:hover {
+  background: var(--surface-high);
+  border-color: var(--line-mid, #cbd5e1);
+}
+
+.sched-btn.lock-style:hover {
+  color: #DC2626;
+  border-color: #FCA5A5;
+}
+
+.sched-btn.unlock-style {
+  background: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #047857;
+}
+
+.sched-btn.unlock-style:hover {
+  background: #D1FAE5;
+}
+
+.sched-empty-box {
+  padding: 16px 8px;
+  text-align: center;
+  background: var(--surface-high);
+  border-radius: 10px;
+}
+
+/* Calendar Layer Checkboxes */
+.calendar-layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cal-layer-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: background 0.14s ease;
+  user-select: none;
+}
+
+.cal-layer-item:hover {
+  background: var(--surface-high);
+}
+
+.cal-layer-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cal-layer-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 2px solid var(--cat-layer-color, #7C3AED);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cal-layer-input:checked + .cal-layer-box {
+  background: var(--cat-layer-color, #7C3AED);
+}
+
+.cal-layer-input:checked + .cal-layer-box::after {
+  content: '';
+  width: 4px;
+  height: 8px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-top: -2px;
+}
+
+.cal-layer-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* 3. Weekly Time Grid (Timeline de 07:00 a 22:00) */
+.weekly-timegrid-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.timegrid-header-row {
+  display: grid;
+  grid-template-columns: 54px repeat(7, 1fr);
+  background: var(--surface-high);
+  border-bottom: 1px solid var(--line-soft);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.timegrid-time-corner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 700;
+  border-right: 1px solid var(--line-soft);
+}
+
+.timegrid-day-header-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-right: 1px solid var(--line-soft);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.timegrid-day-header-cell:last-child {
+  border-right: none;
+}
+
+.timegrid-day-header-cell:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.day-header-weekday {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.day-header-num-bubble {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.day-header-num-bubble.today-bubble {
+  background: var(--accent, #0284C7);
+  color: #ffffff;
+}
+
+.timegrid-scroll-body {
+  display: flex;
+  max-height: 650px;
+  overflow-y: auto;
+  overflow-x: auto;
+  position: relative;
+}
+
+.timegrid-hours-col {
+  width: 54px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--line-soft);
+  background: var(--surface-high);
+}
+
+.timegrid-hour-marker {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 4px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+  box-sizing: border-box;
+}
+
+.timegrid-days-columns {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(80px, 1fr));
+  position: relative;
+}
+
+.timegrid-day-column {
+  position: relative;
+  border-right: 1px solid var(--line-soft);
+  box-sizing: border-box;
+}
+
+.timegrid-day-column:last-child {
+  border-right: none;
+}
+
+.timegrid-day-column.today-col {
+  background: rgba(2, 132, 199, 0.02);
+}
+
+.timegrid-slot-cell {
+  border-bottom: 1px solid var(--line-soft);
+  box-sizing: border-box;
+  transition: background 0.12s ease;
+}
+
+.timegrid-slot-cell:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* Availability block */
+.timegrid-avail-window {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--avail-color) 12%, transparent);
+  border-left: 3px solid var(--avail-color);
+  padding: 4px 6px;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.timegrid-avail-window.is-locked-window {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(220, 38, 38, 0.06),
+    rgba(220, 38, 38, 0.06) 6px,
+    rgba(220, 38, 38, 0.14) 6px,
+    rgba(220, 38, 38, 0.14) 12px
+  );
+  border-left-color: #DC2626;
+}
+
+.avail-window-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.avail-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.avail-sched-name {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.avail-locked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #DC2626;
+  background: #FEE2E2;
+  padding: 1px 4px;
+  border-radius: 4px;
+  margin-left: 2px;
+}
+
+/* Event block in timegrid */
+.timegrid-event-block {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border-radius: 6px;
+  background: var(--event-color, #7C3AED);
+  color: #ffffff;
+  padding: 4px 6px;
+  z-index: 6;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+  box-sizing: border-box;
+}
+
+.timegrid-event-block:hover {
+  transform: translateY(-1px) scale(1.01);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+  z-index: 10;
+}
+
+.event-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  opacity: 0.9;
+  font-weight: 700;
+}
+
+.event-block-title {
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-client-name {
+  font-size: 10px;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Red current time indicator */
+.timegrid-current-time-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #EA4335;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.timegrid-now-circle {
+  position: absolute;
+  left: -5px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #EA4335;
+}
+
+/* 4. Schedule Configurator Split Screen (Captura 2) */
+.schedule-configurator-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.configurator-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+.config-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.back-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.config-topbar-badge {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  background: var(--surface-high);
+  border-radius: 6px;
+  color: var(--ink);
+}
+
+.config-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule-split-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) 1fr;
+  gap: 20px;
+  align-items: start;
+  width: 100%;
+}
+
+@media (max-width: 991px) {
+  .schedule-split-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.schedule-config-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: var(--radius-md);
+}
+
+.config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.config-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.config-input-title {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-high);
+  color: var(--ink);
+  transition: border-color 0.16s ease;
+}
+
+.config-input-title:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.config-palette-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.palette-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.palette-swatch:hover {
+  transform: scale(1.1);
+}
+
+.palette-swatch.is-selected {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px var(--ink);
+  transform: scale(1.05);
+}
+
+.config-select, .config-textarea {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-high);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.config-divider {
+  height: 1px;
+  background: var(--line-soft);
+  margin: 4px 0;
+}
+
+.sched-lock-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-high);
+  border: 1px solid var(--line-soft);
+}
+
+.sched-lock-card.is-locked-state {
+  border-color: #FCA5A5;
+  background: #FEF2F2;
+}
+
+.sched-days-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sched-day-editor-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-high);
+  border: 1px solid var(--line-soft);
+}
+
+.sched-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sched-day-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sched-not-avail-tag {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.sched-slots-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sched-slot-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sched-time-input {
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.sched-time-sep {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sched-remove-slot-btn, .sched-copy-all-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.14s ease;
+}
+
+.sched-remove-slot-btn:hover {
+  color: #DC2626;
+  border-color: #FCA5A5;
+}
+
+.sched-copy-all-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.sched-add-extra-btn {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.config-note-box {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-high);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.schedule-preview-area {
+  padding: 20px;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preview-area-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.preview-color-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--live-color, #7C3AED) 12%, transparent);
+  border: 1px solid var(--live-color, #7C3AED);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.live-title-preview {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.live-timegrid-wrap {
+  width: 100%;
 }

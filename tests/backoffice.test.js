@@ -173,3 +173,7 @@ test('Backoffice: Superadmin can purge production data and root account remains 
   // Re-seed demo data for pleasant user experience
   await request('/api/backoffice/seed-demo', { method: 'POST' }, loginAgain.cookie);
 });
+
+test.after(() => {
+  setTimeout(() => process.exit(0), 100);
+});

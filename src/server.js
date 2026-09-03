@@ -1946,6 +1946,393 @@ app.patch('/api/appointments/:id', requireAuth, async (request, response) => {
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
+// ---------------- APPOINTMENT SCHEDULES & BOOKING PAGES ----------------
+app.get('/api/schedules', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const schedulesRes = await pool.query(`
+      SELECT s.*, u.full_name AS artist_name, cc.name AS category_name, cc.color AS category_color
+      FROM appointment_schedules s
+      LEFT JOIN users u ON u.id = s.artist_id
+      LEFT JOIN commitment_categories cc ON cc.id = s.category_id
+      WHERE s.studio_id = $1 AND s.is_active = TRUE
+      ORDER BY s.created_at ASC
+    `, [request.studioId]);
+
+    const scheduleIds = schedulesRes.rows.map(r => r.id);
+    let rulesBySchedule = {};
+    if (scheduleIds.length > 0) {
+      const rulesRes = await pool.query(`
+        SELECT * FROM schedule_availability_rules
+        WHERE schedule_id = ANY($1::int[])
+        ORDER BY day_of_week ASC, start_time ASC
+      `, [scheduleIds]);
+      rulesRes.rows.forEach(rule => {
+        if (!rulesBySchedule[rule.schedule_id]) rulesBySchedule[rule.schedule_id] = [];
+        rulesBySchedule[rule.schedule_id].push(rule);
+      });
+    }
+
+    const result = schedulesRes.rows.map(s => ({
+      ...s,
+      rules: rulesBySchedule[s.id] || []
+    }));
+
+    return response.json(result);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/schedules', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const {
+      title,
+      artistId = null,
+      categoryId = null,
+      durationMinutes = 60,
+      color = '#7C3AED',
+      minLeadHours = 4,
+      maxAdvanceDays = 60,
+      instructions = '',
+      rules = []
+    } = request.body;
+
+    if (!title || !title.trim()) {
+      return response.status(400).json({ error: 'El título de la agenda es obligatorio' });
+    }
+
+    const cleanTitle = title.trim();
+    const baseSlug = cleanTitle.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const uniqueSlug = `${baseSlug || 'agenda'}-${crypto.randomBytes(3).toString('hex')}`;
+
+    const insertSchedule = await pool.query(`
+      INSERT INTO appointment_schedules
+        (studio_id, artist_id, category_id, title, slug, duration_minutes, color, is_locked, is_active, min_lead_hours, max_advance_days, instructions)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, TRUE, $8, $9, $10)
+      RETURNING *
+    `, [
+      request.studioId,
+      artistId ? Number(artistId) : null,
+      categoryId ? Number(categoryId) : null,
+      cleanTitle,
+      uniqueSlug,
+      Math.max(15, Number(durationMinutes || 60)),
+      color || '#7C3AED',
+      Math.max(0, Number(minLeadHours || 4)),
+      Math.max(1, Number(maxAdvanceDays || 60)),
+      instructions ? instructions.trim() : ''
+    ]);
+
+    const schedule = insertSchedule.rows[0];
+
+    // Insert rules
+    const insertedRules = [];
+    if (Array.isArray(rules) && rules.length > 0) {
+      for (const r of rules) {
+        const dow = Number(r.dayOfWeek ?? r.day_of_week);
+        if (dow >= 0 && dow <= 6) {
+          const ruleRes = await pool.query(`
+            INSERT INTO schedule_availability_rules (schedule_id, day_of_week, start_time, end_time)
+            VALUES ($1, $2, $3, $4)
+            RETURNING *
+          `, [schedule.id, dow, r.startTime || r.start_time || '09:00', r.endTime || r.end_time || '17:00']);
+          insertedRules.push(ruleRes.rows[0]);
+        }
+      }
+    }
+
+    if (typeof logAuditEvent === 'function') {
+      await logAuditEvent({
+        userId: request.userId,
+        studioId: request.studioId,
+        action: 'create_appointment_schedule',
+        entityType: 'schedule',
+        entityId: schedule.id,
+        metadata: { title: schedule.title, color: schedule.color }
+      });
+    }
+
+    return response.status(201).json({ ...schedule, rules: insertedRules });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/schedules/:id', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const res = await pool.query(`
+      SELECT s.*, u.full_name AS artist_name, cc.name AS category_name
+      FROM appointment_schedules s
+      LEFT JOIN users u ON u.id = s.artist_id
+      LEFT JOIN commitment_categories cc ON cc.id = s.category_id
+      WHERE s.id = $1 AND s.studio_id = $2
+    `, [Number(request.params.id), request.studioId]);
+
+    if (!res.rowCount) return response.status(404).json({ error: 'Agenda no encontrada' });
+    const schedule = res.rows[0];
+
+    const rules = await pool.query(`
+      SELECT * FROM schedule_availability_rules
+      WHERE schedule_id = $1
+      ORDER BY day_of_week ASC, start_time ASC
+    `, [schedule.id]);
+
+    return response.json({ ...schedule, rules: rules.rows });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/schedules/:id/lock', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const current = await pool.query(
+      'SELECT id, is_locked, title FROM appointment_schedules WHERE id = $1 AND studio_id = $2',
+      [Number(request.params.id), request.studioId]
+    );
+    if (!current.rowCount) return response.status(404).json({ error: 'Agenda no encontrada' });
+
+    const newLockState = request.body.isLocked !== undefined ? Boolean(request.body.isLocked) : !current.rows[0].is_locked;
+
+    const updated = await pool.query(
+      'UPDATE appointment_schedules SET is_locked = $1, updated_at = NOW() WHERE id = $2 AND studio_id = $3 RETURNING *',
+      [newLockState, Number(request.params.id), request.studioId]
+    );
+
+    if (typeof logAuditEvent === 'function') {
+      await logAuditEvent({
+        userId: request.userId,
+        studioId: request.studioId,
+        action: newLockState ? 'lock_appointment_schedule' : 'unlock_appointment_schedule',
+        entityType: 'schedule',
+        entityId: Number(request.params.id),
+        metadata: { title: current.rows[0].title, is_locked: newLockState }
+      });
+    }
+
+    return response.json(updated.rows[0]);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/schedules/:id', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const {
+      title,
+      artistId,
+      categoryId,
+      durationMinutes,
+      color,
+      isLocked,
+      minLeadHours,
+      maxAdvanceDays,
+      instructions,
+      rules
+    } = request.body;
+
+    const current = await pool.query(
+      'SELECT id FROM appointment_schedules WHERE id = $1 AND studio_id = $2',
+      [Number(request.params.id), request.studioId]
+    );
+    if (!current.rowCount) return response.status(404).json({ error: 'Agenda no encontrada' });
+
+    const updateRes = await pool.query(`
+      UPDATE appointment_schedules SET
+        title = COALESCE($1, title),
+        artist_id = CASE WHEN $2::integer IS NOT NULL THEN (CASE WHEN $2 = -1 THEN NULL ELSE $2 END) ELSE artist_id END,
+        category_id = CASE WHEN $3::integer IS NOT NULL THEN (CASE WHEN $3 = -1 THEN NULL ELSE $3 END) ELSE category_id END,
+        duration_minutes = COALESCE($4, duration_minutes),
+        color = COALESCE($5, color),
+        is_locked = COALESCE($6, is_locked),
+        min_lead_hours = COALESCE($7, min_lead_hours),
+        max_advance_days = COALESCE($8, max_advance_days),
+        instructions = COALESCE($9, instructions),
+        updated_at = NOW()
+      WHERE id = $10 AND studio_id = $11
+      RETURNING *
+    `, [
+      title ? title.trim() : null,
+      artistId !== undefined ? (artistId ? Number(artistId) : -1) : null,
+      categoryId !== undefined ? (categoryId ? Number(categoryId) : -1) : null,
+      durationMinutes ? Number(durationMinutes) : null,
+      color || null,
+      isLocked !== undefined ? Boolean(isLocked) : null,
+      minLeadHours !== undefined ? Number(minLeadHours) : null,
+      maxAdvanceDays !== undefined ? Number(maxAdvanceDays) : null,
+      instructions !== undefined ? instructions.trim() : null,
+      Number(request.params.id),
+      request.studioId
+    ]);
+
+    const schedule = updateRes.rows[0];
+
+    // If rules are provided, replace them
+    if (Array.isArray(rules)) {
+      await pool.query('DELETE FROM schedule_availability_rules WHERE schedule_id = $1', [schedule.id]);
+      for (const r of rules) {
+        const dow = Number(r.dayOfWeek ?? r.day_of_week);
+        if (dow >= 0 && dow <= 6) {
+          await pool.query(`
+            INSERT INTO schedule_availability_rules (schedule_id, day_of_week, start_time, end_time)
+            VALUES ($1, $2, $3, $4)
+          `, [schedule.id, dow, r.startTime || r.start_time || '09:00', r.endTime || r.end_time || '17:00']);
+        }
+      }
+    }
+
+    const updatedRules = await pool.query(
+      'SELECT * FROM schedule_availability_rules WHERE schedule_id = $1 ORDER BY day_of_week ASC, start_time ASC',
+      [schedule.id]
+    );
+
+    return response.json({ ...schedule, rules: updatedRules.rows });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/schedules/:id', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const res = await pool.query(
+      'DELETE FROM appointment_schedules WHERE id = $1 AND studio_id = $2 RETURNING id',
+      [Number(request.params.id), request.studioId]
+    );
+    if (!res.rowCount) return response.status(404).json({ error: 'Agenda no encontrada' });
+    return response.json({ ok: true, id: Number(request.params.id) });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+// Public schedule booking info
+app.get('/api/public/schedules/:slug', async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const res = await pool.query(`
+      SELECT s.*, st.name AS studio_name, st.currency, st.timezone,
+             u.full_name AS artist_name, cc.name AS category_name
+      FROM appointment_schedules s
+      JOIN studios st ON st.id = s.studio_id
+      LEFT JOIN users u ON u.id = s.artist_id
+      LEFT JOIN commitment_categories cc ON cc.id = s.category_id
+      WHERE s.slug = $1 AND s.is_active = TRUE
+    `, [request.params.slug]);
+
+    if (!res.rowCount) return response.status(404).json({ error: 'Agenda de citas no encontrada' });
+    const schedule = res.rows[0];
+
+    const rulesRes = await pool.query(
+      'SELECT * FROM schedule_availability_rules WHERE schedule_id = $1 ORDER BY day_of_week ASC, start_time ASC',
+      [schedule.id]
+    );
+    const rules = rulesRes.rows;
+
+    return response.json({
+      schedule: {
+        id: schedule.id,
+        title: schedule.title,
+        slug: schedule.slug,
+        durationMinutes: schedule.duration_minutes,
+        color: schedule.color,
+        isLocked: schedule.is_locked,
+        instructions: schedule.instructions,
+        studioName: schedule.studio_name,
+        artistName: schedule.artist_name,
+        categoryName: schedule.category_name,
+        timezone: schedule.timezone,
+        minLeadHours: schedule.min_lead_hours,
+        maxAdvanceDays: schedule.max_advance_days
+      },
+      rules
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/public/schedules/:slug/book', publicApiRateLimiter, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const { clientName, clientEmail, clientPhone, startsAt, notes = '' } = request.body;
+    if (!clientName?.trim() || !startsAt) {
+      return response.status(400).json({ error: 'Nombre del cliente y horario son requeridos' });
+    }
+
+    const schedRes = await pool.query(
+      'SELECT * FROM appointment_schedules WHERE slug = $1 AND is_active = TRUE',
+      [request.params.slug]
+    );
+    if (!schedRes.rowCount) return response.status(404).json({ error: 'Agenda no encontrada' });
+    const schedule = schedRes.rows[0];
+
+    if (schedule.is_locked) {
+      return response.status(403).json({ error: 'Esta agenda se encuentra actualmente bloqueada y no acepta nuevas reservas.' });
+    }
+
+    // Check conflict
+    const conflict = await checkAppointmentConflict(
+      schedule.studio_id,
+      startsAt,
+      schedule.duration_minutes,
+      schedule.artist_id,
+      null
+    );
+    if (conflict) {
+      return response.status(409).json({ error: 'El horario solicitado ya ha sido ocupado. Por favor selecciona otro tramo.' });
+    }
+
+    // Find or create client
+    let clientId = null;
+    const cleanPhone = (clientPhone || '').trim();
+    const cleanEmail = (clientEmail || '').trim().toLowerCase();
+
+    if (cleanEmail || cleanPhone) {
+      const existingClient = await pool.query(
+        'SELECT id FROM clients WHERE studio_id = $1 AND ( (email = $2 AND $2 <> \'\') OR (phone = $3 AND $3 <> \'\') ) LIMIT 1',
+        [schedule.studio_id, cleanEmail, cleanPhone]
+      );
+      if (existingClient.rowCount) {
+        clientId = existingClient.rows[0].id;
+      }
+    }
+
+    if (!clientId) {
+      const newClient = await pool.query(
+        'INSERT INTO clients (studio_id, name, email, phone, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+        [schedule.studio_id, clientName.trim(), cleanEmail || null, cleanPhone || null, `Creado desde reserva pública: ${schedule.title}`]
+      );
+      clientId = newClient.rows[0].id;
+    }
+
+    // Create appointment
+    const newAppt = await pool.query(`
+      INSERT INTO appointments
+        (studio_id, category_id, client_id, artist_id, title, notes, starts_at, duration_minutes, status, price, deposit)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'confirmed', 0, 0)
+      RETURNING *
+    `, [
+      schedule.studio_id,
+      schedule.category_id,
+      clientId,
+      schedule.artist_id,
+      `${schedule.title} - ${clientName.trim()}`,
+      notes ? notes.trim() : `Reserva online de ${schedule.title}`,
+      startsAt,
+      schedule.duration_minutes
+    ]);
+
+    return response.status(201).json({ ok: true, appointment: newAppt.rows[0] });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
 // ---------------- SESSION TRANSCRIPTS & MEETING NOTES ----------------
 app.get('/api/appointments/:id/transcripts', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
@@ -3163,6 +3550,59 @@ async function ensureAuthSchema() {
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+
+  // 20. Appointment Schedules (Google Calendar style Appointment Schedules & Booking Pages)
+  await safeExec('CREATE TABLE appointment_schedules', `CREATE TABLE IF NOT EXISTS appointment_schedules (
+    id SERIAL PRIMARY KEY,
+    studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+    artist_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    category_id INTEGER REFERENCES commitment_categories(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    duration_minutes INTEGER NOT NULL DEFAULT 60,
+    color TEXT NOT NULL DEFAULT '#7C3AED',
+    is_locked BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    min_lead_hours INTEGER NOT NULL DEFAULT 4,
+    max_advance_days INTEGER NOT NULL DEFAULT 60,
+    instructions TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+
+  await safeExec('CREATE TABLE schedule_availability_rules', `CREATE TABLE IF NOT EXISTS schedule_availability_rules (
+    id SERIAL PRIMARY KEY,
+    schedule_id INTEGER NOT NULL REFERENCES appointment_schedules(id) ON DELETE CASCADE,
+    day_of_week INTEGER NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6),
+    start_time TEXT NOT NULL DEFAULT '09:00',
+    end_time TEXT NOT NULL DEFAULT '17:00'
+  )`);
+
+  // Seed default appointment schedule if none exists per studio
+  try {
+    const allStudiosForSched = await pool.query('SELECT id, name FROM studios');
+    for (const st of allStudiosForSched.rows) {
+      const existingSched = await pool.query('SELECT id FROM appointment_schedules WHERE studio_id = $1 LIMIT 1', [st.id]);
+      if (!existingSched.rowCount) {
+        const defSched = await pool.query(`
+          INSERT INTO appointment_schedules
+            (studio_id, title, slug, duration_minutes, color, is_locked, is_active, instructions)
+          VALUES ($1, 'Citas de Tatuaje', $2, 120, '#7C3AED', FALSE, TRUE, 'Reserva tu sesión de tatuaje. Por favor asiste puntual y descansado.')
+          RETURNING id
+        `, [st.id, `citas-tatuaje-${st.id}-${Date.now().toString(36)}`]);
+        const schedId = defSched.rows[0].id;
+        // Default rules: Lun a Vie de 09:00 a 17:00
+        for (let dow = 1; dow <= 5; dow++) {
+          await pool.query(`
+            INSERT INTO schedule_availability_rules (schedule_id, day_of_week, start_time, end_time)
+            VALUES ($1, $2, '09:00', '17:00')
+          `, [schedId, dow]);
+        }
+      }
+    }
+  } catch (schedSeedErr) {
+    console.warn('[DB Migration] Schedules seed warning:', schedSeedErr.message);
+  }
 
   // Seed default categories
   try {
