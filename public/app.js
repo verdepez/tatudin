@@ -679,10 +679,15 @@ function appointmentCard(item) {
           <h3 class="client-name">${primaryTitle}</h3>
         </div>
         <div class="appointment-chips-row">
-          <span class="category-chip" style="--cat-color: ${catColor}">
+          <span class="category-chip cat-chip-${item.category_id || '0'}" style="--cat-color: ${catColor}">
             <span class="cat-dot" style="background: ${catColor}"></span>
             ${catName}
           </span>
+          ${item.external_source ? `
+            <span class="sync-chip" title="Enlazado con ${item.external_calendar_name || 'calendario externo'}">
+              🔗 ${item.external_calendar_name || 'Enlazado'}
+            </span>
+          ` : ''}
           <span class="status-chip ${statusInfo.class}">${statusInfo.label}</span>
           ${item.artist_name ? `<span class="artist-chip ${roleInfo.class}">${(item.artist_name || '').split(' ')[0]}</span>` : ''}
           ${item.space_name ? `<span class="space-chip">${icon('box')} ${item.space_name}</span>` : ''}
@@ -690,6 +695,25 @@ function appointmentCard(item) {
         <p class="service-title">${secondaryTitle}</p>
       </div>
       <div class="appointment-actions">
+        <button type="button" class="cal-inject-btn"
+          data-action="add-google-cal"
+          data-title="${encodeURIComponent(primaryTitle)}"
+          data-starts-at="${item.starts_at}"
+          data-duration="${item.duration_minutes || 120}"
+          data-notes="${encodeURIComponent(item.notes || '')}"
+          title="Inyectar / añadir a Google Calendar">
+          <span>📅 Google</span>
+        </button>
+        <button type="button" class="cal-inject-btn"
+          data-action="download-appt-ics"
+          data-title="${encodeURIComponent(primaryTitle)}"
+          data-starts-at="${item.starts_at}"
+          data-duration="${item.duration_minutes || 120}"
+          data-notes="${encodeURIComponent(item.notes || '')}"
+          title="Añadir a Apple Calendar (.ics)">
+          <span>🍏 Apple</span>
+        </button>
+
         <button type="button" class="voice-mic-btn"
           data-action="open-voice-modal"
           data-appt-id="${item.id}"
@@ -954,7 +978,7 @@ function renderDayIndicators(dayData, isMonthView = false) {
   const dotsHtml = `
     <span class="day-cat-dots" aria-hidden="true">
       ${dayCats.slice(0, 4).map((c) => `
-        <span class="day-cat-dot" style="background: ${c.color || '#7C3AED'};" title="${c.name} (${c.count})"></span>
+        <span class="day-cat-dot cat-dot-${c.id}" style="background: ${c.color || '#7C3AED'};" title="${c.name} (${c.count})"></span>
       `).join('')}
     </span>
   `;
@@ -1086,12 +1110,16 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                   const color = a.category_color || '#7C3AED';
                   return `
                     <div class="timegrid-event-block"
-                         style="top: ${top}px; height: ${height}px; --event-color: ${color};"
+                         style="top: ${top}px; height: ${height}px; --event-color: ${color}; background: ${color};"
                          data-action="view-appointment-detail" data-appointment-id="${a.id}"
+                         data-event-category-id="${a.category_id || ''}"
                          title="${a.title} · ${formatTime(a.starts_at)} (${duration} min)">
                       <div class="event-block-header">
                         <span class="event-time">${formatTime(a.starts_at)}</span>
-                        ${a.status === 'completed' ? `<span class="event-status-tag">✓</span>` : ''}
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                          ${a.external_source ? `<span class="event-sync-badge" title="Enlazado con ${a.external_calendar_name || 'calendario externo'}">🔗</span>` : ''}
+                          ${a.status === 'completed' ? `<span class="event-status-tag">✓</span>` : ''}
+                        </div>
                       </div>
                       <strong class="event-block-title">${a.title}</strong>
                       ${a.client_name ? `<span class="event-client-name">${a.client_name}</span>` : ''}
@@ -1329,6 +1357,360 @@ async function openPublicBookingModal(slug) {
     });
   } catch (err) {
     alert(`No se pudo cargar la agenda: ${err.message}`);
+  }
+}
+
+// ---------------- CALENDAR SYNC (GOOGLE / APPLE CALENDAR) & ICS IMPORT ----------------
+function makeGoogleCalendarEventUrl(title, startsAt, durationMinutes = 120, notes = '') {
+  const start = new Date(startsAt);
+  const end = new Date(start.getTime() + (durationMinutes || 120) * 60000);
+  const formatUtc = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const dates = `${formatUtc(start)}/${formatUtc(end)}`;
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title || 'Cita Tatudin',
+    dates,
+    details: `${notes || ''}\n\nGestionado desde Tatudin PWA`
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function downloadSingleApptIcs(title, startsAt, durationMinutes = 120, notes = '') {
+  const start = new Date(startsAt);
+  const end = new Date(start.getTime() + (durationMinutes || 120) * 60000);
+  const formatUtc = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const nowUtc = formatUtc(new Date());
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Tatudin//Agenda//ES',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:tatudin-${Date.now()}@tatudin.cl`,
+    `DTSTAMP:${nowUtc}`,
+    `DTSTART:${formatUtc(start)}`,
+    `DTEND:${formatUtc(end)}`,
+    `SUMMARY:${(title || 'Cita Tatudin').replace(/[,;\n]/g, ' ')}`,
+    `DESCRIPTION:${(notes || '').replace(/[,;\n]/g, ' ')}`,
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(title || 'cita').toLowerCase().replace(/[^a-z0-9]/gi, '_')}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function handleCategoryColorChange(catId, newColor, persist = false) {
+  // 1. Update swatch and box in sidebar
+  const row = document.querySelector(`.cal-layer-row[data-cat-id="${catId}"]`);
+  if (row) {
+    const swatch = row.querySelector('.cal-layer-color-swatch');
+    if (swatch) swatch.style.background = newColor;
+    const box = row.querySelector('.cal-layer-box');
+    if (box) box.style.setProperty('--cat-layer-color', newColor);
+  }
+
+  // 2. Update category in local memory
+  if (Array.isArray(categories)) {
+    const cat = categories.find((c) => String(c.id) === String(catId));
+    if (cat) cat.color = newColor;
+  }
+
+  // 3. Update rendered event cards in timegrid and week view
+  document.querySelectorAll(`[data-event-category-id="${catId}"]`).forEach((el) => {
+    el.style.setProperty('--event-color', newColor);
+    el.style.background = newColor;
+  });
+
+  // 4. Update month view category dots
+  document.querySelectorAll(`.cat-dot-${catId}`).forEach((dot) => {
+    dot.style.background = newColor;
+  });
+
+  // 5. Update category chips in appointments list
+  document.querySelectorAll(`.cat-chip-${catId}`).forEach((chip) => {
+    chip.style.setProperty('--cat-color', newColor);
+    const dot = chip.querySelector('.cat-dot');
+    if (dot) dot.style.background = newColor;
+  });
+
+  // 6. Persist to server on change
+  if (persist) {
+    api(`/api/categories/${catId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ color: newColor })
+    }).catch((err) => console.error('Error guardando color de categoría:', err));
+  }
+}
+
+async function openCalendarSyncModal() {
+  try {
+    const feedInfo = await api('/api/calendar/feed-url').catch(() => ({
+      feedUrl: '',
+      webcalUrl: '',
+      googleUrl: ''
+    }));
+
+    const artistsList = members || [];
+    const categoriesList = categories || [];
+
+    openModal(`
+      <div class="calendar-sync-modal">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(2, 132, 199, 0.12); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 18px;">
+            ${icon('upload')}
+          </div>
+          <div>
+            <h2 style="margin: 0; font-size: 18px;">Sincronizar y Enlazar Calendarios</h2>
+            <p style="margin: 2px 0 0; color: var(--muted); font-size: 12.5px;">Importa citas existentes y conecta Tatudin en vivo con Google Calendar y Apple Calendar.</p>
+          </div>
+        </div>
+
+        <div class="sync-modal-tabs">
+          <button type="button" class="sync-tab-btn active" data-sync-tab="import">
+            📥 Importar archivo .ICS
+          </button>
+          <button type="button" class="sync-tab-btn" data-sync-tab="connect">
+            🔄 Conectar Google & Apple Calendar
+          </button>
+        </div>
+
+        <!-- Tab 1: Import ICS -->
+        <div id="sync-tab-import" class="sync-tab-content">
+          <form id="import-ics-form" style="display: flex; flex-direction: column; gap: 14px;">
+            <div class="ics-dropzone" id="ics-dropzone">
+              <input type="file" id="ics-file-input" accept=".ics,text/calendar" style="display: none;" />
+              <div class="ics-dropzone-inner">
+                <span class="dropzone-icon" style="font-size: 28px;">📅</span>
+                <p style="margin: 6px 0 2px; font-weight: 700; font-size: 14px;">Arrastra tu archivo .ics aquí o haz clic para seleccionarlo</p>
+                <small style="color: var(--muted); font-size: 12px;">Compatible con exportaciones de Google Calendar, Apple Calendar, Outlook, etc.</small>
+                <div id="ics-file-status" style="margin-top: 8px; font-size: 12.5px; font-weight: 700; color: var(--accent);"></div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <label style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-size: 12px; font-weight: 700;">Categoría destino</span>
+                <select name="categoryId" class="config-select">
+                  ${categoriesList.map((c) => `<option value="${c.id}">${c.name}</option>`).join('')}
+                </select>
+              </label>
+
+              <label style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-size: 12px; font-weight: 700;">Artista asignado</span>
+                <select name="artistId" class="config-select">
+                  <option value="all">Yo mismo (Usuario actual)</option>
+                  ${artistsList.map((m) => `<option value="${m.id}">${m.full_name || m.email}</option>`).join('')}
+                </select>
+              </label>
+            </div>
+
+            <label style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 12px; font-weight: 700;">Nombre de la agenda de origen</span>
+              <input type="text" name="calendarName" class="config-select" value="Google Calendar Personal" placeholder="Ej: Google Calendar Personal" />
+            </label>
+
+            <div id="ics-preview-box" class="config-note-box" style="display: none; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2);">
+              <span id="ics-preview-text" style="font-weight: 700; color: #065F46; font-size: 12.5px;"></span>
+            </div>
+
+            <textarea id="raw-ics-data" style="display: none;"></textarea>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
+              <button type="button" class="btn-ghost" data-close-modal>Cancelar</button>
+              <button type="submit" id="submit-import-ics" class="primary" disabled>
+                ${icon('upload')} <span>Importar Citas a Tatudin</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Tab 2: Connect Live with Google & Apple Calendar -->
+        <div id="sync-tab-connect" class="sync-tab-content" style="display: none;">
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div class="config-note-box" style="background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(2, 132, 199, 0.2); font-size: 12.5px;">
+              <p style="margin: 0 0 4px; font-weight: 700; color: var(--accent);">📡 Sincronización en vivo (webcal feed RFC 5545)</p>
+              <span style="color: var(--ink);">
+                Al suscribirte, cualquier cita creada, modificada o cancelada en Tatudin se reflejará automáticamente en Google Calendar y Apple Calendar en tu iPhone, Mac o Android.
+              </span>
+            </div>
+
+            <!-- Apple Calendar card -->
+            <div class="sync-service-card">
+              <div class="sync-service-info">
+                <div class="sync-service-icon" style="background: #111827; color: #ffffff;">🍏</div>
+                <div>
+                  <strong style="font-size: 13.5px;">Apple Calendar (Mac, iPhone, iPad)</strong>
+                  <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--muted);">Suscripción nativa con 1 clic en la app Calendario de iOS y macOS.</p>
+                </div>
+              </div>
+              <a href="${feedInfo.webcalUrl}" class="primary button" style="text-decoration: none; padding: 8px 14px; font-size: 12px;">
+                Suscribir en Apple Calendar
+              </a>
+            </div>
+
+            <!-- Google Calendar card -->
+            <div class="sync-service-card">
+              <div class="sync-service-info">
+                <div class="sync-service-icon" style="background: #4285F4; color: #ffffff;">📅</div>
+                <div>
+                  <strong style="font-size: 13.5px;">Google Calendar (Web y Android)</strong>
+                  <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--muted);">Añade tu agenda de Tatudin directamente a tus calendarios de Google.</p>
+                </div>
+              </div>
+              <a href="${feedInfo.googleUrl}" target="_blank" rel="noopener noreferrer" class="button" style="text-decoration: none; padding: 8px 14px; font-size: 12px; background: var(--surface-high); border: 1px solid var(--line-soft);">
+                Añadir a Google Calendar
+              </a>
+            </div>
+
+            <!-- Manual URL copy -->
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+              <span style="font-size: 11.5px; font-weight: 700; color: var(--muted);">URL privada del feed (para Outlook u otros clientes):</span>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" readonly value="${feedInfo.feedUrl}" id="copy-feed-url-input" class="config-select" style="flex: 1; font-size: 11.5px;" />
+                <button type="button" class="btn-ghost sched-btn" data-action="copy-feed-url">
+                  ${icon('copy')} <span>Copiar</span>
+                </button>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line-soft); padding-top: 12px;">
+              <button type="button" class="btn-ghost sched-btn" data-action="regenerate-feed-token" style="color: #DC2626; font-size: 11px;">
+                ${icon('lock')} <span>Regenerar clave privada</span>
+              </button>
+              <button type="button" class="primary" data-close-modal>Entendido</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `);
+
+    // Wire tab switching
+    const modalEl = document.querySelector('#modal');
+    modalEl.querySelectorAll('[data-sync-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        modalEl.querySelectorAll('[data-sync-tab]').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.syncTab;
+        const importTab = modalEl.querySelector('#sync-tab-import');
+        const connectTab = modalEl.querySelector('#sync-tab-connect');
+        if (tab === 'import') {
+          importTab.style.display = 'block';
+          connectTab.style.display = 'none';
+        } else {
+          importTab.style.display = 'none';
+          connectTab.style.display = 'block';
+        }
+      });
+    });
+
+    // Wire dropzone & file input
+    const dropzone = modalEl.querySelector('#ics-dropzone');
+    const fileInput = modalEl.querySelector('#ics-file-input');
+    const rawData = modalEl.querySelector('#raw-ics-data');
+    const fileStatus = modalEl.querySelector('#ics-file-status');
+    const previewBox = modalEl.querySelector('#ics-preview-box');
+    const previewText = modalEl.querySelector('#ics-preview-text');
+    const submitBtn = modalEl.querySelector('#submit-import-ics');
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('drag-over');
+    });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('drag-over');
+      if (e.dataTransfer.files?.length) {
+        handleIcsFile(e.dataTransfer.files[0]);
+      }
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files?.length) {
+        handleIcsFile(fileInput.files[0]);
+      }
+    });
+
+    function handleIcsFile(file) {
+      if (!file.name.toLowerCase().endsWith('.ics')) {
+        alert('Por favor selecciona un archivo con extensión .ics');
+        return;
+      }
+      fileStatus.textContent = `Archivo seleccionado: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result;
+        rawData.value = text;
+        const count = (text.match(/BEGIN:VEVENT/gi) || []).length;
+        if (count > 0) {
+          previewBox.style.display = 'block';
+          previewText.textContent = `✓ ${count} evento(s) detectados listos para importar y enlazar con Tatudin.`;
+          submitBtn.disabled = false;
+        } else {
+          previewBox.style.display = 'block';
+          previewText.textContent = `⚠ No se detectaron bloques VEVENT en el archivo.`;
+          submitBtn.disabled = true;
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // Submit import
+    const form = modalEl.querySelector('#import-ics-form');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const icsContent = rawData.value;
+      if (!icsContent) return;
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = 'Importando citas...';
+
+      try {
+        const formData = new FormData(form);
+        const res = await api('/api/calendar/import-ics', {
+          method: 'POST',
+          body: JSON.stringify({
+            icsContent,
+            categoryId: formData.get('categoryId'),
+            artistId: formData.get('artistId'),
+            calendarName: formData.get('calendarName')
+          })
+        });
+
+        openModal(`
+          <div style="text-align: center; padding: 20px 8px;">
+            <div style="width: 54px; height: 54px; border-radius: 50%; background: #D1FAE5; color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+              ${icon('check')}
+            </div>
+            <h2 style="margin: 0 0 6px;">¡Citas Importadas Exitosamente!</h2>
+            <p style="color: var(--muted); font-size: 14px; margin-bottom: 14px;">
+              Se procesaron <strong>${res.totalEvents}</strong> eventos de la agenda externa:<br/>
+              <strong>${res.importedCount}</strong> nuevas citas creadas y <strong>${res.updatedCount}</strong> actualizadas.<br/>
+              La información quedó enlazada con la agenda principal de Tatudin.
+            </p>
+            <button type="button" class="primary" data-close-modal>Ver en Calendario</button>
+          </div>
+        `);
+        renderAgenda();
+      } catch (err) {
+        alert(`Error al importar: ${err.message}`);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `${icon('upload')} <span>Importar Citas a Tatudin</span>`;
+      }
+    });
+
+  } catch (err) {
+    alert(`Error al abrir sincronización de calendarios: ${err.message}`);
   }
 }
 
@@ -1976,16 +2358,28 @@ async function renderAgenda() {
 
         <!-- 2. Mis Calendarios / Categorías (Capas estilo Google Calendar) -->
         <div class="panel sidebar-block">
-          <p class="eyebrow" style="margin: 0 0 10px; font-size: 10px;">MIS CALENDARIOS</p>
+          <div class="sidebar-block-header">
+            <p class="eyebrow" style="margin: 0; font-size: 10px;">MIS CALENDARIOS</p>
+            <button type="button" class="btn-ghost sched-btn" data-action="open-calendar-sync" title="Sincronizar y enlazar con Google / Apple Calendar">
+              ${icon('upload')} <span>Importar / Sync</span>
+            </button>
+          </div>
           <div class="calendar-layers-list">
             ${categories.map((c) => {
               const isHidden = (agendaFilter.hiddenCategories || []).includes(String(c.id));
+              const catColor = c.color || '#7C3AED';
               return `
-                <label class="cal-layer-item">
-                  <input type="checkbox" class="cal-layer-input" data-category-layer="${c.id}" ${isHidden ? '' : 'checked'} />
-                  <span class="cal-layer-box" style="--cat-layer-color: ${c.color};"></span>
-                  <span class="cal-layer-title">${c.name}</span>
-                </label>
+                <div class="cal-layer-row" data-cat-id="${c.id}">
+                  <label class="cal-layer-item">
+                    <input type="checkbox" class="cal-layer-input" data-category-layer="${c.id}" ${isHidden ? '' : 'checked'} />
+                    <span class="cal-layer-box" style="--cat-layer-color: ${catColor};"></span>
+                    <span class="cal-layer-title">${c.name}</span>
+                  </label>
+                  <label class="cal-layer-color-trigger" title="Cambiar color del filtro ${c.name}">
+                    <input type="color" class="cal-layer-color-input" data-category-id="${c.id}" value="${catColor}" />
+                    <span class="cal-layer-color-swatch" style="background: ${catColor};"></span>
+                  </label>
+                </div>
               `;
             }).join('')}
           </div>
@@ -8259,6 +8653,43 @@ document.addEventListener('click', async (event) => {
     return;
   }
 
+  // Calendar Sync & Export actions
+  if (event.target.closest('[data-action="open-calendar-sync"]')) {
+    return await openCalendarSyncModal();
+  }
+  const copyFeedBtn = event.target.closest('[data-action="copy-feed-url"]');
+  if (copyFeedBtn) {
+    const input = document.querySelector('#copy-feed-url-input');
+    if (input) {
+      navigator.clipboard?.writeText(input.value);
+      copyFeedBtn.innerHTML = `${icon('check')} <span>¡Copiado!</span>`;
+      setTimeout(() => {
+        copyFeedBtn.innerHTML = `${icon('copy')} <span>Copiar</span>`;
+      }, 2000);
+    }
+    return;
+  }
+  if (event.target.closest('[data-action="regenerate-feed-token"]')) {
+    if (confirm('¿Regenerar la clave privada de tu feed? Los calendarios previamente suscritos deberán actualizarse con la nueva URL.')) {
+      await api('/api/calendar/regenerate-token', { method: 'POST' });
+      return await openCalendarSyncModal();
+    }
+    return;
+  }
+  const addGoogleBtn = event.target.closest('[data-action="add-google-cal"]');
+  if (addGoogleBtn) {
+    const { title, startsAt, duration, notes } = addGoogleBtn.dataset;
+    const url = makeGoogleCalendarEventUrl(decodeURIComponent(title || ''), startsAt, Number(duration), decodeURIComponent(notes || ''));
+    window.open(url, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  const downloadIcsBtn = event.target.closest('[data-action="download-appt-ics"]');
+  if (downloadIcsBtn) {
+    const { title, startsAt, duration, notes } = downloadIcsBtn.dataset;
+    downloadSingleApptIcs(decodeURIComponent(title || ''), startsAt, Number(duration), decodeURIComponent(notes || ''));
+    return;
+  }
+
   // Modals trigger buttons
   if (event.target.closest('[data-action="new-booking"]')) {
     if (createMenuDropdown) {
@@ -8809,8 +9240,19 @@ document.addEventListener('submit', async (event) => {
   }
 });
 
+// Dynamic color customization for calendar category layers
+document.addEventListener('input', (event) => {
+  if (event.target.classList.contains('cal-layer-color-input')) {
+    handleCategoryColorChange(event.target.dataset.categoryId, event.target.value, false);
+  }
+});
+
 // File input listener for direct gallery image upload
 document.addEventListener('change', async (event) => {
+  if (event.target.classList.contains('cal-layer-color-input')) {
+    handleCategoryColorChange(event.target.dataset.categoryId, event.target.value, true);
+  }
+
   if (event.target.id === 'gallery-native-file-input') {
     const files = event.target.files;
     if (files && files.length) {

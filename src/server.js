@@ -2333,6 +2333,304 @@ app.post('/api/public/schedules/:slug/book', publicApiRateLimiter, async (reques
   }
 });
 
+// ---------------- CALENDAR IMPORT (ICS) & WEBCAL FEED SYNC ----------------
+function parseIcsDateString(dateStr) {
+  if (!dateStr) return null;
+  const clean = dateStr.trim().replace(/^VALUE=DATE:/i, '');
+  const match = clean.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?/);
+  if (!match) return new Date(clean);
+  const [, year, month, day, hour = '09', min = '00', sec = '00', isUtc] = match;
+  if (isUtc) {
+    return new Date(Date.UTC(+year, +month - 1, +day, +hour, +min, +sec));
+  }
+  return new Date(+year, +month - 1, +day, +hour, +min, +sec);
+}
+
+function parseIcsEvents(content) {
+  if (!content || typeof content !== 'string') return [];
+  // Unfold lines as per RFC 5545
+  const unfolded = content.replace(/\r\n[ \t]|\r[ \t]|\n[ \t]/g, '');
+  const eventRegex = /BEGIN:VEVENT([\s\S]*?)END:VEVENT/gi;
+  const events = [];
+  let match;
+
+  while ((match = eventRegex.exec(unfolded)) !== null) {
+    const rawEvent = match[1];
+    const eventObj = {};
+    const lines = rawEvent.split(/\r\n|\r|\n/);
+
+    for (const line of lines) {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx === -1) continue;
+      const keyPart = line.slice(0, colonIdx).trim().toUpperCase();
+      const val = line.slice(colonIdx + 1).trim();
+      const propName = keyPart.split(';')[0];
+
+      if (propName === 'SUMMARY') eventObj.summary = val.replace(/\\([,;nN\\])/g, (m, c) => c.toLowerCase() === 'n' ? '\n' : c);
+      else if (propName === 'DESCRIPTION') eventObj.description = val.replace(/\\([,;nN\\])/g, (m, c) => c.toLowerCase() === 'n' ? '\n' : c);
+      else if (propName === 'LOCATION') eventObj.location = val.replace(/\\([,;nN\\])/g, (m, c) => c.toLowerCase() === 'n' ? '\n' : c);
+      else if (propName === 'UID') eventObj.uid = val;
+      else if (propName === 'DTSTART') eventObj.dtstart = val;
+      else if (propName === 'DTEND') eventObj.dtend = val;
+    }
+
+    if (eventObj.dtstart) {
+      const startDate = parseIcsDateString(eventObj.dtstart);
+      if (startDate && !isNaN(startDate.getTime())) {
+        let durationMinutes = 120;
+        if (eventObj.dtend) {
+          const endDate = parseIcsDateString(eventObj.dtend);
+          if (endDate && !isNaN(endDate.getTime()) && endDate > startDate) {
+            durationMinutes = Math.max(15, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
+          }
+        }
+        events.push({
+          uid: eventObj.uid || `import-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          title: eventObj.summary || 'Cita Importada',
+          notes: eventObj.description || (eventObj.location ? `Ubicación: ${eventObj.location}` : ''),
+          startsAt: startDate.toISOString(),
+          durationMinutes
+        });
+      }
+    }
+  }
+  return events;
+}
+
+function formatIcsTimestamp(d) {
+  const date = d instanceof Date ? d : new Date(d);
+  if (isNaN(date.getTime())) return '';
+  return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+}
+
+function escapeIcsText(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n');
+}
+
+// 1. Import ICS file content
+app.post('/api/calendar/import-ics', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const { icsContent, categoryId, artistId, calendarName = 'Calendario Importado' } = request.body;
+  if (!icsContent || typeof icsContent !== 'string') {
+    return response.status(400).json({ error: 'El contenido del archivo .ics es requerido' });
+  }
+
+  try {
+    const events = parseIcsEvents(icsContent);
+    if (!events.length) {
+      return response.status(400).json({ error: 'No se encontraron eventos válidos en el archivo .ics' });
+    }
+
+    // Determine target category
+    let targetCatId = categoryId ? Number(categoryId) : null;
+    if (!targetCatId) {
+      const defaultCat = await pool.query(
+        'SELECT id FROM commitment_categories WHERE studio_id = $1 ORDER BY is_system DESC, id ASC LIMIT 1',
+        [request.studioId]
+      );
+      if (defaultCat.rowCount) targetCatId = defaultCat.rows[0].id;
+    }
+
+    const targetArtistId = artistId && artistId !== 'all' ? Number(artistId) : request.userId;
+    let importedCount = 0;
+    let updatedCount = 0;
+
+    for (const ev of events) {
+      const existing = await pool.query(
+        'SELECT id FROM appointments WHERE studio_id = $1 AND external_uid = $2 LIMIT 1',
+        [request.studioId, ev.uid]
+      );
+
+      if (existing.rowCount) {
+        await pool.query(`
+          UPDATE appointments SET
+            title = $1,
+            notes = $2,
+            starts_at = $3,
+            duration_minutes = $4,
+            external_calendar_name = $5,
+            synced_at = NOW()
+          WHERE id = $6
+        `, [ev.title, ev.notes, ev.startsAt, ev.durationMinutes, calendarName, existing.rows[0].id]);
+        updatedCount++;
+      } else {
+        await pool.query(`
+          INSERT INTO appointments (
+            studio_id, category_id, artist_id, title, notes, starts_at, duration_minutes,
+            status, external_source, external_uid, external_calendar_name, synced_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed', 'ics_import', $8, $9, NOW())
+        `, [
+          request.studioId,
+          targetCatId,
+          targetArtistId,
+          ev.title,
+          ev.notes,
+          ev.startsAt,
+          ev.durationMinutes,
+          ev.uid,
+          calendarName
+        ]);
+        importedCount++;
+      }
+    }
+
+    await pool.query(`
+      INSERT INTO audit_logs (studio_id, user_id, action, entity_type, details)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [
+      request.studioId,
+      request.userId,
+      'IMPORT_CALENDAR_ICS',
+      'appointments',
+      JSON.stringify({ calendarName, importedCount, updatedCount, totalEvents: events.length })
+    ]).catch(() => {});
+
+    return response.json({
+      ok: true,
+      importedCount,
+      updatedCount,
+      totalEvents: events.length
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+// 2. Get Live Feed URL for Google Calendar and Apple Calendar
+app.get('/api/calendar/feed-url', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    let res = await pool.query('SELECT calendar_feed_token, name FROM studios WHERE id = $1', [request.studioId]);
+    if (!res.rowCount) return response.status(404).json({ error: 'Estudio no encontrado' });
+
+    let token = res.rows[0].calendar_feed_token;
+    if (!token) {
+      const gen = await pool.query(
+        'UPDATE studios SET calendar_feed_token = md5(random()::text || clock_timestamp()::text) WHERE id = $1 RETURNING calendar_feed_token',
+        [request.studioId]
+      );
+      token = gen.rows[0].calendar_feed_token;
+    }
+
+    const host = request.get('host') || 'localhost:3000';
+    const proto = request.headers['x-forwarded-proto'] || request.protocol || 'http';
+    const httpsFeedUrl = `${proto}://${host}/api/calendar/feed/${token}.ics`;
+    const webcalFeedUrl = `webcal://${host}/api/calendar/feed/${token}.ics`;
+    const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcalFeedUrl)}`;
+
+    return response.json({
+      token,
+      feedUrl: httpsFeedUrl,
+      webcalUrl: webcalFeedUrl,
+      googleUrl,
+      studioName: res.rows[0].name
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+// 3. Regenerate calendar feed token
+app.post('/api/calendar/regenerate-token', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const gen = await pool.query(
+      'UPDATE studios SET calendar_feed_token = md5(random()::text || clock_timestamp()::text) WHERE id = $1 RETURNING calendar_feed_token',
+      [request.studioId]
+    );
+    const token = gen.rows[0].calendar_feed_token;
+    const host = request.get('host') || 'localhost:3000';
+    const proto = request.headers['x-forwarded-proto'] || request.protocol || 'http';
+    const httpsFeedUrl = `${proto}://${host}/api/calendar/feed/${token}.ics`;
+    const webcalFeedUrl = `webcal://${host}/api/calendar/feed/${token}.ics`;
+    const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcalFeedUrl)}`;
+
+    return response.json({
+      token,
+      feedUrl: httpsFeedUrl,
+      webcalUrl: webcalFeedUrl,
+      googleUrl
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+// 4. RFC 5545 Public/Token Feed (Live Subscription for Apple Calendar & Google Calendar)
+app.get('/api/calendar/feed/:token.ics', publicApiRateLimiter, async (request, response) => {
+  if (!pool) return response.status(503).send('Database not configured');
+  const { token } = request.params;
+  if (!token) return response.status(400).send('Token no provisto');
+
+  try {
+    const studioRes = await pool.query('SELECT id, name FROM studios WHERE calendar_feed_token = $1', [token]);
+    if (!studioRes.rowCount) {
+      return response.status(404).send('Calendario no encontrado o token inválido');
+    }
+
+    const studio = studioRes.rows[0];
+    const apptsRes = await pool.query(`
+      SELECT a.*, c.name AS client_name, c.phone AS client_phone,
+             u.full_name AS artist_name, cc.name AS category_name
+      FROM appointments a
+      LEFT JOIN clients c ON c.id = a.client_id
+      LEFT JOIN users u ON u.id = a.artist_id
+      LEFT JOIN commitment_categories cc ON cc.id = a.category_id
+      WHERE a.studio_id = $1 AND a.status <> 'cancelled'
+      ORDER BY a.starts_at ASC
+    `, [studio.id]);
+
+    const nowStr = formatIcsTimestamp(new Date());
+    let ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Tatudin//Agenda//ES',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      `X-WR-CALNAME:${escapeIcsText('Tatudin - ' + studio.name)}`,
+      'X-WR-TIMEZONE:UTC'
+    ];
+
+    for (const a of apptsRes.rows) {
+      const start = new Date(a.starts_at);
+      const end = new Date(start.getTime() + (a.duration_minutes || 120) * 60000);
+      const uid = a.external_uid || `tatudin-${a.id}@tatudin.cl`;
+      const title = `${a.title || 'Cita'}${a.client_name ? ` - ${a.client_name}` : ''}`;
+      let desc = a.notes || '';
+      if (a.client_name) desc += `\\nCliente: ${a.client_name}`;
+      if (a.client_phone) desc += `\\nTel: ${a.client_phone}`;
+      if (a.artist_name) desc += `\\nArtista: ${a.artist_name}`;
+      desc += '\\nGestionado desde Tatudin PWA';
+
+      ics.push('BEGIN:VEVENT');
+      ics.push(`UID:${uid}`);
+      ics.push(`DTSTAMP:${nowStr}`);
+      ics.push(`DTSTART:${formatIcsTimestamp(start)}`);
+      ics.push(`DTEND:${formatIcsTimestamp(end)}`);
+      ics.push(`SUMMARY:${escapeIcsText(title)}`);
+      ics.push(`DESCRIPTION:${escapeIcsText(desc)}`);
+      ics.push(`CATEGORIES:${escapeIcsText(a.category_name || 'Tatuaje')}`);
+      ics.push('STATUS:CONFIRMED');
+      ics.push('END:VEVENT');
+    }
+
+    ics.push('END:VCALENDAR');
+    const icsContent = ics.join('\r\n');
+
+    response.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    response.setHeader('Content-Disposition', `inline; filename="tatudin-${studio.id}.ics"`);
+    response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return response.send(icsContent);
+  } catch (error) {
+    return response.status(500).send('Error generando feed de calendario');
+  }
+});
+
 // ---------------- SESSION TRANSCRIPTS & MEETING NOTES ----------------
 app.get('/api/appointments/:id/transcripts', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
@@ -3321,6 +3619,8 @@ async function ensureAuthSchema() {
   await safeExec('ALTER TABLE studios guest_payment_info', `ALTER TABLE studios ADD COLUMN IF NOT EXISTS guest_payment_info TEXT NOT NULL DEFAULT ''`);
   await safeExec('ALTER TABLE studios guest_supplies_info', `ALTER TABLE studios ADD COLUMN IF NOT EXISTS guest_supplies_info TEXT NOT NULL DEFAULT ''`);
   await safeExec('ALTER TABLE studios guest_access_info', `ALTER TABLE studios ADD COLUMN IF NOT EXISTS guest_access_info TEXT NOT NULL DEFAULT ''`);
+  await safeExec('ALTER TABLE studios calendar_feed_token', `ALTER TABLE studios ADD COLUMN IF NOT EXISTS calendar_feed_token TEXT UNIQUE DEFAULT md5(random()::text || clock_timestamp()::text)`);
+  await safeExec('UPDATE studios calendar_feed_token', `UPDATE studios SET calendar_feed_token = md5(random()::text || clock_timestamp()::text || id::text) WHERE calendar_feed_token IS NULL`);
 
   // 5. Spaces / Boxes
   await safeExec('CREATE TABLE spaces', `CREATE TABLE IF NOT EXISTS spaces (
@@ -3396,6 +3696,10 @@ async function ensureAuthSchema() {
   await safeExec('ALTER TABLE appointments notes', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''`);
   await safeExec('ALTER TABLE appointments artist_id', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS artist_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
   await safeExec('ALTER TABLE appointments space_id', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS space_id INTEGER REFERENCES spaces(id) ON DELETE SET NULL`);
+  await safeExec('ALTER TABLE appointments external_source', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS external_source TEXT DEFAULT NULL`);
+  await safeExec('ALTER TABLE appointments external_uid', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS external_uid TEXT DEFAULT NULL`);
+  await safeExec('ALTER TABLE appointments external_calendar_name', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS external_calendar_name TEXT DEFAULT NULL`);
+  await safeExec('ALTER TABLE appointments synced_at', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ DEFAULT NULL`);
 
   // 10. Transactions
   await safeExec('CREATE TABLE transactions', `CREATE TABLE IF NOT EXISTS transactions (
