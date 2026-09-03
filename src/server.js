@@ -1289,8 +1289,8 @@ async function checkAppointmentConflict(studioId, startsAt, durationMinutes, art
     LEFT JOIN spaces sp ON sp.id = a.space_id
     WHERE a.studio_id = $1
       AND a.status <> 'cancelled'
-      AND a.starts_at < ((CASE WHEN $2 ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $2::timestamptz ELSE ($2::timestamp AT TIME ZONE 'America/Santiago') END) + $3::interval)
-      AND (a.starts_at + (a.duration_minutes || ' minutes')::interval) > (CASE WHEN $2 ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $2::timestamptz ELSE ($2::timestamp AT TIME ZONE 'America/Santiago') END)
+      AND a.starts_at < ((CASE WHEN $2::text ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $2::timestamptz ELSE ($2::timestamp AT TIME ZONE 'America/Santiago') END) + $3::interval)
+      AND (a.starts_at + (a.duration_minutes || ' minutes')::interval) > (CASE WHEN $2::text ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $2::timestamptz ELSE ($2::timestamp AT TIME ZONE 'America/Santiago') END)
   `;
   if (excludeAppointmentId) {
     params.push(Number(excludeAppointmentId));
@@ -1869,6 +1869,27 @@ app.get('/api/appointments', requireAuth, async (request, response) => {
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
+app.get('/api/appointments/:id', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const result = await pool.query(`
+      SELECT a.*, c.name AS client_name, c.phone AS client_phone, c.email AS client_email,
+      u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
+      cc.name AS category_name, cc.color AS category_color, cc.icon AS category_icon, cc.kind AS category_kind,
+      cc.requires_client, cc.requires_space
+      FROM appointments a
+      LEFT JOIN commitment_categories cc ON cc.id = a.category_id
+      LEFT JOIN clients c ON c.id = a.client_id
+      LEFT JOIN users u ON u.id = a.artist_id
+      LEFT JOIN studio_memberships sm ON sm.user_id = u.id AND sm.studio_id = a.studio_id
+      LEFT JOIN spaces sp ON sp.id = a.space_id
+      WHERE a.id = $1 AND a.studio_id = $2
+    `, [Number(request.params.id), request.studioId]);
+    if (!result.rowCount) return response.status(404).json({ error: 'Cita no encontrada' });
+    return response.json(result.rows[0]);
+  } catch (error) { return response.status(500).json({ error: error.message }); }
+});
+
 app.post('/api/appointments', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   const { categoryId = null, clientId = null, artistId = null, spaceId = null, title, notes = '', startsAt, durationMinutes = 60, status = 'confirmed', price = 0, deposit = 0 } = request.body;
@@ -1897,7 +1918,7 @@ app.post('/api/appointments', requireAuth, async (request, response) => {
       INSERT INTO appointments
       (studio_id, category_id, client_id, artist_id, space_id, title, notes, starts_at, duration_minutes, status, price, deposit)
       VALUES ($1, $2, $3, $4, $5, $6, $7, 
-        CASE WHEN $8 ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $8::timestamptz ELSE ($8::timestamp AT TIME ZONE 'America/Santiago') END,
+        CASE WHEN $8::text ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $8::timestamptz ELSE ($8::timestamp AT TIME ZONE 'America/Santiago') END,
         $9, $10, $11, $12)
       RETURNING *
     `, [request.studioId, catId, validClientId, artistId ? Number(artistId) : null, spaceId ? Number(spaceId) : null, title.trim(), notes.trim(), startsAt, Math.max(15, Number(durationMinutes || 60)), status, Number(price || 0), Number(deposit || 0)]);
@@ -1931,8 +1952,8 @@ app.patch('/api/appointments/:id', requireAuth, async (request, response) => {
       title = COALESCE($5, title),
       notes = COALESCE($6, notes),
       starts_at = CASE 
-        WHEN $7 IS NULL THEN starts_at 
-        WHEN $7 ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $7::timestamptz 
+        WHEN $7::text IS NULL THEN starts_at 
+        WHEN $7::text ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $7::timestamptz 
         ELSE ($7::timestamp AT TIME ZONE 'America/Santiago') 
       END,
       duration_minutes = COALESCE($8::integer, duration_minutes),
@@ -2329,7 +2350,7 @@ app.post('/api/public/schedules/:slug/book', publicApiRateLimiter, async (reques
       INSERT INTO appointments
         (studio_id, category_id, client_id, artist_id, title, notes, starts_at, duration_minutes, status, price, deposit)
       VALUES ($1, $2, $3, $4, $5, $6, 
-        CASE WHEN $7 ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $7::timestamptz ELSE ($7::timestamp AT TIME ZONE 'America/Santiago') END,
+        CASE WHEN $7::text ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $7::timestamptz ELSE ($7::timestamp AT TIME ZONE 'America/Santiago') END,
         $8, 'confirmed', 0, 0)
       RETURNING *
     `, [

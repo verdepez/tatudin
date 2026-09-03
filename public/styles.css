@@ -7159,8 +7159,14 @@ textarea {
   transition: background 0.12s ease;
 }
 
+.timegrid-slot-cell {
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
 .timegrid-slot-cell:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: color-mix(in srgb, var(--accent, #7C3AED) 8%, transparent);
 }
 
 /* Availability block */

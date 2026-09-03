@@ -1277,7 +1277,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
             return `
               <div class="timegrid-day-column ${data.isToday ? 'today-col' : ''}" data-column-date="${data.dateISO}">
                 ${hours.map((h) => `
-                  <div class="timegrid-slot-cell" data-slot-hour="${h}" data-slot-date="${data.dateISO}" style="height: ${TIMEGRID_HOUR_HEIGHT}px;"></div>
+                  <div class="timegrid-slot-cell" data-slot-hour="${h}" data-slot-date="${data.dateISO}" style="height: ${TIMEGRID_HOUR_HEIGHT}px;" title="Toca para agendar a las ${String(h).padStart(2, '0')}:00"></div>
                 `).join('')}
 
                 ${data.availBlocks.map((b) => `
@@ -1335,7 +1335,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                 <span>Sábado ${satDay.getDate()}</span>
               </div>
               ${hours.map((h) => `
-                <div class="timegrid-slot-cell is-half-slot" data-slot-hour="${h}" data-slot-date="${satData.dateISO}" style="height: ${TIMEGRID_HOUR_HEIGHT * 0.5}px;"></div>
+                <div class="timegrid-slot-cell is-half-slot" data-slot-hour="${h}" data-slot-date="${satData.dateISO}" style="height: ${TIMEGRID_HOUR_HEIGHT * 0.5}px;" title="Toca para agendar a las ${String(h).padStart(2, '0')}:00"></div>
               `).join('')}
 
               ${satData.availBlocks.map((b) => `
@@ -1389,7 +1389,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                 <span>Domingo ${sunDay.getDate()}</span>
               </div>
               ${hours.map((h) => `
-                <div class="timegrid-slot-cell is-half-slot" data-slot-hour="${h}" data-slot-date="${sunData.dateISO}" style="height: ${TIMEGRID_HOUR_HEIGHT * 0.5}px;"></div>
+                <div class="timegrid-slot-cell is-half-slot" data-slot-hour="${h}" data-slot-date="${sunData.dateISO}" style="height: ${TIMEGRID_HOUR_HEIGHT * 0.5}px;" title="Toca para agendar a las ${String(h).padStart(2, '0')}:00"></div>
               `).join('')}
 
               ${sunData.availBlocks.map((b) => `
@@ -3069,6 +3069,178 @@ function openAppointmentOutcomeModal(appt) {
     const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
     await render(currentActiveView);
   });
+}
+
+async function openAppointmentSummaryModal(apptOrId) {
+  let appt = apptOrId;
+  if (typeof apptOrId === 'string' || typeof apptOrId === 'number') {
+    try {
+      appt = await api(`/api/appointments/${apptOrId}`);
+    } catch (err) {
+      console.warn('Could not fetch appointment detail from server:', err);
+      appt = null;
+    }
+  }
+  if (!appt) return;
+
+  const startsAt = appt.starts_at ? new Date(appt.starts_at) : new Date();
+  const dateFormatted = new Intl.DateTimeFormat('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(startsAt);
+  const timeFormatted = formatTime(appt.starts_at);
+  const duration = Number(appt.duration_minutes) || 60;
+  const statusInfo = STATUS_MAP[appt.status] || { label: appt.status || 'Confirmada', class: 'status-default' };
+  const catColor = appt.category_color || '#7C3AED';
+  const catName = appt.category_name || 'Compromiso';
+  const price = Number(appt.price) || 0;
+  const deposit = Number(appt.deposit) || 0;
+  const pending = Math.max(0, price - deposit);
+  const cleanPhone = (appt.client_phone || '').replace(/[^0-9+]/g, '');
+
+  openModal(`
+    <div class="appointment-summary-modal" style="display: flex; flex-direction: column; gap: 14px;">
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 1px solid var(--line-soft); padding-bottom: 12px;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
+            <span style="background: ${catColor}; color: #ffffff; font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 4px;">
+              ${catName}
+            </span>
+            <span class="status-chip ${statusInfo.class}" style="font-size: 10px; padding: 2px 7px;">
+              ${statusInfo.label}
+            </span>
+            ${appt.external_source ? `
+              <span class="sync-chip" title="Enlazado con ${appt.external_calendar_name || 'calendario externo'}" style="display: inline-flex; align-items: center; gap: 4px; font-size: 10px;">
+                ${icon('link')} <span>${appt.external_calendar_name || 'Enlazado'}</span>
+              </span>
+            ` : ''}
+          </div>
+          <h2 id="modal-title" style="margin: 0; font-size: 18px; font-weight: 800; color: var(--ink);">
+            ${appt.title || 'Cita de Agenda'}
+          </h2>
+        </div>
+      </div>
+
+      <!-- Schedule time & duration card -->
+      <div style="background: var(--surface-high); border: 1px solid var(--line-soft); border-left: 4px solid ${catColor}; border-radius: var(--radius-md); padding: 12px 14px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 700; color: var(--ink);">
+          ${icon('calendar')} <span>${dateFormatted}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px; font-size: 12.5px; color: var(--muted); margin-top: 4px;">
+          <span><strong>Hora:</strong> ${timeFormatted} hrs</span>
+          <span><strong>Duración:</strong> ${duration} min</span>
+        </div>
+      </div>
+
+      <!-- Detail Grid: Client, Artist, Space -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+        <!-- Cliente -->
+        <div style="background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius-sm); padding: 10px 12px;">
+          <div style="font-size: 10.5px; font-weight: 800; color: var(--muted); text-transform: uppercase; margin-bottom: 4px;">
+            Cliente
+          </div>
+          <strong style="font-size: 13.5px; color: var(--ink); display: block;">
+            ${appt.client_name || 'Sin cliente registrado'}
+          </strong>
+          ${appt.client_phone ? `
+            <div style="font-size: 12px; color: var(--muted); margin-top: 4px; display: flex; align-items: center; gap: 6px;">
+              <span>${appt.client_phone}</span>
+              <a href="https://wa.me/${cleanPhone.replace('+', '')}" target="_blank" rel="noopener noreferrer" style="color: #059669; font-weight: 700; font-size: 11px; text-decoration: underline;">
+                WhatsApp
+              </a>
+            </div>
+          ` : ''}
+          ${appt.client_email ? `<div style="font-size: 11.5px; color: var(--muted); margin-top: 2px;">${appt.client_email}</div>` : ''}
+        </div>
+
+        <!-- Artista / Box -->
+        <div style="background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius-sm); padding: 10px 12px;">
+          <div style="font-size: 10.5px; font-weight: 800; color: var(--muted); text-transform: uppercase; margin-bottom: 4px;">
+            Responsable & Espacio
+          </div>
+          <div style="font-size: 13px; color: var(--ink);">
+            <strong>Artista:</strong> ${appt.artist_name || 'Sin asignar'}
+          </div>
+          <div style="font-size: 12px; color: var(--muted); margin-top: 3px;">
+            <strong>Box:</strong> ${appt.space_name || 'Sin box específico'}
+          </div>
+        </div>
+      </div>
+
+      <!-- Financial Info (if applicable) -->
+      ${price > 0 || deposit > 0 ? `
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--surface-high); border: 1px solid var(--line-soft); border-radius: var(--radius-sm); padding: 9px 12px; font-size: 12.5px;">
+          <div><strong>Total:</strong> ${money(price)}</div>
+          <div><strong>Abono:</strong> ${money(deposit)}</div>
+          <div style="color: ${pending > 0 ? 'var(--red, #DC2626)' : '#059669'}; font-weight: 800;">
+            <strong>Saldo:</strong> ${money(pending)}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Notes -->
+      ${appt.notes ? `
+        <div style="background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius-sm); padding: 10px 12px;">
+          <div style="font-size: 10.5px; font-weight: 800; color: var(--muted); text-transform: uppercase; margin-bottom: 2px;">
+            Notas del compromiso
+          </div>
+          <p style="margin: 0; font-size: 12.5px; color: var(--ink); white-space: pre-wrap;">${appt.notes}</p>
+        </div>
+      ` : ''}
+
+      <!-- Quick Actions (Voice Notes & Outcome) -->
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px;">
+        <button type="button" class="voice-mic-btn" style="flex: 1; justify-content: center; padding: 8px 12px; font-size: 12px;"
+          data-action="open-voice-modal"
+          data-appt-id="${appt.id}"
+          data-title="${encodeURIComponent(appt.title || 'Sesión')}"
+          data-kind="${appt.category_kind || 'custom'}"
+          data-cat-name="${encodeURIComponent(appt.category_name || 'Compromiso')}"
+          data-client-name="${encodeURIComponent(appt.client_name || '')}">
+          ${icon('mic')} <span>Notas de Voz</span>
+        </button>
+
+        <button type="button" class="secondary" style="flex: 1; justify-content: center; padding: 8px 12px; font-size: 12px;"
+          data-action="open-outcome-modal"
+          data-appt-id="${appt.id}"
+          data-client-name="${encodeURIComponent(appt.client_name || '')}"
+          data-title="${encodeURIComponent(appt.title || '')}"
+          data-starts-at="${appt.starts_at}"
+          data-price="${appt.price || 0}"
+          data-deposit="${appt.deposit || 0}"
+          data-status="${appt.status || 'confirmed'}">
+          ${icon('check')} <span>Gestionar Estado</span>
+        </button>
+      </div>
+
+      <!-- Footer / Close button & Calendar sync -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line-soft); padding-top: 10px; margin-top: 2px;">
+        <!-- Calendar injection links -->
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="cal-inject-btn"
+            data-action="add-google-cal"
+            data-title="${encodeURIComponent(appt.title || '')}"
+            data-starts-at="${appt.starts_at}"
+            data-duration="${duration}"
+            data-notes="${encodeURIComponent(appt.notes || '')}"
+            title="Añadir a Google Calendar" style="width: 32px; height: 32px;">
+            <img src="https://www.uc3m.es/sdic/media/sdic/img/mediana/original/im_icono-google-calendar/google_calendar_icon-300.png" onerror="this.src='/assets/google-calendar.png'" alt="Google Calendar" class="cal-inject-icon-img" />
+          </button>
+          <button type="button" class="cal-inject-btn"
+            data-action="download-appt-ics"
+            data-title="${encodeURIComponent(appt.title || '')}"
+            data-starts-at="${appt.starts_at}"
+            data-duration="${duration}"
+            data-notes="${encodeURIComponent(appt.notes || '')}"
+            title="Descargar para Apple Calendar (.ics)" style="width: 32px; height: 32px;">
+            <img src="https://cdn.sanity.io/images/tia9na8b/production/01469f8fdc249a006e5c1ae1baccb775fc125cae-400x400.png" onerror="this.src='/assets/apple-calendar.png'" alt="Apple Calendar" class="cal-inject-icon-img" />
+          </button>
+        </div>
+
+        <button type="button" class="secondary" data-close-modal style="padding: 6px 16px; font-size: 12px;">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  `);
 }
 
 async function renderClients(search = '') {
@@ -7317,7 +7489,7 @@ function spaceOptions() {
     : '<option value="">Sin boxes creados</option>';
 }
 
-async function newBookingModal(preselectedClientId = null) {
+async function newBookingModal(preselectedClientId = null, preselectedDateTime = null) {
   try {
     const [clData, memData, spData, catData] = await Promise.all([
       api('/api/clients').catch(() => []),
@@ -7330,7 +7502,7 @@ async function newBookingModal(preselectedClientId = null) {
     spaces = spData;
     categories = catData;
 
-    const defaultDateTime = getNextDefaultDateTime();
+    const defaultDateTime = preselectedDateTime || getNextDefaultDateTime();
     const defaultCat = categories[0] || { id: '', name: 'Compromiso', kind: 'tattoo', color: '#7C3AED', requires_client: true, requires_space: false };
 
     openModal(`
@@ -9076,6 +9248,35 @@ document.addEventListener('click', async (event) => {
   if (event.target.closest('[data-action="new-transaction"]')) return newTransactionModal();
   if (event.target.closest('[data-action="open-agenda-filter-modal"]')) return openAgendaFilterModal();
   if (event.target.closest('[data-close-modal]') || event.target === modal) return closeModal();
+
+  // View appointment detail / summary modal from calendar or card
+  const apptDetailBtn = event.target.closest('[data-action="view-appointment-detail"]');
+  if (apptDetailBtn) {
+    const apptId = apptDetailBtn.dataset.appointmentId;
+    if (apptId) {
+      return await openAppointmentSummaryModal(apptId);
+    }
+  }
+
+  const apptCard = event.target.closest('.appointment-card');
+  if (apptCard && !event.target.closest('button, a, input, select')) {
+    const apptId = apptCard.dataset.apptId;
+    if (apptId) {
+      return await openAppointmentSummaryModal(apptId);
+    }
+  }
+
+  // Click / tap on calendar hour slot to create new appointment
+  const slotCell = event.target.closest('.timegrid-slot-cell');
+  if (slotCell && !event.target.closest('.timegrid-event-block')) {
+    const slotDate = slotCell.dataset.slotDate;
+    const slotHour = Number(slotCell.dataset.slotHour);
+    if (slotDate && !isNaN(slotHour)) {
+      const padHour = String(slotHour).padStart(2, '0');
+      const targetDateTime = `${slotDate}T${padHour}:00`;
+      return await newBookingModal(null, targetDateTime);
+    }
+  }
 
   // Calendar View switcher
   const calViewBtn = event.target.closest('[data-cal-view]');
