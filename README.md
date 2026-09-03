@@ -14,7 +14,7 @@ docker compose up --build
 
 Abrir `http://localhost:3000`.
 
-La aplicación expone `GET /api/health` para comprobar la conexión con PostgreSQL. La base usa un volumen Docker llamado `tatudin-postgres` y se inicializa con `database/init.sql`. El primer vertical incluye onboarding MVP, dashboard, agenda, clientes y finanzas.
+La aplicación expone `GET /api/health` para comprobar la conexión con PostgreSQL. La base usa un volumen Docker llamado `tatudin-postgres` y se inicializa con `database/init.sql`. El entorno actual incluye onboarding, autenticación, dashboard, agenda, horarios públicos, clientes, miembros, espacios, finanzas, portfolio, inventario, transcripciones y backoffice.
 
 Al abrir por primera vez se muestra el onboarding: cuenta, rol, perfil, fuente de adquisición y metas. El progreso se guarda en PostgreSQL y el navegador conserva la sesión de desarrollo en `localStorage`.
 
@@ -51,8 +51,11 @@ Las pantallas y el flujo inicial de autenticación/onboarding de la versión PHP
 
 ## Estructura inicial
 
-- `src/server.js`: servidor Express, endpoint de salud y API de citas, clientes y movimientos.
+- `src/server.js`: servidor Express, autenticación, endpoints operativos, APIs públicas y backoffice.
 - `public/`: shell de la PWA, estilos, manifest y service worker.
+- `public/offline-store.js`: almacenamiento IndexedDB y cola de mutaciones offline.
+- `src/middlewares/` y `src/services/`: protección CSRF, rate limiting, correo y auditoría.
+- `tests/` y `playwright.config.js`: pruebas API y E2E.
 - `public/assets/`: gráfica local seleccionada desde `imagen/` para continuidad de marca.
 - `database/init.sql`: esquema y datos demo de PostgreSQL.
 - `docker-compose.yml`: servicios `app` y `db`.
