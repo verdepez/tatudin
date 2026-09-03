@@ -32,27 +32,8 @@ const compactNumber = (value) => {
 
 // Compact currency formatter (e.g. $1.500.000 -> $1,5M, $350.000 -> $350mil, $800 -> $800)
 const compactMoney = (value) => {
-  const num = Number(value || 0);
-  if (isNaN(num)) return '$0';
-  const abs = Math.abs(num);
-  const sign = num < 0 ? '-' : '';
-
-  if (abs >= 1_000_000_000) {
-    const val = abs / 1_000_000_000;
-    const formatted = val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace('.', ',');
-    return `${sign}$${formatted}B`;
-  }
-  if (abs >= 1_000_000) {
-    const val = abs / 1_000_000;
-    const formatted = val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace('.', ',');
-    return `${sign}$${formatted}M`;
-  }
-  if (abs >= 1_000) {
-    const val = abs / 1_000;
-    const formatted = val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace('.', ',');
-    return `${sign}$${formatted}mil`;
-  }
-  return `${sign}$${abs.toLocaleString('es-CL')}`;
+  const formatted = compactNumber(value);
+  return formatted.startsWith('-') ? `-$${formatted.slice(1)}` : `$${formatted}`;
 };
 
 // Default money formatter now applies the abbreviation format across the entire system
@@ -138,6 +119,14 @@ const ROLE_MAP = {
   resident: { label: 'Residente', class: 'role-resident' },
   nomad: { label: 'Nómade', class: 'role-nomad' }
 };
+
+const GUEST_SPOT_STATUS_MAP = {
+  approved: { label: 'Aprobada', class: 'tag-income' },
+  rejected: { label: 'Rechazada', class: 'tag-expense' },
+  pending: { label: 'Pendiente', class: 'tag-pending' }
+};
+
+const getGuestSpotStatus = (status) => GUEST_SPOT_STATUS_MAP[status] || { label: 'Pendiente', class: 'tag-pending' };
 
 function getCsrfCookie() {
   const match = document.cookie.match(new RegExp('(^| )tatudin_csrf=([^;]+)'));
@@ -227,6 +216,36 @@ let agendaFilter = {
 };
 let onboarding = JSON.parse(localStorage.getItem('tatudin_onboarding') || '{}');
 
+async function copyToClipboard(text, triggerBtn = null, successText = '¡Copiado!') {
+  if (!text) return false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    if (triggerBtn) {
+      const origHtml = triggerBtn.innerHTML;
+      triggerBtn.innerHTML = `${icon('check')} <span>${successText}</span>`;
+      setTimeout(() => {
+        triggerBtn.innerHTML = origHtml;
+      }, 2000);
+    }
+    return true;
+  } catch (err) {
+    console.warn('[CLIPBOARD] Error al copiar:', err);
+    return false;
+  }
+}
+
 function formatTime(isoString) {
   if (!isoString) return '10:00';
   const date = new Date(isoString);
@@ -242,6 +261,11 @@ function formatDateISO(date) {
   const month = (d.getMonth() + 1).toString().padStart(2, '0');
   const day = d.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function formatUtc(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 }
 
 function getWeekRange(baseDate = new Date()) {
@@ -309,12 +333,7 @@ function getNextDefaultDateTime() {
   const now = new Date();
   now.setMinutes(0, 0, 0);
   now.setHours(now.getHours() + 1);
-  const year = now.getFullYear();
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-  const day = now.getDate().toString().padStart(2, '0');
-  const hours = now.getHours().toString().padStart(2, '0');
-  const minutes = now.getMinutes().toString().padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
+  return `${formatDateISO(now)}T${formatTime(now)}`;
 }
 
 function saveOnboarding(values) {
@@ -820,7 +839,7 @@ function appointmentCard(item) {
             data-status="${item.status}"
             title="Indicar estado: ¿Qué ocurrió con esta cita?">
             <span>${outcomeLabel}</span>
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            ${icon('chevronDown')}
           </button>
         </div>
       </div>
@@ -972,7 +991,7 @@ async function render(view = 'dashboard', options = {}) {
             <div class="dashboard-tri-grid">
               <div class="tri-grid-col">
                 <div class="mini-bubble purple-soft">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                  ${icon('calendar')}
                 </div>
                 <strong class="tri-metric-val" title="${data.stats?.scheduled_appointments || 0}">${compactNumber(data.stats?.scheduled_appointments || 0)}</strong>
                 <span class="tri-metric-label">Agendadas</span>
@@ -983,7 +1002,7 @@ async function render(view = 'dashboard', options = {}) {
 
               <div class="tri-grid-col">
                 <div class="mini-bubble green-soft">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  ${icon('check')}
                 </div>
                 <strong class="tri-metric-val" title="${data.stats?.completed_appointments || 0}">${compactNumber(data.stats?.completed_appointments || 0)}</strong>
                 <span class="tri-metric-label">Completadas</span>
@@ -994,7 +1013,7 @@ async function render(view = 'dashboard', options = {}) {
 
               <div class="tri-grid-col" title="${fullMoney(data.stats?.income || 0)}">
                 <div class="mini-bubble dark-soft">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                  ${icon('finances')}
                 </div>
                 <strong class="tri-metric-val" title="${fullMoney(data.stats?.income || 0)}">${compactMoney(data.stats?.income || 0)}</strong>
                 <small class="tri-metric-sub" style="margin-top: 2px;">Total Ingresos</small>
@@ -1011,7 +1030,7 @@ async function render(view = 'dashboard', options = {}) {
             <div class="dashboard-quad-grid">
               <div class="quad-item" title="${fullMoney(data.stats?.income || 0)}">
                 <div class="quad-bubble gray-soft">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                  ${icon('finances')}
                 </div>
                 <div class="quad-content">
                   <span class="quad-eyebrow">INGRESOS</span>
@@ -1647,7 +1666,6 @@ async function openPublicBookingModal(slug) {
 function makeGoogleCalendarEventUrl(title, startsAt, durationMinutes = 120, notes = '') {
   const start = new Date(startsAt);
   const end = new Date(start.getTime() + (durationMinutes || 120) * 60000);
-  const formatUtc = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const dates = `${formatUtc(start)}/${formatUtc(end)}`;
   const params = new URLSearchParams({
     action: 'TEMPLATE',
@@ -1661,7 +1679,6 @@ function makeGoogleCalendarEventUrl(title, startsAt, durationMinutes = 120, note
 function downloadSingleApptIcs(title, startsAt, durationMinutes = 120, notes = '') {
   const start = new Date(startsAt);
   const end = new Date(start.getTime() + (durationMinutes || 120) * 60000);
-  const formatUtc = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const nowUtc = formatUtc(new Date());
   const ics = [
     'BEGIN:VCALENDAR',
@@ -3564,8 +3581,7 @@ async function renderSettings() {
         <div class="members-list">
           ${guestList.map((g) => {
             const isPending = g.status === 'pending';
-            const statusLabel = g.status === 'approved' ? 'Aprobada' : g.status === 'rejected' ? 'Rechazada' : 'Pendiente';
-            const statusClass = g.status === 'approved' ? 'tag-income' : g.status === 'rejected' ? 'tag-expense' : 'tag-pending';
+            const { label: statusLabel, class: statusClass } = getGuestSpotStatus(g.status);
             return `
               <article class="setting-item">
                 <div class="setting-item-icon initials">${(g.artist_name || 'N').slice(0, 2).toUpperCase()}</div>
@@ -3707,7 +3723,7 @@ async function renderCommunications() {
             return `
               <article class="setting-item">
                 <div class="setting-item-icon space-icon-bubble" style="background: #25D36620; color: #25D366;">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  ${icon('whatsapp')}
                 </div>
                 <div class="setting-item-body">
                   <div class="setting-item-top">
@@ -3717,7 +3733,7 @@ async function renderCommunications() {
                     </div>
                     <div class="setting-item-action">
                       <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="primary small-btn" style="background: #25D366; color: #ffffff; text-decoration: none;">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        ${icon('whatsapp')}
                         <span>Enviar WhatsApp</span>
                       </a>
                     </div>
@@ -5073,8 +5089,7 @@ function renderBackofficeStatsTab(data) {
           </div>
           <div class="appointment-list">
             ${(data.recentGuestSpots || []).map((g) => {
-              const statusClass = g.status === 'approved' ? 'tag-income' : g.status === 'rejected' ? 'tag-expense' : 'tag-pending';
-              const statusLabel = g.status === 'approved' ? 'Aprobada' : g.status === 'rejected' ? 'Rechazada' : 'Pendiente';
+              const { label: statusLabel, class: statusClass } = getGuestSpotStatus(g.status);
               return `
                 <article class="setting-item">
                   <div class="setting-item-icon initials">${(g.artist_name || 'N').slice(0, 2).toUpperCase()}</div>
@@ -5287,8 +5302,7 @@ function renderBackofficeGuestSpotsTab(requests) {
           <tbody>
             ${requests.map((r) => {
               const isPending = r.status === 'pending';
-              const statusLabel = r.status === 'approved' ? 'Aprobada' : r.status === 'rejected' ? 'Rechazada' : 'Pendiente';
-              const statusClass = r.status === 'approved' ? 'tag-income' : r.status === 'rejected' ? 'tag-expense' : 'tag-pending';
+              const { label: statusLabel, class: statusClass } = getGuestSpotStatus(r.status);
               return `
                 <tr>
                   <td>
@@ -5753,7 +5767,7 @@ async function renderPortfolio() {
           <div class="portfolio-tab-dropdown-container">
             <button class="portfolio-tab-selector-btn" data-action="toggle-portfolio-tab-menu" id="portfolio-tab-selector-btn">
               <span id="portfolio-active-tab-text">${portfolioCurrentTab === 'profile' ? 'Perfil' : 'Galería'}</span>
-              <svg class="chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              ${icon('chevronDown')}
             </button>
 
             <div class="portfolio-tab-dropdown-popover" id="portfolio-tab-popover" hidden>
@@ -5988,7 +6002,7 @@ function renderPortfolioGalleryTab(portfolio, gallery) {
           <!-- Aesthetic Empty Placeholder Slots (filling up to 9 slots like in wireframe) -->
           ${Array.from({ length: Math.max(0, 8 - gallery.length) }).map(() => `
             <div class="gallery-placeholder-slot" data-action="trigger-file-upload" title="Subir foto">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              ${icon('image')}
             </div>
           `).join('')}
         </div>
@@ -6123,36 +6137,44 @@ function openAddGalleryPhotoModal() {
   `);
 }
 
-function openSampleCoverPicker() {
+function openSampleImagePicker({ eyebrow, title, lead, samples, targetAttr, isAvatar = false }) {
   openModal(`
-    <p class="eyebrow">FOTO DE PORTADA</p>
-    <h2 id="modal-title">Seleccionar foto de portada</h2>
-    <p class="lead" style="margin-bottom: 14px;">Elige una de las imágenes de alta resolución sugeridas para tu encabezado:</p>
-    <div class="sample-covers-grid">
-      ${SAMPLE_COVERS.map((cov) => `
-        <div class="sample-cover-card" data-pick-cover-url="${cov.url}">
-          <div class="cover-img-box" style="background-image: url('${cov.url}');"></div>
-          <strong>${cov.label}</strong>
+    <p class="eyebrow">${eyebrow}</p>
+    <h2 id="modal-title">${title}</h2>
+    <p class="lead" style="margin-bottom: 14px;">${lead}</p>
+    <div class="${isAvatar ? 'sample-avatars-grid' : 'sample-covers-grid'}">
+      ${samples.map((item) => `
+        <div class="${isAvatar ? 'sample-avatar-card' : 'sample-cover-card'}" ${targetAttr}="${item.url}">
+          ${isAvatar
+            ? `<img src="${item.url}" alt="${item.label}" class="sample-avatar-img" />`
+            : `<div class="cover-img-box" style="background-image: url('${item.url}');"></div>`}
+          <strong>${item.label}</strong>
         </div>
       `).join('')}
     </div>
   `);
 }
 
+function openSampleCoverPicker() {
+  openSampleImagePicker({
+    eyebrow: 'FOTO DE PORTADA',
+    title: 'Seleccionar foto de portada',
+    lead: 'Elige una de las imágenes de alta resolución sugeridas para tu encabezado:',
+    samples: SAMPLE_COVERS,
+    targetAttr: 'data-pick-cover-url',
+    isAvatar: false
+  });
+}
+
 function openSampleAvatarPicker() {
-  openModal(`
-    <p class="eyebrow">FOTO DE PERFIL</p>
-    <h2 id="modal-title">Seleccionar avatar de muestra</h2>
-    <p class="lead" style="margin-bottom: 14px;">Elige un avatar sugerido para tu perfil:</p>
-    <div class="sample-avatars-grid">
-      ${SAMPLE_AVATARS.map((av) => `
-        <div class="sample-avatar-card" data-pick-avatar-url="${av.url}">
-          <img src="${av.url}" alt="${av.label}" class="sample-avatar-img" />
-          <strong>${av.label}</strong>
-        </div>
-      `).join('')}
-    </div>
-  `);
+  openSampleImagePicker({
+    eyebrow: 'FOTO DE PERFIL',
+    title: 'Seleccionar avatar de muestra',
+    lead: 'Elige un avatar sugerido para tu perfil:',
+    samples: SAMPLE_AVATARS,
+    targetAttr: 'data-pick-avatar-url',
+    isAvatar: true
+  });
 }
 
 function openLightbox(imageUrl, title = '', styleTag = '') {
@@ -8288,17 +8310,8 @@ async function openVoiceTranscriptModal({ apptId, title, kind, catName, clientNa
   // Copy button
   document.querySelector('#btn-copy-transcript')?.addEventListener('click', async () => {
     const text = textarea.value.trim();
-    if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
-      const btn = document.querySelector('#btn-copy-transcript');
-      if (btn) {
-        const prev = btn.innerHTML;
-        btn.innerHTML = '<span>Copiado</span>';
-        setTimeout(() => { btn.innerHTML = prev; }, 2000);
-      }
-    } catch (e) {
-      alert('Texto copiado');
+    if (text) {
+      await copyToClipboard(text, document.querySelector('#btn-copy-transcript'), 'Copiado');
     }
   });
 
@@ -8607,11 +8620,7 @@ document.addEventListener('click', async (event) => {
   const copyGuideBtn = event.target.closest('[data-action="copy-guest-guide-text"]');
   if (copyGuideBtn) {
     const text = decodeURIComponent(copyGuideBtn.dataset.text || '');
-    navigator.clipboard?.writeText(text);
-    const orig = copyGuideBtn.innerHTML;
-    copyGuideBtn.innerHTML = '¡Copiado!';
-    setTimeout(() => { copyGuideBtn.innerHTML = orig; }, 2000);
-    return;
+    return await copyToClipboard(text, copyGuideBtn, '¡Copiado!');
   }
 
   // Edit agreement & commission
@@ -8643,11 +8652,10 @@ document.addEventListener('click', async (event) => {
   if (event.target.closest('[data-action="new-guest-spot"]')) {
     return newGuestSpotModal();
   }
-  if (event.target.closest('[data-action="copy-guest-spot-link"]')) {
+  const copyGsBtn = event.target.closest('[data-action="copy-guest-spot-link"]');
+  if (copyGsBtn) {
     const url = `${window.location.origin}/#guest-spot-${activeStudio?.id || 1}`;
-    navigator.clipboard?.writeText(url);
-    alert(`Enlace copiado al portapapeles:\n${url}`);
-    return;
+    return await copyToClipboard(url, copyGsBtn, '¡Enlace copiado!');
   }
   const approveGuestBtn = event.target.closest('[data-action="approve-guest-spot"]');
   if (approveGuestBtn) {
@@ -8687,9 +8695,7 @@ document.addEventListener('click', async (event) => {
   const copyTextBtn = event.target.closest('[data-copy-text]');
   if (copyTextBtn) {
     const textToCopy = copyTextBtn.dataset.copyText;
-    navigator.clipboard?.writeText(textToCopy);
-    alert(`Texto copiado al portapapeles:\n\n"${textToCopy}"`);
-    return;
+    return await copyToClipboard(textToCopy, copyTextBtn, '¡Copiado!');
   }
 
   // Toggle GCal sync simulation
@@ -8699,11 +8705,10 @@ document.addEventListener('click', async (event) => {
   }
 
   // Connect iCal simulation
-  if (event.target.closest('[data-action="connect-ical"]')) {
+  const icalBtn = event.target.closest('[data-action="connect-ical"]');
+  if (icalBtn) {
     const icalUrl = `webcal://${window.location.host}/api/public/calendar/${activeStudio?.id || 1}.ics`;
-    navigator.clipboard?.writeText(icalUrl);
-    alert(`URL de suscripción Apple Calendar copiada:\n\n${icalUrl}`);
-    return;
+    return await copyToClipboard(icalUrl, icalBtn, '¡URL copiada!');
   }
 
   // Test consent form modal
@@ -8992,13 +8997,7 @@ document.addEventListener('click', async (event) => {
   }
   const copyRawBtn = event.target.closest('[data-action="copy-raw-link"]');
   if (copyRawBtn) {
-    const url = copyRawBtn.dataset.url;
-    navigator.clipboard?.writeText(url);
-    copyRawBtn.innerHTML = `${icon('check')} ¡Copiado!`;
-    setTimeout(() => {
-      copyRawBtn.innerHTML = `${icon('copy')} Copiar enlace`;
-    }, 2000);
-    return;
+    return await copyToClipboard(copyRawBtn.dataset.url, copyRawBtn, '¡Copiado!');
   }
 
   // Calendar Sync & Export actions
@@ -9009,11 +9008,7 @@ document.addEventListener('click', async (event) => {
   if (copyFeedBtn) {
     const input = document.querySelector('#copy-feed-url-input');
     if (input) {
-      navigator.clipboard?.writeText(input.value);
-      copyFeedBtn.innerHTML = `${icon('check')} <span>¡Copiado!</span>`;
-      setTimeout(() => {
-        copyFeedBtn.innerHTML = `${icon('copy')} <span>Copiar</span>`;
-      }, 2000);
+      return await copyToClipboard(input.value, copyFeedBtn, '¡Copiado!');
     }
     return;
   }

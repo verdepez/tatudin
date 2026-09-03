@@ -1156,12 +1156,19 @@ app.post('/api/auth/switch-studio', requireAuth, async (request, response) => {
 });
 
 app.get('/api/health', async (_request, response) => {
-  if (!pool) return response.status(503).json({ status: 'degraded', database: 'not configured' });
+  if (!pool) return response.status(503).json({ ok: false, status: 'degraded', database: 'not configured' });
   try {
-    await pool.query('SELECT 1');
-    return response.json({ status: 'ok', database: 'connected' });
+    const dbTest = await pool.query('SELECT NOW() as now, current_database() as db');
+    return response.json({
+      ok: true,
+      status: 'ok',
+      database: 'connected',
+      databaseName: dbTest.rows[0]?.db,
+      timestamp: dbTest.rows[0]?.now,
+      nodeVersion: process.version
+    });
   } catch (error) {
-    return response.status(503).json({ status: 'degraded', database: 'unavailable' });
+    return response.status(503).json({ ok: false, status: 'degraded', database: 'unavailable', error: error.message });
   }
 });
 
@@ -3482,22 +3489,6 @@ app.post('/api/inventory/movements', requireAuth, async (request, response) => {
   }
 });
 
-// Endpoint de diagnóstico y salud
-app.get('/api/health', async (_request, response) => {
-  if (!pool) return response.status(503).json({ ok: false, status: 'error', message: 'No DATABASE_URL configured' });
-  try {
-    const dbTest = await pool.query('SELECT NOW() as now, current_database() as db');
-    return response.json({
-      ok: true,
-      status: 'healthy',
-      database: dbTest.rows[0]?.db,
-      timestamp: dbTest.rows[0]?.now,
-      nodeVersion: process.version
-    });
-  } catch (err) {
-    return response.status(500).json({ ok: false, status: 'db_error', error: err.message });
-  }
-});
 
 async function ensureAuthSchema() {
   if (!pool) {

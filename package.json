@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "seed": "node scripts/seed_studio.js",
+    "seed": "node src/seed_studio.js",
     "test": "node --test tests/*.test.js",
     "test:e2e": "playwright test"
   },
