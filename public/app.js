@@ -1050,13 +1050,59 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
     return true;
   });
 
+  // 6 columns: 5 full columns (Monday to Friday) + 1 stacked column (Saturday top half, Sunday bottom half)
+  const weekDays = (rangeInfo.days || []).slice(0, 5);
+  const satDay = (rangeInfo.days || [])[5] || new Date();
+  const sunDay = (rangeInfo.days || [])[6] || new Date();
+
+  function getDayData(d, scale = 1.0) {
+    const dateISO = formatDateISO(d);
+    const isToday = dateISO === todayISO;
+    const isSelected = agendaFilter.date === dateISO;
+    const dayOfWeek = d.getDay();
+
+    const availBlocks = [];
+    (schedules || []).forEach((sched) => {
+      if (sched.is_active === false) return;
+      (sched.rules || []).forEach((rule) => {
+        const ruleDow = Number(rule.day_of_week);
+        if (ruleDow === dayOfWeek) {
+          const startMin = parseTimeToMinutes(rule.start_time);
+          const endMin = parseTimeToMinutes(rule.end_time);
+          if (endMin > startMin) {
+            const top = Math.max(0, ((startMin - TIMEGRID_START_HOUR * 60) / 60) * (TIMEGRID_HOUR_HEIGHT * scale));
+            const height = ((endMin - startMin) / 60) * (TIMEGRID_HOUR_HEIGHT * scale);
+            availBlocks.push({
+              schedule: sched,
+              rule,
+              top,
+              height
+            });
+          }
+        }
+      });
+    });
+
+    const dayAppts = visibleAppointments.filter((a) => {
+      if (!a.starts_at) return false;
+      return formatDateISO(a.starts_at) === dateISO && a.status !== 'cancelled';
+    });
+
+    return { dateISO, isToday, isSelected, dayOfWeek, availBlocks, dayAppts };
+  }
+
+  const satData = getDayData(satDay, 0.5);
+  const sunData = getDayData(sunDay, 0.5);
+  const satWeekday = satDay.toLocaleDateString('es-CL', { weekday: 'short' });
+  const sunWeekday = sunDay.toLocaleDateString('es-CL', { weekday: 'short' });
+
   return `
     <div class="weekly-timegrid-container">
       <div class="timegrid-header-row">
         <div class="timegrid-time-corner">
           <span class="tz-label">GMT-4</span>
         </div>
-        ${rangeInfo.days.map((d) => {
+        ${weekDays.map((d) => {
           const dateISO = formatDateISO(d);
           const isToday = dateISO === todayISO;
           const isSelected = agendaFilter.date === dateISO;
@@ -1068,6 +1114,21 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
             </div>
           `;
         }).join('')}
+
+        <!-- 6th Header: Sábado / Domingo -->
+        <div class="timegrid-day-header-cell is-weekend-header ${satData.isToday || sunData.isToday ? 'is-today' : ''}">
+          <div class="weekend-header-split">
+            <div class="weekend-header-sub ${satData.isToday ? 'is-today' : ''} ${satData.isSelected ? 'is-selected' : ''}" data-select-date="${satData.dateISO}" title="Sábado ${satDay.getDate()}">
+              <span class="day-header-weekday">${satWeekday}</span>
+              <span class="day-header-num-bubble ${satData.isToday ? 'today-bubble' : ''}">${satDay.getDate()}</span>
+            </div>
+            <span class="weekend-header-sep">/</span>
+            <div class="weekend-header-sub ${sunData.isToday ? 'is-today' : ''} ${sunData.isSelected ? 'is-selected' : ''}" data-select-date="${sunData.dateISO}" title="Domingo ${sunDay.getDate()}">
+              <span class="day-header-weekday">${sunWeekday}</span>
+              <span class="day-header-num-bubble ${sunData.isToday ? 'today-bubble' : ''}">${sunDay.getDate()}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="timegrid-scroll-body">
@@ -1080,45 +1141,16 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
         </div>
 
         <div class="timegrid-days-columns">
-          ${rangeInfo.days.map((d) => {
-            const dateISO = formatDateISO(d);
-            const isToday = dateISO === todayISO;
-            const dayOfWeek = d.getDay();
-
-            const availBlocks = [];
-            (schedules || []).forEach((sched) => {
-              if (sched.is_active === false) return;
-              (sched.rules || []).forEach((rule) => {
-                const ruleDow = Number(rule.day_of_week);
-                if (ruleDow === dayOfWeek) {
-                  const startMin = parseTimeToMinutes(rule.start_time);
-                  const endMin = parseTimeToMinutes(rule.end_time);
-                  if (endMin > startMin) {
-                    const top = Math.max(0, ((startMin - TIMEGRID_START_HOUR * 60) / 60) * TIMEGRID_HOUR_HEIGHT);
-                    const height = ((endMin - startMin) / 60) * TIMEGRID_HOUR_HEIGHT;
-                    availBlocks.push({
-                      schedule: sched,
-                      rule,
-                      top,
-                      height
-                    });
-                  }
-                }
-              });
-            });
-
-            const dayAppts = visibleAppointments.filter((a) => {
-              if (!a.starts_at) return false;
-              return formatDateISO(a.starts_at) === dateISO && a.status !== 'cancelled';
-            });
-
+          <!-- Col 1-5: Lunes a Viernes (Columna Completa) -->
+          ${weekDays.map((d) => {
+            const data = getDayData(d, 1.0);
             return `
-              <div class="timegrid-day-column ${isToday ? 'today-col' : ''}" data-column-date="${dateISO}">
+              <div class="timegrid-day-column ${data.isToday ? 'today-col' : ''}" data-column-date="${data.dateISO}">
                 ${hours.map((h) => `
-                  <div class="timegrid-slot-cell" data-slot-hour="${h}" data-slot-date="${dateISO}" style="height: ${TIMEGRID_HOUR_HEIGHT}px;"></div>
+                  <div class="timegrid-slot-cell" data-slot-hour="${h}" data-slot-date="${data.dateISO}" style="height: ${TIMEGRID_HOUR_HEIGHT}px;"></div>
                 `).join('')}
 
-                ${availBlocks.map((b) => `
+                ${data.availBlocks.map((b) => `
                   <div class="timegrid-avail-window ${b.schedule.is_locked ? 'is-locked-window' : ''}"
                        style="top: ${b.top}px; height: ${b.height}px; --avail-color: ${b.schedule.color || '#7C3AED'};"
                        title="${b.schedule.title} (${b.rule.start_time} - ${b.rule.end_time}) ${b.schedule.is_locked ? '· BLOQUEADA' : '· DISPONIBLE'}">
@@ -1130,7 +1162,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                   </div>
                 `).join('')}
 
-                ${dayAppts.map((a) => {
+                ${data.dayAppts.map((a) => {
                   const apptDate = new Date(a.starts_at);
                   const apptMin = apptDate.getHours() * 60 + apptDate.getMinutes();
                   const duration = Math.max(20, Number(a.duration_minutes || 60));
@@ -1156,7 +1188,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                   `;
                 }).join('')}
 
-                ${isToday && isNowInRange ? `
+                ${data.isToday && isNowInRange ? `
                   <div class="timegrid-current-time-line" style="top: ${nowOffsetTop}px;">
                     <span class="timegrid-now-circle"></span>
                   </div>
@@ -1164,6 +1196,117 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
               </div>
             `;
           }).join('')}
+
+          <!-- Col 6: Sábado y Domingo (A media columna, uno sobre el otro) -->
+          <div class="timegrid-day-column weekend-column">
+            <!-- Sábado (Mitad superior) -->
+            <div class="timegrid-weekend-half sat-half ${satData.isToday ? 'today-col' : ''}" data-column-date="${satData.dateISO}">
+              <div class="weekend-half-tag ${satData.isToday ? 'is-today' : ''}">
+                <span>Sábado ${satDay.getDate()}</span>
+              </div>
+              ${hours.map((h) => `
+                <div class="timegrid-slot-cell is-half-slot" data-slot-hour="${h}" data-slot-date="${satData.dateISO}" style="height: ${TIMEGRID_HOUR_HEIGHT * 0.5}px;"></div>
+              `).join('')}
+
+              ${satData.availBlocks.map((b) => `
+                <div class="timegrid-avail-window is-half-window ${b.schedule.is_locked ? 'is-locked-window' : ''}"
+                     style="top: ${b.top}px; height: ${b.height}px; --avail-color: ${b.schedule.color || '#7C3AED'};"
+                     title="${b.schedule.title} (${b.rule.start_time} - ${b.rule.end_time}) ${b.schedule.is_locked ? '· BLOQUEADA' : '· DISPONIBLE'}">
+                  <div class="avail-window-label">
+                    <span class="avail-pill-dot" style="background: ${b.schedule.color || '#7C3AED'};"></span>
+                    <strong class="avail-sched-name">${b.schedule.title}</strong>
+                    ${b.schedule.is_locked ? `<span class="avail-locked-badge">${icon('lock')}</span>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+
+              ${satData.dayAppts.map((a) => {
+                const apptDate = new Date(a.starts_at);
+                const apptMin = apptDate.getHours() * 60 + apptDate.getMinutes();
+                const duration = Math.max(20, Number(a.duration_minutes || 60));
+                const top = Math.max(0, ((apptMin - TIMEGRID_START_HOUR * 60) / 60) * (TIMEGRID_HOUR_HEIGHT * 0.5));
+                const height = Math.max(20, (duration / 60) * (TIMEGRID_HOUR_HEIGHT * 0.5));
+                const color = a.category_color || '#7C3AED';
+                return `
+                  <div class="timegrid-event-block weekend-event-block"
+                       style="top: ${top}px; height: ${height}px; --event-color: ${color}; background: ${color};"
+                       data-action="view-appointment-detail" data-appointment-id="${a.id}"
+                       data-event-category-id="${a.category_id || ''}"
+                       title="${a.title} · ${formatTime(a.starts_at)} (${duration} min)">
+                    <div class="event-block-header">
+                      <span class="event-time">${formatTime(a.starts_at)}</span>
+                      <div style="display: flex; align-items: center; gap: 4px;">
+                        ${a.external_source ? `<span class="event-sync-badge" title="Enlazado">🔗</span>` : ''}
+                        ${a.status === 'completed' ? `<span class="event-status-tag">✓</span>` : ''}
+                      </div>
+                    </div>
+                    <strong class="event-block-title">${a.title}</strong>
+                    ${a.client_name ? `<span class="event-client-name">${a.client_name}</span>` : ''}
+                  </div>
+                `;
+              }).join('')}
+
+              ${satData.isToday && isNowInRange ? `
+                <div class="timegrid-current-time-line" style="top: ${nowOffsetTop * 0.5}px;">
+                  <span class="timegrid-now-circle"></span>
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Domingo (Mitad inferior) -->
+            <div class="timegrid-weekend-half sun-half ${sunData.isToday ? 'today-col' : ''}" data-column-date="${sunData.dateISO}">
+              <div class="weekend-half-tag ${sunData.isToday ? 'is-today' : ''}">
+                <span>Domingo ${sunDay.getDate()}</span>
+              </div>
+              ${hours.map((h) => `
+                <div class="timegrid-slot-cell is-half-slot" data-slot-hour="${h}" data-slot-date="${sunData.dateISO}" style="height: ${TIMEGRID_HOUR_HEIGHT * 0.5}px;"></div>
+              `).join('')}
+
+              ${sunData.availBlocks.map((b) => `
+                <div class="timegrid-avail-window is-half-window ${b.schedule.is_locked ? 'is-locked-window' : ''}"
+                     style="top: ${b.top}px; height: ${b.height}px; --avail-color: ${b.schedule.color || '#7C3AED'};"
+                     title="${b.schedule.title} (${b.rule.start_time} - ${b.rule.end_time}) ${b.schedule.is_locked ? '· BLOQUEADA' : '· DISPONIBLE'}">
+                  <div class="avail-window-label">
+                    <span class="avail-pill-dot" style="background: ${b.schedule.color || '#7C3AED'};"></span>
+                    <strong class="avail-sched-name">${b.schedule.title}</strong>
+                    ${b.schedule.is_locked ? `<span class="avail-locked-badge">${icon('lock')}</span>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+
+              ${sunData.dayAppts.map((a) => {
+                const apptDate = new Date(a.starts_at);
+                const apptMin = apptDate.getHours() * 60 + apptDate.getMinutes();
+                const duration = Math.max(20, Number(a.duration_minutes || 60));
+                const top = Math.max(0, ((apptMin - TIMEGRID_START_HOUR * 60) / 60) * (TIMEGRID_HOUR_HEIGHT * 0.5));
+                const height = Math.max(20, (duration / 60) * (TIMEGRID_HOUR_HEIGHT * 0.5));
+                const color = a.category_color || '#7C3AED';
+                return `
+                  <div class="timegrid-event-block weekend-event-block"
+                       style="top: ${top}px; height: ${height}px; --event-color: ${color}; background: ${color};"
+                       data-action="view-appointment-detail" data-appointment-id="${a.id}"
+                       data-event-category-id="${a.category_id || ''}"
+                       title="${a.title} · ${formatTime(a.starts_at)} (${duration} min)">
+                    <div class="event-block-header">
+                      <span class="event-time">${formatTime(a.starts_at)}</span>
+                      <div style="display: flex; align-items: center; gap: 4px;">
+                        ${a.external_source ? `<span class="event-sync-badge" title="Enlazado">🔗</span>` : ''}
+                        ${a.status === 'completed' ? `<span class="event-status-tag">✓</span>` : ''}
+                      </div>
+                    </div>
+                    <strong class="event-block-title">${a.title}</strong>
+                    ${a.client_name ? `<span class="event-client-name">${a.client_name}</span>` : ''}
+                  </div>
+                `;
+              }).join('')}
+
+              ${sunData.isToday && isNowInRange ? `
+                <div class="timegrid-current-time-line" style="top: ${nowOffsetTop * 0.5}px;">
+                  <span class="timegrid-now-circle"></span>
+                </div>
+              ` : ''}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2201,8 +2344,11 @@ async function renderScheduleConfigurator(scheduleId = null) {
 }
 
 async function renderAgenda() {
+  if (agendaFilter.viewMode === 'week') {
+    agendaFilter.viewMode = 'timegrid';
+  }
   const isTimeGrid = agendaFilter.viewMode === 'timegrid';
-  const isWeekView = agendaFilter.viewMode === 'week';
+  const isWeekView = false;
   const isMonthView = agendaFilter.viewMode === 'month';
   const rangeInfo = isMonthView ? getMonthMatrix(agendaFilter.currentDate) : getWeekRange(agendaFilter.currentDate);
 
@@ -2424,9 +2570,6 @@ async function renderAgenda() {
               <div class="calendar-view-toggle">
                 <button class="cal-view-btn ${isTimeGrid ? 'active' : ''}" data-cal-view="timegrid">
                   Horaria (Timeline)
-                </button>
-                <button class="cal-view-btn ${isWeekView ? 'active' : ''}" data-cal-view="week">
-                  Semanal (7 días)
                 </button>
                 <button class="cal-view-btn ${isMonthView ? 'active' : ''}" data-cal-view="month">
                   Mensual
