@@ -51,6 +51,7 @@ const ICONS = {
   bell: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
   clock: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
   arrowRight: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>',
+  arrowLeft: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>',
   search: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
   income: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>',
   expense: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>',
@@ -212,8 +213,10 @@ let agendaFilter = {
   spaceId: 'all',
   categoryId: 'all',
   status: 'all',
-  hiddenCategories: []
+  hiddenCategories: [],
+  offset: 0 // Truncar a 5 citas y avanzar de 5 en 5
 };
+let walletTransactionsLimit = 5; // Ver más en historial de movimientos
 let onboarding = JSON.parse(localStorage.getItem('tatudin_onboarding') || '{}');
 
 async function copyToClipboard(text, triggerBtn = null, successText = '¡Copiado!') {
@@ -2744,19 +2747,55 @@ async function renderAgenda() {
           ` : ''}
         </section>
 
-        <!-- Appointment List Heading & Count -->
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 18px 0 12px; padding: 0 4px;">
-          <h2 style="font-size: 17px; margin: 0; font-weight: 800;">
-            ${agendaFilter.date ? `Compromisos del día (${agendaFilter.date})` : 'Compromisos programados'}
-          </h2>
-          <span class="count" style="font-weight: 700;">
-            ${appointmentsList.length} ${appointmentsList.length === 1 ? 'compromiso' : 'compromisos'}
-          </span>
-        </div>
+        <!-- Appointment List Heading & Count (Truncado a 5 y avance de 5 en 5) -->
+        ${(() => {
+          const pageSize = 5;
+          const totalAppts = appointmentsList.length;
+          if (typeof agendaFilter.offset !== 'number' || agendaFilter.offset < 0) agendaFilter.offset = 0;
+          if (agendaFilter.offset >= totalAppts && totalAppts > 0) {
+            agendaFilter.offset = Math.floor((totalAppts - 1) / pageSize) * pageSize;
+          }
+          const visibleAppts = appointmentsList.slice(agendaFilter.offset, agendaFilter.offset + pageSize);
 
-        <section class="agenda-list">
-          ${appointmentsList.map(appointmentCard).join('') || emptyState('Agenda despejada', 'No hay compromisos registrados para los filtros o período seleccionado.')}
-        </section>
+          return `
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 18px 0 12px; padding: 0 4px; flex-wrap: wrap;">
+              <div>
+                <h2 style="font-size: 17px; margin: 0; font-weight: 800;">
+                  ${agendaFilter.date ? `Compromisos del día (${agendaFilter.date})` : 'Compromisos programados'}
+                </h2>
+                ${totalAppts > pageSize ? `
+                  <p style="margin: 2px 0 0; font-size: 12px; color: var(--muted); font-weight: 600;">
+                    Mostrando citas <strong>${agendaFilter.offset + 1}–${Math.min(agendaFilter.offset + pageSize, totalAppts)}</strong> de <strong>${totalAppts}</strong>
+                  </p>
+                ` : ''}
+              </div>
+              <span class="count" style="font-weight: 700;">
+                ${totalAppts} ${totalAppts === 1 ? 'compromiso' : 'compromisos'}
+              </span>
+            </div>
+
+            <section class="agenda-list">
+              ${visibleAppts.map(appointmentCard).join('') || emptyState('Agenda despejada', 'No hay compromisos registrados para los filtros o período seleccionado.')}
+            </section>
+
+            ${totalAppts > pageSize ? `
+              <div class="agenda-pagination-bar">
+                <button class="secondary small" data-action="agenda-prev-5" ${agendaFilter.offset === 0 ? 'disabled' : ''} style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                  ${icon('arrowLeft')} <span>Anteriores 5</span>
+                </button>
+
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--text);">
+                  <span>Página ${Math.floor(agendaFilter.offset / pageSize) + 1} de ${Math.ceil(totalAppts / pageSize)}</span>
+                  <span style="color: var(--muted); font-weight: 500;">(${agendaFilter.offset + 1}–${Math.min(agendaFilter.offset + pageSize, totalAppts)} de ${totalAppts})</span>
+                </div>
+
+                <button class="secondary small" data-action="agenda-next-5" ${agendaFilter.offset + pageSize >= totalAppts ? 'disabled' : ''} style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                  <span>Avanzar 5</span> ${icon('arrowRight')}
+                </button>
+              </div>
+            ` : ''}
+          `;
+        })()}
       </main>
     </div>
   `;
@@ -2863,6 +2902,7 @@ function openAgendaFilterModal() {
     agendaFilter.artistId = formData.get('artistId') || 'all';
     agendaFilter.spaceId = formData.get('spaceId') || 'all';
     agendaFilter.status = formData.get('status') || 'all';
+    agendaFilter.offset = 0;
     closeModal();
     renderAgenda();
   });
@@ -2873,6 +2913,7 @@ function openAgendaFilterModal() {
     agendaFilter.spaceId = 'all';
     agendaFilter.status = 'all';
     agendaFilter.hiddenCategories = [];
+    agendaFilter.offset = 0;
     closeModal();
     renderAgenda();
   });
@@ -3528,19 +3569,51 @@ async function renderFinances() {
 
     <section class="transaction-list panel">
       <div class="section-heading">
-        <h2>Historial de movimientos</h2>
+        <div>
+          <h2>Historial de movimientos</h2>
+          ${transactions.length > 5 ? `
+            <p style="margin: 2px 0 0; font-size: 12px; color: var(--muted); font-weight: 600;">
+              Mostrando ${Math.min(walletTransactionsLimit, transactions.length)} de ${transactions.length} movimientos
+            </p>
+          ` : ''}
+        </div>
         <span class="count">${transactions.length} ${transactions.length === 1 ? 'movimiento' : 'movimientos'}</span>
       </div>
-      ${transactions.map((item) => `
-        <article class="transaction">
-          <span class="transaction-kind ${item.kind}">${item.kind === 'income' ? '+' : '−'}</span>
-          <div class="transaction-info">
-            <h3>${item.description}</h3>
-            <p>${item.occurred_on}${item.artist_name ? ` · ${item.artist_name}` : ''}</p>
-          </div>
-          <strong class="transaction-amount ${item.kind}">${item.kind === 'income' ? '+' : '−'}${money(item.amount)}</strong>
-        </article>
-      `).join('') || emptyState('Sin movimientos', 'Registra tu primer ingreso o gasto.')}
+
+      <div class="transactions-container">
+        ${transactions.slice(0, walletTransactionsLimit).map((item) => `
+          <article class="transaction">
+            <span class="transaction-kind ${item.kind}">${item.kind === 'income' ? '+' : '−'}</span>
+            <div class="transaction-info">
+              <h3>${item.description}</h3>
+              <p>${item.occurred_on}${item.artist_name ? ` · ${item.artist_name}` : ''}</p>
+            </div>
+            <strong class="transaction-amount ${item.kind}">${item.kind === 'income' ? '+' : '−'}${money(item.amount)}</strong>
+          </article>
+        `).join('') || emptyState('Sin movimientos', 'Registra tu primer ingreso o gasto.')}
+      </div>
+
+      ${transactions.length > 5 ? `
+        <div class="wallet-more-bar">
+          ${walletTransactionsLimit < transactions.length ? `
+            <button class="secondary" data-action="wallet-show-more" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 9px 22px;">
+              ${icon('plus')} <span>Ver más movimientos (+5)</span>
+            </button>
+            <span class="muted-label" style="font-size: 12px; color: var(--muted); margin-top: 4px;">
+              Quedan ${transactions.length - Math.min(walletTransactionsLimit, transactions.length)} movimientos por mostrar
+            </span>
+          ` : `
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 8px;">
+              <span class="muted-label" style="font-size: 12.5px; color: var(--muted); font-weight: 600;">
+                ✓ Todos los movimientos cargados (${transactions.length})
+              </span>
+              <button class="text-button" data-action="wallet-show-less" style="font-size: 12.5px; color: var(--accent); font-weight: 700;">
+                Mostrar menos (primeros 5)
+              </button>
+            </div>
+          `}
+        </div>
+      ` : ''}
     </section>
   `;
 }
@@ -9288,6 +9361,7 @@ document.addEventListener('click', async (event) => {
   if (calViewBtn) {
     agendaFilter.viewMode = calViewBtn.dataset.calView;
     agendaFilter.date = null;
+    agendaFilter.offset = 0;
     return await transitionView(() => renderAgenda());
   }
 
@@ -9301,6 +9375,7 @@ document.addEventListener('click', async (event) => {
       agendaFilter.currentDate = d;
     }
     agendaFilter.date = null;
+    agendaFilter.offset = 0;
     return await transitionView(() => renderAgenda());
   }
   if (event.target.closest('[data-action="cal-next"]')) {
@@ -9312,11 +9387,13 @@ document.addEventListener('click', async (event) => {
       agendaFilter.currentDate = d;
     }
     agendaFilter.date = null;
+    agendaFilter.offset = 0;
     return await transitionView(() => renderAgenda());
   }
   if (event.target.closest('[data-action="cal-today"]')) {
     agendaFilter.currentDate = new Date();
     agendaFilter.date = formatDateISO(new Date());
+    agendaFilter.offset = 0;
     return await transitionView(() => renderAgenda());
   }
 
@@ -9325,6 +9402,7 @@ document.addEventListener('click', async (event) => {
   if (catBtn) {
     const targetCatId = catBtn.dataset.selectCategory;
     agendaFilter.categoryId = String(agendaFilter.categoryId) === String(targetCatId) ? 'all' : targetCatId;
+    agendaFilter.offset = 0;
     return await transitionView(() => renderAgenda());
   }
 
@@ -9343,10 +9421,12 @@ document.addEventListener('click', async (event) => {
   if (dateBtn) {
     const selectedDate = dateBtn.dataset.selectDate;
     agendaFilter.date = agendaFilter.date === selectedDate ? null : selectedDate;
+    agendaFilter.offset = 0;
     return await transitionView(() => renderAgenda());
   }
   if (event.target.closest('[data-clear-date]')) {
     agendaFilter.date = null;
+    agendaFilter.offset = 0;
     return await transitionView(() => renderAgenda());
   }
   if (event.target.closest('[data-clear-all-filters]')) {
@@ -9355,7 +9435,32 @@ document.addEventListener('click', async (event) => {
     agendaFilter.categoryId = 'all';
     agendaFilter.status = 'all';
     agendaFilter.date = null;
+    agendaFilter.offset = 0;
     return await transitionView(() => renderAgenda());
+  }
+
+  // Agenda 5-by-5 pagination controls
+  if (event.target.closest('[data-action="agenda-next-5"]')) {
+    agendaFilter.offset = (agendaFilter.offset || 0) + 5;
+    await transitionView(() => renderAgenda());
+    document.querySelector('.agenda-list')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
+  if (event.target.closest('[data-action="agenda-prev-5"]')) {
+    agendaFilter.offset = Math.max(0, (agendaFilter.offset || 0) - 5);
+    await transitionView(() => renderAgenda());
+    document.querySelector('.agenda-list')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
+
+  // Wallet (billetera) transactions load-more / show-less
+  if (event.target.closest('[data-action="wallet-show-more"]')) {
+    walletTransactionsLimit += 5;
+    return await renderFinances();
+  }
+  if (event.target.closest('[data-action="wallet-show-less"]')) {
+    walletTransactionsLimit = 5;
+    return await renderFinances();
   }
 
   // Toggle member status
