@@ -495,6 +495,39 @@ test('Session Transcripts: Delete transcript /api/transcripts/:id', async () => 
   assert.equal(res.data.ok, true);
 });
 
+test('Transactions: Filter by date range and sort order /api/transactions', async () => {
+  // Create test transactions
+  await request('/api/transactions', {
+    method: 'POST',
+    body: JSON.stringify({
+      kind: 'income',
+      description: 'Venta de crema aftercare',
+      amount: 15000,
+      occurredOn: '2026-08-15'
+    })
+  });
+  await request('/api/transactions', {
+    method: 'POST',
+    body: JSON.stringify({
+      kind: 'expense',
+      description: 'Compra de papel absorbente',
+      amount: 8000,
+      occurredOn: '2026-08-20'
+    })
+  });
+
+  // Query with sorting asc (older first)
+  const resAsc = await request('/api/transactions?sort=asc');
+  assert.equal(resAsc.status, 200);
+  assert.ok(Array.isArray(resAsc.data));
+
+  // Query with date range
+  const resRange = await request('/api/transactions?startDate=2026-08-10&endDate=2026-08-25');
+  assert.equal(resRange.status, 200);
+  assert.ok(resRange.data.length >= 2);
+  assert.ok(resRange.data.every(t => t.occurred_on >= '2026-08-10' && t.occurred_on <= '2026-08-25'));
+});
+
 test.after(() => {
   setTimeout(() => process.exit(0), 100);
 });

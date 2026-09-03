@@ -2917,10 +2917,26 @@ app.patch('/api/clients/:id', requireAuth, async (request, response) => {
 app.get('/api/transactions', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
-    const result = await pool.query(`SELECT t.*, u.full_name AS artist_name
+    const { startDate, endDate, sort } = request.query;
+    let query = `SELECT t.*, u.full_name AS artist_name
       FROM transactions t
       LEFT JOIN users u ON u.id = t.artist_id
-      WHERE t.studio_id = $1 ORDER BY t.occurred_on DESC, t.id DESC`, [request.studioId]);
+      WHERE t.studio_id = $1`;
+    const params = [request.studioId];
+
+    if (startDate) {
+      params.push(startDate);
+      query += ` AND t.occurred_on >= $${params.length}::date`;
+    }
+    if (endDate) {
+      params.push(endDate);
+      query += ` AND t.occurred_on <= $${params.length}::date`;
+    }
+
+    const orderDir = (sort || '').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    query += ` ORDER BY t.occurred_on ${orderDir}, t.id ${orderDir}`;
+
+    const result = await pool.query(query, params);
     return response.json(result.rows);
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });

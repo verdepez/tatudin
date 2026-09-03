@@ -217,6 +217,11 @@ let agendaFilter = {
   offset: 0 // Truncar a 5 citas y avanzar de 5 en 5
 };
 let walletTransactionsLimit = 5; // Ver más en historial de movimientos
+let walletFilter = {
+  sort: 'desc', // 'desc' (más reciente) | 'asc' (más antiguo)
+  startDate: '',
+  endDate: ''
+};
 let onboarding = JSON.parse(localStorage.getItem('tatudin_onboarding') || '{}');
 
 async function copyToClipboard(text, triggerBtn = null, successText = '¡Copiado!') {
@@ -3398,8 +3403,14 @@ function editClientModal(clientId) {
 }
 
 async function renderFinances() {
+  const txParams = new URLSearchParams();
+  if (walletFilter.startDate) txParams.append('startDate', walletFilter.startDate);
+  if (walletFilter.endDate) txParams.append('endDate', walletFilter.endDate);
+  if (walletFilter.sort) txParams.append('sort', walletFilter.sort);
+  const txUrl = `/api/transactions${txParams.toString() ? `?${txParams.toString()}` : ''}`;
+
   const [transactions, artistSummary, overview, studio] = await Promise.all([
-    api('/api/transactions').catch(() => []),
+    api(txUrl).catch(() => []),
     api('/api/finances/summary').catch(() => []),
     api('/api/finances/overview').catch(() => ({})),
     api('/api/studio').catch(() => activeStudio)
@@ -3568,16 +3579,52 @@ async function renderFinances() {
     </section>
 
     <section class="transaction-list panel">
-      <div class="section-heading">
+      <div class="section-heading" style="flex-wrap: wrap; gap: 12px; align-items: flex-start;">
         <div>
           <h2>Historial de movimientos</h2>
-          ${transactions.length > 5 ? `
-            <p style="margin: 2px 0 0; font-size: 12px; color: var(--muted); font-weight: 600;">
-              Mostrando ${Math.min(walletTransactionsLimit, transactions.length)} de ${transactions.length} movimientos
-            </p>
+          <p style="margin: 2px 0 0; font-size: 12px; color: var(--muted); font-weight: 600;">
+            ${transactions.length > 0 
+              ? `Mostrando <strong>${Math.min(walletTransactionsLimit, transactions.length)}</strong> de <strong>${transactions.length}</strong> movimientos ${walletFilter.startDate || walletFilter.endDate ? '(rango filtrado)' : ''}` 
+              : 'Sin movimientos registrados para el filtro seleccionado'}
+          </p>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+          <button class="secondary small" data-action="export-wallet-csv" title="Exportar movimientos a archivo CSV / Excel">
+            ${icon('download')} <span>Exportar a hoja de cálculo</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de Filtros: Ordenar por y Rango de Fechas -->
+      <div class="wallet-filters-bar" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 12px 0 16px; padding: 12px 14px; background: var(--surface-high, rgba(255,255,255,0.03)); border: 1px solid var(--border); border-radius: var(--radius-md, 10px);">
+        <div style="display: flex; flex-direction: column; gap: 4px; min-width: 160px; flex: 1;">
+          <label for="wallet-sort-select" style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Ordenar por</label>
+          <select id="wallet-sort-select" style="padding: 7px 10px; font-size: 13px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--ink);">
+            <option value="desc" ${walletFilter.sort === 'desc' ? 'selected' : ''}>Más reciente primero</option>
+            <option value="asc" ${walletFilter.sort === 'asc' ? 'selected' : ''}>Más antiguo primero</option>
+          </select>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 4px; min-width: 135px; flex: 1;">
+          <label for="wallet-start-date" style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Fecha desde</label>
+          <input type="date" id="wallet-start-date" value="${walletFilter.startDate || ''}" style="padding: 6px 8px; font-size: 13px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--ink);" />
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 4px; min-width: 135px; flex: 1;">
+          <label for="wallet-end-date" style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Fecha hasta</label>
+          <input type="date" id="wallet-end-date" value="${walletFilter.endDate || ''}" style="padding: 6px 8px; font-size: 13px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--ink);" />
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="primary small" data-action="apply-wallet-filters" style="padding: 7px 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+            ${icon('check')} <span>Filtrar</span>
+          </button>
+          ${walletFilter.startDate || walletFilter.endDate || walletFilter.sort !== 'desc' ? `
+            <button class="secondary small" data-action="clear-wallet-filters" style="padding: 7px 12px; font-weight: 600;">
+              Limpiar
+            </button>
           ` : ''}
         </div>
-        <span class="count">${transactions.length} ${transactions.length === 1 ? 'movimiento' : 'movimientos'}</span>
       </div>
 
       <div class="transactions-container">
@@ -3590,7 +3637,7 @@ async function renderFinances() {
             </div>
             <strong class="transaction-amount ${item.kind}">${item.kind === 'income' ? '+' : '−'}${money(item.amount)}</strong>
           </article>
-        `).join('') || emptyState('Sin movimientos', 'Registra tu primer ingreso o gasto.')}
+        `).join('') || emptyState('Sin movimientos', walletFilter.startDate || walletFilter.endDate ? 'No hay movimientos en el rango de fechas seleccionado.' : 'Registra tu primer ingreso o gasto.')}
       </div>
 
       ${transactions.length > 5 ? `
@@ -8137,6 +8184,50 @@ function boEditUserModal(userId, userName, userEmail, isRoot) {
   `);
 }
 
+function exportWalletTransactionsCSV(transactions, filter = {}) {
+  let csv = '=== TATUDIN · HISTORIAL DE MOVIMIENTOS ===\r\n';
+  const sortLabel = filter.sort === 'asc' ? 'Más antiguo primero' : 'Más reciente primero';
+  const rangeLabel = filter.startDate || filter.endDate 
+    ? `Desde ${filter.startDate || 'el inicio'} hasta ${filter.endDate || 'hoy'}` 
+    : 'Todos los períodos';
+  csv += `Período,${rangeLabel}\r\n`;
+  csv += `Orden,${sortLabel}\r\n`;
+  csv += `Fecha de exportación,${new Date().toLocaleString('es-CL')}\r\n`;
+  csv += `Total de movimientos,${(transactions || []).length}\r\n\r\n`;
+
+  csv += 'ID,Fecha,Tipo,Descripción,Monto (CLP),Artista / Responsable\r\n';
+
+  let totalIncome = 0;
+  let totalExpense = 0;
+
+  (transactions || []).forEach((t) => {
+    const kindLabel = t.kind === 'income' ? 'Ingreso' : 'Gasto';
+    const numAmount = Number(t.amount || 0);
+    if (t.kind === 'income') totalIncome += numAmount;
+    else totalExpense += numAmount;
+
+    csv += `${t.id},"${t.occurred_on}","${kindLabel}","${(t.description || '').replace(/"/g, '""')}",${numAmount},"${(t.artist_name || 'General').replace(/"/g, '""')}"\r\n`;
+  });
+
+  csv += `\r\n=== TOTALES DEL PERÍODO ===\r\n`;
+  csv += `Total Ingresos,${totalIncome}\r\n`;
+  csv += `Total Gastos,${totalExpense}\r\n`;
+  csv += `Balance Neto,${totalIncome - totalExpense}\r\n`;
+
+  // Prepend BOM (\uFEFF) for proper UTF-8 decoding in Excel & Google Sheets
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const startStr = filter.startDate || 'inicio';
+  const endStr = filter.endDate || 'actual';
+  a.download = `tatudin_movimientos_${startStr}_al_${endStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function exportFinancesCSV(artistSummary, transactions, overview = {}) {
   let csv = '=== RESUMEN FINANCIERO GENERAL ===\r\n';
   csv += `Ingresos Esperados (Proyección Citas),${overview.expected_income || 0}\r\n`;
@@ -8159,7 +8250,7 @@ function exportFinancesCSV(artistSummary, transactions, overview = {}) {
     csv += `${t.id},"${t.occurred_on}","${t.kind}","${(t.description || '').replace(/"/g, '""')}",${t.amount},"${t.artist_name || 'General'}"\r\n`;
   });
 
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -9463,6 +9554,34 @@ document.addEventListener('click', async (event) => {
     return await renderFinances();
   }
 
+  // Wallet sorting, date range filter & spreadsheet export
+  if (event.target.closest('[data-action="apply-wallet-filters"]')) {
+    const sortSelect = document.querySelector('#wallet-sort-select');
+    const startDateInput = document.querySelector('#wallet-start-date');
+    const endDateInput = document.querySelector('#wallet-end-date');
+    if (sortSelect) walletFilter.sort = sortSelect.value;
+    if (startDateInput) walletFilter.startDate = startDateInput.value;
+    if (endDateInput) walletFilter.endDate = endDateInput.value;
+    walletTransactionsLimit = 5;
+    return await renderFinances();
+  }
+  if (event.target.closest('[data-action="clear-wallet-filters"]')) {
+    walletFilter.sort = 'desc';
+    walletFilter.startDate = '';
+    walletFilter.endDate = '';
+    walletTransactionsLimit = 5;
+    return await renderFinances();
+  }
+  if (event.target.closest('[data-action="export-wallet-csv"]')) {
+    const txParams = new URLSearchParams();
+    if (walletFilter.startDate) txParams.append('startDate', walletFilter.startDate);
+    if (walletFilter.endDate) txParams.append('endDate', walletFilter.endDate);
+    if (walletFilter.sort) txParams.append('sort', walletFilter.sort);
+    const txUrl = `/api/transactions${txParams.toString() ? `?${txParams.toString()}` : ''}`;
+    const txs = await api(txUrl).catch(() => []);
+    return exportWalletTransactionsCSV(txs, walletFilter);
+  }
+
   // Toggle member status
   const memberToggleBtn = event.target.closest('[data-toggle-member-id]');
   if (memberToggleBtn) {
@@ -9934,6 +10053,12 @@ document.addEventListener('input', (event) => {
 document.addEventListener('change', async (event) => {
   if (event.target.classList.contains('cal-layer-color-input')) {
     handleCategoryColorChange(event.target.dataset.categoryId, event.target.value, true);
+  }
+
+  if (event.target.id === 'wallet-sort-select') {
+    walletFilter.sort = event.target.value;
+    walletTransactionsLimit = 5;
+    return await renderFinances();
   }
 
   if (event.target.id === 'gallery-native-file-input') {
