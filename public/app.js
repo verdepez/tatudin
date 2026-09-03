@@ -2,9 +2,35 @@ const app = document.querySelector('#app');
 const modal = document.querySelector('#modal');
 const modalContent = document.querySelector('#modal-content');
 
-// Helper to format currency
-const money = (value) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0));
+// System-wide number & currency formatting with clean abbreviations
+const fullMoney = (value) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0));
 
+// Compact number formatter (e.g. 1.200 -> 1,2mil, 1.500.000 -> 1,5M)
+const compactNumber = (value) => {
+  const num = Number(value || 0);
+  if (isNaN(num)) return '0';
+  const abs = Math.abs(num);
+  const sign = num < 0 ? '-' : '';
+
+  if (abs >= 1_000_000_000) {
+    const val = abs / 1_000_000_000;
+    const formatted = val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace('.', ',');
+    return `${sign}${formatted}B`;
+  }
+  if (abs >= 1_000_000) {
+    const val = abs / 1_000_000;
+    const formatted = val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace('.', ',');
+    return `${sign}${formatted}M`;
+  }
+  if (abs >= 1_000) {
+    const val = abs / 1_000;
+    const formatted = val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace('.', ',');
+    return `${sign}${formatted}mil`;
+  }
+  return `${sign}${abs.toLocaleString('es-CL')}`;
+};
+
+// Compact currency formatter (e.g. $1.500.000 -> $1,5M, $350.000 -> $350mil, $800 -> $800)
 const compactMoney = (value) => {
   const num = Number(value || 0);
   if (isNaN(num)) return '$0';
@@ -28,6 +54,9 @@ const compactMoney = (value) => {
   }
   return `${sign}$${abs.toLocaleString('es-CL')}`;
 };
+
+// Default money formatter now applies the abbreviation format across the entire system
+const money = (value) => compactMoney(value);
 
 // SVG Icons library
 const ICONS = {
@@ -835,7 +864,7 @@ async function render(view = 'dashboard') {
                 <div class="mini-bubble purple-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
                 </div>
-                <strong class="tri-metric-val">${data.stats?.scheduled_appointments || 0}</strong>
+                <strong class="tri-metric-val" title="${data.stats?.scheduled_appointments || 0}">${compactNumber(data.stats?.scheduled_appointments || 0)}</strong>
                 <span class="tri-metric-label">Agendadas</span>
                 <small class="tri-metric-sub">Total</small>
               </div>
@@ -846,18 +875,18 @@ async function render(view = 'dashboard') {
                 <div class="mini-bubble green-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
-                <strong class="tri-metric-val">${data.stats?.completed_appointments || 0}</strong>
+                <strong class="tri-metric-val" title="${data.stats?.completed_appointments || 0}">${compactNumber(data.stats?.completed_appointments || 0)}</strong>
                 <span class="tri-metric-label">Completadas</span>
                 <small class="tri-metric-sub">Finalizadas</small>
               </div>
 
               <div class="tri-grid-divider"></div>
 
-              <div class="tri-grid-col" title="${money(data.stats?.income || 0)}">
+              <div class="tri-grid-col" title="${fullMoney(data.stats?.income || 0)}">
                 <div class="mini-bubble dark-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
                 </div>
-                <strong class="tri-metric-val" title="${money(data.stats?.income || 0)}">${compactMoney(data.stats?.income || 0)}</strong>
+                <strong class="tri-metric-val" title="${fullMoney(data.stats?.income || 0)}">${compactMoney(data.stats?.income || 0)}</strong>
                 <small class="tri-metric-sub" style="margin-top: 2px;">Total Ingresos</small>
               </div>
             </div>
@@ -870,45 +899,45 @@ async function render(view = 'dashboard') {
               <p class="eyebrow">INGRESOS & ABONOS</p>
             </div>
             <div class="dashboard-quad-grid">
-              <div class="quad-item" title="${money(data.stats?.income || 0)}">
+              <div class="quad-item" title="${fullMoney(data.stats?.income || 0)}">
                 <div class="quad-bubble gray-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
                 </div>
                 <div class="quad-content">
                   <span class="quad-eyebrow">INGRESOS</span>
-                  <strong class="quad-val" title="${money(data.stats?.income || 0)}">${money(data.stats?.income || 0)}</strong>
+                  <strong class="quad-val" title="${fullMoney(data.stats?.income || 0)}">${money(data.stats?.income || 0)}</strong>
                   <small class="quad-sub">Ingresos Totales</small>
                 </div>
               </div>
 
-              <div class="quad-item" title="${money(data.stats?.total_deposits || 0)}">
+              <div class="quad-item" title="${fullMoney(data.stats?.total_deposits || 0)}">
                 <div class="quad-bubble yellow-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M9 10h6"/></svg>
                 </div>
                 <div class="quad-content">
                   <span class="quad-eyebrow">ABONOS</span>
-                  <strong class="quad-val" title="${money(data.stats?.total_deposits || 0)}">${money(data.stats?.total_deposits || 0)}</strong>
+                  <strong class="quad-val" title="${fullMoney(data.stats?.total_deposits || 0)}">${money(data.stats?.total_deposits || 0)}</strong>
                   <small class="quad-sub">En Abonos Actual</small>
                 </div>
               </div>
 
-              <div class="quad-item" title="${money(data.stats?.expected_income || 0)}">
+              <div class="quad-item" title="${fullMoney(data.stats?.expected_income || 0)}">
                 <div class="quad-bubble light-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/><line x1="3" x2="21" y1="9" y2="9"/></svg>
                 </div>
                 <div class="quad-content">
                   <span class="quad-eyebrow">TOTAL ESPERADO</span>
-                  <strong class="quad-val" title="${money(data.stats?.expected_income || 0)}">${money(data.stats?.expected_income || 0)}</strong>
+                  <strong class="quad-val" title="${fullMoney(data.stats?.expected_income || 0)}">${money(data.stats?.expected_income || 0)}</strong>
                 </div>
               </div>
 
-              <div class="quad-item" title="${money(pendingAmount)}">
+              <div class="quad-item" title="${fullMoney(pendingAmount)}">
                 <div class="quad-bubble slate-soft">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/></svg>
                 </div>
                 <div class="quad-content">
                   <span class="quad-eyebrow">PENDIENTE</span>
-                  <strong class="quad-val" title="${money(pendingAmount)}">${money(pendingAmount)}</strong>
+                  <strong class="quad-val" title="${fullMoney(pendingAmount)}">${money(pendingAmount)}</strong>
                 </div>
               </div>
             </div>
@@ -920,7 +949,7 @@ async function render(view = 'dashboard') {
               <span class="stat-icon-bubble red">${icon('clients')}</span>
               <p class="eyebrow">CLIENTES</p>
             </div>
-            <strong class="stat-value" style="font-size: clamp(24px, 3vw, 32px);">${data.stats?.clients || 0}</strong>
+            <strong class="stat-value" style="font-size: clamp(24px, 3vw, 32px);" title="${data.stats?.clients || 0}">${compactNumber(data.stats?.clients || 0)}</strong>
             <small class="stat-trend" style="margin-top: 4px;">Base de datos activa de clientes</small>
           </article>
         </section>
@@ -2916,7 +2945,7 @@ async function renderFinances() {
           <span class="stat-label">Saldo Neto Billetera</span>
           <div class="stat-icon-bubble green">${icon('finances')}</div>
         </div>
-        <strong class="stat-value" style="color: ${netBalance >= 0 ? 'var(--green-text)' : 'var(--red)'};">${money(netBalance)}</strong>
+        <strong class="stat-value" title="${fullMoney(netBalance)}" style="color: ${netBalance >= 0 ? 'var(--green-text)' : 'var(--red)'};">${money(netBalance)}</strong>
         <p class="stat-trend">Margen real retenido tras comisiones y gastos</p>
       </article>
 
@@ -2926,7 +2955,7 @@ async function renderFinances() {
           <span class="stat-label">Ingresos Esperados</span>
           <div class="stat-icon-bubble purple">${icon('calendar')}</div>
         </div>
-        <strong class="stat-value">${money(expectedIncome)}</strong>
+        <strong class="stat-value" title="${fullMoney(expectedIncome)}">${money(expectedIncome)}</strong>
         <p class="stat-trend">Valor proyectado de citas agendadas</p>
       </article>
 
@@ -2936,7 +2965,7 @@ async function renderFinances() {
           <span class="stat-label">Abonos Cobrados</span>
           <div class="stat-icon-bubble teal">${icon('income')}</div>
         </div>
-        <strong class="stat-value">${money(totalDeposits)}</strong>
+        <strong class="stat-value" title="${fullMoney(totalDeposits)}">${money(totalDeposits)}</strong>
         <p class="stat-trend">Señas cobradas para asegurar citas</p>
       </article>
 
@@ -2946,7 +2975,7 @@ async function renderFinances() {
           <span class="stat-label">Total Recaudado</span>
           <div class="stat-icon-bubble blue">${icon('income')}</div>
         </div>
-        <strong class="stat-value">${money(totalGrossIncome)}</strong>
+        <strong class="stat-value" title="${fullMoney(totalGrossIncome)}">${money(totalGrossIncome)}</strong>
         <p class="stat-trend">Abonos + citas completadas + otros ingresos</p>
       </article>
 
@@ -2956,9 +2985,9 @@ async function renderFinances() {
           <span class="stat-label">Comisiones Artistas</span>
           <div class="stat-icon-bubble orange">${icon('percent')}</div>
         </div>
-        <strong class="stat-value">${money(totalCommissions)}</strong>
+        <strong class="stat-value" title="${fullMoney(totalCommissions)}">${money(totalCommissions)}</strong>
         <p class="stat-trend" style="color: ${totalPending > 0 ? 'var(--red)' : 'var(--green-text)'}; font-weight: 600;">
-          ${totalPending > 0 ? `${money(totalPending)} por liquidar` : 'Todas liquidadas'}
+          ${totalPending > 0 ? `<span title="${fullMoney(totalPending)}">${money(totalPending)} por liquidar</span>` : 'Todas liquidadas'}
         </p>
       </article>
 
@@ -2968,7 +2997,7 @@ async function renderFinances() {
           <span class="stat-label">Pérdidas Estimadas</span>
           <div class="stat-icon-bubble red">${icon('trash')}</div>
         </div>
-        <strong class="stat-value" style="color: ${estimatedLosses > 0 ? 'var(--red)' : 'var(--muted)'};">${money(estimatedLosses)}</strong>
+        <strong class="stat-value" title="${fullMoney(estimatedLosses)}" style="color: ${estimatedLosses > 0 ? 'var(--red)' : 'var(--muted)'};">${money(estimatedLosses)}</strong>
         <p class="stat-trend">Ingresos no percibidos por citas canceladas</p>
       </article>
     </section>
