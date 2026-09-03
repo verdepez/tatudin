@@ -1,15 +1,16 @@
-const CACHE_NAME = 'tatudin-shell-v24';
+const CACHE_NAME = 'tatudin-shell-v25';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
-  '/styles.css',
-  '/app.js',
+  '/styles.css?v=45',
+  '/app.js?v=45',
   '/offline-store.js',
   '/manifest.webmanifest',
   '/favicon.svg',
   '/favicon-32.png',
   '/icon-192.png',
-  '/icon-512.png'
+  '/icon-512.png',
+  '/TatudinGris.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -36,26 +37,39 @@ self.addEventListener('fetch', (event) => {
   // Always fetch fresh from network for API calls
   if (event.request.url.includes('/api/')) return;
 
-  // Network-first strategy with cache fallback for shell and static assets
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response.ok && event.request.method === 'GET' && new URL(event.request.url).origin === self.location.origin) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(event.request).then((cached) => {
-          if (cached) return cached;
-          // Fallback to index.html for SPA client navigation when offline
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+  // Navigation: Network-first to get fresh HTML index, with cache fallback
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
-          return new Response('Offline content unavailable', { status: 503, statusText: 'Service Unavailable' });
-        });
-      })
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cached) => cached || caches.match('/index.html'));
+        })
+    );
+    return;
+  }
+
+  // Static Assets (JS, CSS, Images, Fonts): Stale-While-Revalidate for 0ms instant load
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse.ok && event.request.method === 'GET' && new URL(event.request.url).origin === self.location.origin) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => cachedResponse);
+
+      return cachedResponse || fetchPromise;
+    })
   );
 });
 

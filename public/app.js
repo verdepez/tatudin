@@ -890,15 +890,13 @@ async function transitionView(updateCallback, options = {}) {
       });
       await transition.updateCallbackDone;
       finishRouteProgress();
-      await transition.finished;
     } else {
-      if (!prefersReduced && app) {
-        app.classList.remove('view-enter-transition');
-        void app.offsetWidth;
-      }
       await updateCallback();
       if (!prefersReduced && app) {
-        app.classList.add('view-enter-transition');
+        app.classList.remove('view-enter-transition');
+        requestAnimationFrame(() => {
+          app.classList.add('view-enter-transition');
+        });
       }
       finishRouteProgress();
     }
@@ -2503,18 +2501,25 @@ async function renderAgenda() {
     listParams.append('date', agendaFilter.date);
   }
 
-  const [rangeAppointments, appointmentsList, membersList, spacesList, categoriesList, schedulesList] = await Promise.all([
+  const isSameParams = rangeParams.toString() === listParams.toString();
+  const needsMetadata = !members?.length || !spaces?.length || !categories?.length || !appointmentSchedules?.length;
+
+  const [rangeAppointments, rawAppointmentsList, membersList, spacesList, categoriesList, schedulesList] = await Promise.all([
     api(`/api/appointments?${rangeParams.toString()}`).catch(() => []),
-    api(`/api/appointments?${listParams.toString()}`).catch(() => []),
-    api('/api/members').catch(() => []),
-    api('/api/spaces').catch(() => []),
-    api('/api/categories').catch(() => []),
-    api('/api/schedules').catch(() => [])
+    isSameParams ? null : api(`/api/appointments?${listParams.toString()}`).catch(() => []),
+    needsMetadata ? api('/api/members').catch(() => []) : Promise.resolve(members),
+    needsMetadata ? api('/api/spaces').catch(() => []) : Promise.resolve(spaces),
+    needsMetadata ? api('/api/categories').catch(() => []) : Promise.resolve(categories),
+    needsMetadata ? api('/api/schedules').catch(() => []) : Promise.resolve(appointmentSchedules)
   ]);
-  members = membersList;
-  spaces = spacesList;
-  categories = categoriesList;
-  appointmentSchedules = schedulesList || [];
+
+  if (needsMetadata) {
+    members = membersList || [];
+    spaces = spacesList || [];
+    categories = categoriesList || [];
+    appointmentSchedules = schedulesList || [];
+  }
+  const appointmentsList = isSameParams ? rangeAppointments : (rawAppointmentsList || []);
 
   // Build appointments count and categories map per day for colored indicators
   const dayApptsMap = {};

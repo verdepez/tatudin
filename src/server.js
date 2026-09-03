@@ -2,6 +2,8 @@ import express from 'express';
 import pg from 'pg';
 import crypto from 'node:crypto';
 import path from 'node:path';
+import fs from 'node:fs';
+import zlib from 'node:zlib';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { seedStudioData } from './seed_studio.js';
@@ -72,7 +74,45 @@ function addLog(level, message, details = null) {
 
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// High-performance streaming gzip compression & immutable caching for main PWA bundle assets
+app.get(['/app.js', '/styles.css', '/offline-store.js', '/speech-recognition.js'], (req, res, next) => {
+  const filePath = path.join(__dirname, '..', 'public', req.path);
+  if (!fs.existsSync(filePath)) return next();
+
+  if (req.query && req.query.v) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  } else {
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+  }
+
+  const ext = path.extname(filePath);
+  const mimeMap = {
+    '.js': 'text/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8'
+  };
+  if (mimeMap[ext]) {
+    res.setHeader('Content-Type', mimeMap[ext]);
+  }
+
+  const acceptEncoding = req.headers['accept-encoding'] || '';
+  if (acceptEncoding.includes('gzip')) {
+    res.setHeader('Content-Encoding', 'gzip');
+    const gzip = zlib.createGzip({ level: 6 });
+    return fs.createReadStream(filePath).pipe(gzip).pipe(res);
+  }
+
+  return res.sendFile(filePath);
+});
+
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  maxAge: '1h',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.svg') || filePath.endsWith('.png') || filePath.endsWith('.jpg')) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    }
+  }
+}));
 app.use(csrfProtection());
 
 // CSRF Token endpoint
@@ -116,10 +156,32 @@ function setSessionCookie(response, sessionId) {
   response.setHeader('Set-Cookie', `tatudin_session=${encodeURIComponent(sessionId)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${sessionDuration / 1000}`);
 }
 
+// High-performance in-memory session cache (20s TTL) to prevent database query stampedes on parallel frontend requests
+const authSessionCache = new Map();
+const AUTH_CACHE_TTL_MS = 20000;
+
+export function clearAuthSessionCache(sessionId = null) {
+  if (sessionId) {
+    authSessionCache.delete(sessionId);
+  } else {
+    authSessionCache.clear();
+  }
+}
+
 async function requireAuth(request, response, next) {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   const sessionId = parseCookies(request).tatudin_session;
   if (!sessionId) return response.status(401).json({ error: 'Debes iniciar sesión' });
+
+  const cached = authSessionCache.get(sessionId);
+  if (cached && (Date.now() - cached.time < AUTH_CACHE_TTL_MS)) {
+    request.user = cached.user;
+    request.studioId = cached.studioId;
+    request.sessionId = sessionId;
+    request.isSuperAdmin = cached.isSuperAdmin;
+    return next();
+  }
+
   try {
     const result = await pool.query(`
       SELECT u.id, u.email, u.full_name, u.is_superadmin, s_t.id AS session_id,
@@ -135,6 +197,7 @@ async function requireAuth(request, response, next) {
     `, [sessionId]);
 
     if (!result.rowCount) {
+      authSessionCache.delete(sessionId);
       return response.status(401).json({ error: 'Sesión no válida o expirada' });
     }
 
@@ -157,6 +220,14 @@ async function requireAuth(request, response, next) {
     request.studioId = userRow.studio_id;
     request.sessionId = sessionId;
     request.isSuperAdmin = isSuper;
+
+    authSessionCache.set(sessionId, {
+      time: Date.now(),
+      user: userRow,
+      studioId: userRow.studio_id,
+      isSuperAdmin: isSuper
+    });
+
     return next();
   } catch (error) { return response.status(500).json({ error: error.message }); }
 }
@@ -952,6 +1023,7 @@ app.post('/api/auth/logout', async (request, response) => {
       });
     }
     await pool.query('DELETE FROM sessions WHERE id = $1', [sessionId]);
+    clearAuthSessionCache(sessionId);
   }
   response.setHeader('Set-Cookie', 'tatudin_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
   return response.json({ ok: true });
@@ -1151,6 +1223,7 @@ app.post('/api/auth/switch-studio', requireAuth, async (request, response) => {
     if (!check.rowCount) return response.status(403).json({ error: 'No tienes acceso a este estudio' });
 
     await pool.query('UPDATE sessions SET active_studio_id = $1 WHERE id = $2', [studioId, request.sessionId]);
+    clearAuthSessionCache(request.sessionId);
     return response.json({ ok: true, activeStudioId: Number(studioId) });
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
@@ -3984,6 +4057,20 @@ async function ensureAuthSchema() {
   } catch (rootErr) {
     console.error('[DB] Root user initialization error:', rootErr.message);
   }
+
+  // Database Performance Indexes for Fast Multi-tenant Queries
+  await safeExec('CREATE INDEX idx_appointments_studio_starts', 'CREATE INDEX IF NOT EXISTS idx_appointments_studio_starts ON appointments (studio_id, starts_at)');
+  await safeExec('CREATE INDEX idx_appointments_studio_status', 'CREATE INDEX IF NOT EXISTS idx_appointments_studio_status ON appointments (studio_id, status)');
+  await safeExec('CREATE INDEX idx_appointments_client_id', 'CREATE INDEX IF NOT EXISTS idx_appointments_client_id ON appointments (client_id)');
+  await safeExec('CREATE INDEX idx_appointments_artist_id', 'CREATE INDEX IF NOT EXISTS idx_appointments_artist_id ON appointments (artist_id)');
+  await safeExec('CREATE INDEX idx_clients_studio_id', 'CREATE INDEX IF NOT EXISTS idx_clients_studio_id ON clients (studio_id)');
+  await safeExec('CREATE INDEX idx_transactions_studio_kind', 'CREATE INDEX IF NOT EXISTS idx_transactions_studio_kind ON transactions (studio_id, kind)');
+  await safeExec('CREATE INDEX idx_spaces_studio_id', 'CREATE INDEX IF NOT EXISTS idx_spaces_studio_id ON spaces (studio_id)');
+  await safeExec('CREATE INDEX idx_categories_studio_id', 'CREATE INDEX IF NOT EXISTS idx_categories_studio_id ON commitment_categories (studio_id)');
+  await safeExec('CREATE INDEX idx_schedules_studio_id', 'CREATE INDEX IF NOT EXISTS idx_schedules_studio_id ON appointment_schedules (studio_id)');
+  await safeExec('CREATE INDEX idx_sched_rules_schedule_id', 'CREATE INDEX IF NOT EXISTS idx_sched_rules_schedule_id ON schedule_availability_rules (schedule_id)');
+  await safeExec('CREATE INDEX idx_sessions_user_id', 'CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id)');
+  await safeExec('CREATE INDEX idx_studio_memberships_user_studio', 'CREATE INDEX IF NOT EXISTS idx_studio_memberships_user_studio ON studio_memberships (user_id, studio_id)');
 
   // Auto-seed sample studio data on fresh databases
   try {
