@@ -93,7 +93,28 @@ const ICONS = {
   lock: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
   unlock: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>',
   chevronDown: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
-  calendarCheck: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>'
+  calendarCheck: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>',
+  zap: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+  crown: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5v-2z"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  chart: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+  palette: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>',
+  users: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  clipboard: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+  building: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" y1="22" x2="9" y2="18"/><line x1="15" y1="22" x2="15" y2="18"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/></svg>',
+  plane: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>',
+  dollar: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+  fileText: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  scan: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>',
+  sync: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>',
+  mic: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
+  mapPin: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  package: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
+  link2: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>'
 };
 
 const icon = (name) => ICONS[name] || '';
@@ -686,19 +707,19 @@ function appointmentCard(item) {
 
   let outcomeLabel = '¿Qué ocurrió?';
   let outcomeClass = '';
-  if (isCompleted) {
-    outcomeLabel = '✓ Listo';
+  if (item.outcome === 'completed') {
+    outcomeLabel = 'Listo';
     outcomeClass = 'is-completed';
-  } else if (isRescheduled) {
-    outcomeLabel = '📅 Reprog.';
+  } else if (item.outcome === 'rescheduled') {
+    outcomeLabel = 'Reprog.';
     outcomeClass = 'is-rescheduled';
-  } else if (isCancelled) {
-    outcomeLabel = '✕ Cancelada';
+  } else if (item.outcome === 'cancelled') {
+    outcomeLabel = 'Cancelada';
     outcomeClass = 'is-cancelled';
   }
 
   return `
-    <article class="appointment-card">
+    <article class="appointment-card" data-appt-id="${item.id}">
       <div class="appointment-time-badge">
         <span class="time-main">${timeFormatted}</span>
         <span class="time-sub">HRS</span>
@@ -713,8 +734,8 @@ function appointmentCard(item) {
             ${catName}
           </span>
           ${item.external_source ? `
-            <span class="sync-chip" title="Enlazado con ${item.external_calendar_name || 'calendario externo'}">
-              🔗 ${item.external_calendar_name || 'Enlazado'}
+            <span class="sync-chip" title="Enlazado con ${item.external_calendar_name || 'calendario externo'}" style="display: inline-flex; align-items: center; gap: 4px;">
+              ${icon('link')} <span>${item.external_calendar_name || 'Enlazado'}</span>
             </span>
           ` : ''}
           <span class="status-chip ${statusInfo.class}">${statusInfo.label}</span>
@@ -730,8 +751,8 @@ function appointmentCard(item) {
           data-starts-at="${item.starts_at}"
           data-duration="${item.duration_minutes || 120}"
           data-notes="${encodeURIComponent(item.notes || '')}"
-          title="Inyectar / añadir a Google Calendar">
-          <span>📅 Google</span>
+          title="Inyectar / añadir a Google Calendar" style="display: inline-flex; align-items: center; gap: 4px;">
+          ${icon('calendar')} <span>Google</span>
         </button>
         <button type="button" class="cal-inject-btn"
           data-action="download-appt-ics"
@@ -739,8 +760,8 @@ function appointmentCard(item) {
           data-starts-at="${item.starts_at}"
           data-duration="${item.duration_minutes || 120}"
           data-notes="${encodeURIComponent(item.notes || '')}"
-          title="Añadir a Apple Calendar (.ics)">
-          <span>🍏 Apple</span>
+          title="Añadir a Apple Calendar (.ics)" style="display: inline-flex; align-items: center; gap: 4px;">
+          ${icon('calendar')} <span>Apple</span>
         </button>
 
         <button type="button" class="voice-mic-btn"
@@ -750,8 +771,8 @@ function appointmentCard(item) {
           data-kind="${item.category_kind || 'custom'}"
           data-cat-name="${encodeURIComponent(catName)}"
           data-client-name="${encodeURIComponent(item.client_name || '')}"
-          title="Tomar apuntes / dictado de voz de la sesión">
-          <span>🎙️</span>
+          title="Tomar apuntes / dictado de voz de la sesión" style="display: inline-flex; align-items: center; justify-content: center;">
+          ${icon('mic')}
         </button>
 
         ${cleanPhone ? `
@@ -1648,11 +1669,11 @@ async function openCalendarSyncModal() {
         </div>
 
         <div class="sync-modal-tabs">
-          <button type="button" class="sync-tab-btn active" data-sync-tab="import">
-            📥 Importar archivo .ICS
+          <button type="button" class="sync-tab-btn active" data-sync-tab="import" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('download')} <span>Importar archivo .ICS</span>
           </button>
-          <button type="button" class="sync-tab-btn" data-sync-tab="connect">
-            🔄 Conectar Google & Apple Calendar
+          <button type="button" class="sync-tab-btn" data-sync-tab="connect" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('sync')} <span>Conectar Google & Apple Calendar</span>
           </button>
         </div>
 
@@ -1662,7 +1683,7 @@ async function openCalendarSyncModal() {
             <div class="ics-dropzone" id="ics-dropzone">
               <input type="file" id="ics-file-input" accept=".ics,text/calendar" style="display: none;" />
               <div class="ics-dropzone-inner">
-                <span class="dropzone-icon" style="font-size: 28px;">📅</span>
+                <span class="dropzone-icon" style="color: var(--accent); display: flex;">${icon('calendar')}</span>
                 <p style="margin: 6px 0 2px; font-weight: 700; font-size: 14px;">Arrastra tu archivo .ics aquí o haz clic para seleccionarlo</p>
                 <small style="color: var(--muted); font-size: 12px;">Compatible con exportaciones de Google Calendar, Apple Calendar, Outlook, etc.</small>
                 <div id="ics-file-status" style="margin-top: 8px; font-size: 12.5px; font-weight: 700; color: var(--accent);"></div>
@@ -1699,8 +1720,8 @@ async function openCalendarSyncModal() {
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
               <button type="button" class="btn-ghost" data-close-modal>Cancelar</button>
-              <button type="submit" id="submit-import-ics" class="primary" disabled>
-                ${icon('upload')} <span>Importar Citas a Tatudin</span>
+              <button type="submit" id="submit-import-ics" class="primary" disabled style="display: inline-flex; align-items: center; gap: 6px;">
+                ${icon('download')} <span>Importar Citas a Tatudin</span>
               </button>
             </div>
           </form>
@@ -1710,7 +1731,9 @@ async function openCalendarSyncModal() {
         <div id="sync-tab-connect" class="sync-tab-content" style="display: none;">
           <div style="display: flex; flex-direction: column; gap: 14px;">
             <div class="config-note-box" style="background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(2, 132, 199, 0.2); font-size: 12.5px;">
-              <p style="margin: 0 0 4px; font-weight: 700; color: var(--accent);">📡 Sincronización en vivo (webcal feed RFC 5545)</p>
+              <p style="margin: 0 0 4px; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 5px;">
+                ${icon('sync')} <span>Sincronización en vivo (webcal feed RFC 5545)</span>
+              </p>
               <span style="color: var(--ink);">
                 Al suscribirte, cualquier cita creada, modificada o cancelada en Tatudin se reflejará automáticamente en Google Calendar y Apple Calendar en tu iPhone, Mac o Android.
               </span>
@@ -1719,7 +1742,7 @@ async function openCalendarSyncModal() {
             <!-- Apple Calendar card -->
             <div class="sync-service-card">
               <div class="sync-service-info">
-                <div class="sync-service-icon" style="background: #111827; color: #ffffff;">🍏</div>
+                <div class="sync-service-icon" style="background: #111827; color: #ffffff;">${icon('calendar')}</div>
                 <div>
                   <strong style="font-size: 13.5px;">Apple Calendar (Mac, iPhone, iPad)</strong>
                   <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--muted);">Suscripción nativa con 1 clic en la app Calendario de iOS y macOS.</p>
@@ -1733,7 +1756,7 @@ async function openCalendarSyncModal() {
             <!-- Google Calendar card -->
             <div class="sync-service-card">
               <div class="sync-service-info">
-                <div class="sync-service-icon" style="background: #4285F4; color: #ffffff;">📅</div>
+                <div class="sync-service-icon" style="background: #4285F4; color: #ffffff;">${icon('calendar')}</div>
                 <div>
                   <strong style="font-size: 13.5px;">Google Calendar (Web y Android)</strong>
                   <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--muted);">Añade tu agenda de Tatudin directamente a tus calendarios de Google.</p>
@@ -2617,7 +2640,7 @@ async function renderAgenda() {
 
           ${agendaFilter.date ? `
             <div class="cal-selected-day-banner">
-              <span>📅 Filtrando por día seleccionado: <strong>${agendaFilter.date}</strong></span>
+              <span style="display: inline-flex; align-items: center; gap: 6px;">${icon('calendar')} Filtrando por día seleccionado: <strong>${agendaFilter.date}</strong></span>
               <button class="text-button" data-clear-date style="color: #6D28D9; font-size: 11.5px; font-weight: 800;">
                 ✕ Ver todo el período
               </button>
@@ -2820,7 +2843,7 @@ function openAppointmentOutcomeModal(appt) {
         data-kind="${appt.category_kind || 'custom'}"
         data-cat-name="${encodeURIComponent(appt.category_name || 'Compromiso')}"
         data-client-name="${encodeURIComponent(appt.client_name || '')}">
-        <span>🎙️</span> <span>Tomar / Grabar Apuntes de Voz de esta Sesión</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;">${icon('mic')} <span>Tomar / Grabar Apuntes de Voz de esta Sesión</span></span>
       </button>
     </div>
 
@@ -2846,7 +2869,7 @@ function openAppointmentOutcomeModal(appt) {
       <div class="outcome-option-card card-rescheduled ${currentStatus === 'rescheduled' ? 'active' : ''}">
         <div class="outcome-option-header">
           <div class="outcome-option-title" style="color: #0284c7;">
-            <span style="display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #e0f2fe; color: #0284c7;">📅</span>
+            <span style="display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #e0f2fe; color: #0284c7;">${icon('calendar')}</span>
             Reprogramada
           </div>
           ${currentStatus === 'rescheduled' ? `<span class="badge" style="background: #0284c7; color: #fff;">Actual</span>` : ''}
@@ -3519,10 +3542,10 @@ async function renderSettings() {
         </div>
         <div class="legal-summary-card">
           <div class="legal-badges">
-            <span class="legal-badge">🇨🇱 Ley N° 19.628 Chile</span>
-            <span class="legal-badge">🔒 Cero Remarketing</span>
-            <span class="legal-badge">🛡️ Derechos ARCO Garantizados</span>
-            <span class="legal-badge">✉️ soyelroot@tatudin.cl</span>
+            <span class="legal-badge"><span class="flag-tag">CL</span> Ley N° 19.628 Chile</span>
+            <span class="legal-badge">${icon('lock')} Cero Remarketing</span>
+            <span class="legal-badge">${icon('shield')} Derechos ARCO</span>
+            <span class="legal-badge">${icon('mail')} soyelroot@tatudin.cl</span>
           </div>
           <p class="legal-lead">Tatudin protege estrictamente la confidencialidad de los profesionales y sus agendas. Los datos jamás son comercializados ni usados con fines publicitarios.</p>
           <button type="button" class="text-button" data-action="open-terms" style="color: var(--red); font-weight: 700; align-self: flex-start; margin-top: 4px;">
@@ -3934,9 +3957,9 @@ function renderTermsAndConditions(fromOnboarding = false, step = 0, authMode = '
           <h1>Términos y Condiciones de Uso y Política de Privacidad</h1>
           <p class="terms-subtitle">Aplicación "Tatudin" · Gestión, organización y agendamiento de citas y consultas</p>
           <div class="terms-meta-strip">
-            <span>📅 Última actualización: Agosto de 2026</span>
-            <span>⚖️ Jurisdicción: República de Chile</span>
-            <span>📬 Contacto: <a href="mailto:soyelroot@tatudin.cl">soyelroot@tatudin.cl</a></span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;">${icon('calendar')} Última actualización: Agosto de 2026</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;">${icon('shield')} Jurisdicción: República de Chile</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;">${icon('mail')} Contacto: <a href="mailto:soyelroot@tatudin.cl">soyelroot@tatudin.cl</a></span>
           </div>
         </div>
 
@@ -3976,14 +3999,14 @@ function renderTermsAndConditions(fromOnboarding = false, step = 0, authMode = '
               <p>En estricto cumplimiento de la legislación chilena, Tatudin adopta un compromiso de máxima transparencia respecto al uso de la información:</p>
               <div class="terms-points">
                 <div class="terms-point-item">
-                  <span class="point-icon">🛡️</span>
+                  <span class="point-icon">${icon('shield')}</span>
                   <div>
                     <strong>Exclusividad Operativa</strong>
                     <p>Los datos personales proporcionados por los Usuarios (como nombres, correos electrónicos, números de teléfono y registros de agenda) se utilizarán <strong>únicamente para la correcta prestación del servicio solicitado</strong> (envío de confirmaciones, recordatorios de citas, soporte técnico y gestión de la agenda).</p>
                   </div>
                 </div>
                 <div class="terms-point-item">
-                  <span class="point-icon">🚫</span>
+                  <span class="point-icon">${icon('lock')}</span>
                   <div>
                     <strong>Prohibición Absoluta de Publicidad y Remarketing</strong>
                     <p>Tatudin <strong>no utilizará</strong> los datos personales de sus Usuarios para el envío de comunicaciones comerciales ajenas, ni campañas de marketing publicitario. Queda estrictamente prohibida la venta, cesión, transferencia o comunicación de datos a terceras empresas con fines de reorientación publicitaria (<em>remarketing</em>), perfiles comerciales o explotación publicitaria.</p>
@@ -4013,10 +4036,10 @@ function renderTermsAndConditions(fromOnboarding = false, step = 0, authMode = '
               <h3>5. Derechos ARCO (Acceso, Rectificación, Cancelación y Oposición)</h3>
               <p>De acuerdo con la Ley N° 19.628, el Usuario conserva en todo momento la propiedad de sus datos personales y puede ejercer de forma gratuita sus derechos <strong>ARCO</strong>:</p>
               <div class="arco-grid">
-                <div class="arco-pill"><strong>🔍 Acceso:</strong> Solicitar información sobre qué datos personales se mantienen en los registros.</div>
-                <div class="arco-pill"><strong>✏️ Rectificación:</strong> Modificar o corregir datos que sean erróneos, inexactos, equívocos o incompletos.</div>
-                <div class="arco-pill"><strong>🗑️ Cancelación:</strong> Solicitar la eliminación de sus datos cuando su almacenamiento carezca de fundamento legal o hayan caducado.</div>
-                <div class="arco-pill"><strong>✋ Oposición:</strong> Oponerse al uso de sus datos para fines específicos que no sean los estrictamente necesarios.</div>
+                <div class="arco-pill" style="display: flex; align-items: center; gap: 6px;">${icon('search')} <span><strong>Acceso:</strong> Solicitar información sobre qué datos personales se mantienen en los registros.</span></div>
+                <div class="arco-pill" style="display: flex; align-items: center; gap: 6px;">${icon('edit')} <span><strong>Rectificación:</strong> Modificar o corregir datos que sean erróneos, inexactos o incompletos.</span></div>
+                <div class="arco-pill" style="display: flex; align-items: center; gap: 6px;">${icon('trash')} <span><strong>Cancelación:</strong> Solicitar la eliminación de sus datos cuando no tengan fundamento legal.</span></div>
+                <div class="arco-pill" style="display: flex; align-items: center; gap: 6px;">${icon('lock')} <span><strong>Oposición:</strong> Oponerse al uso de sus datos para fines específicos.</span></div>
               </div>
               <p class="arco-contact">Para ejercer cualquiera de estos derechos, el Usuario debe enviar una solicitud formal por escrito al correo: <a href="mailto:soyelroot@tatudin.cl">soyelroot@tatudin.cl</a></p>
             </div>
@@ -4267,37 +4290,37 @@ async function renderBackoffice(tab = currentBackofficeTab) {
     <div class="backoffice-container">
       <div class="backoffice-header-card">
         <div class="backoffice-header-title">
-          <h1>⚡ Backoffice Superadministrador</h1>
+          <h1>${icon('zap')} Backoffice Superadministrador</h1>
           <p>Control maestro de la plataforma, diseño e identidad visual, estadísticas agregadas, gestión global y administración.</p>
         </div>
         <div class="backoffice-header-badges">
-          <span class="backoffice-tag-pill">👑 ${currentUser?.email || 'soyelroot@tatudin.cl'}</span>
-          <span class="backoffice-tag-pill">🛡️ Acceso Root Absoluto</span>
-          <span class="backoffice-tag-pill">🇨🇱 Ley 19.628 Chile</span>
+          <span class="backoffice-tag-pill">${icon('crown')} ${currentUser?.email || 'soyelroot@tatudin.cl'}</span>
+          <span class="backoffice-tag-pill">${icon('shield')} Acceso Root Absoluto</span>
+          <span class="backoffice-tag-pill"><span class="flag-tag">CL</span> Ley 19.628 Chile</span>
         </div>
       </div>
 
       <nav class="backoffice-tabs" aria-label="Pestañas de Backoffice">
         <button type="button" class="bo-tab-btn ${tab === 'stats' ? 'active' : ''}" data-bo-tab="stats">
-          📊 Estadísticas & Funciones
+          ${icon('chart')} <span>Estadísticas & Funciones</span>
         </button>
         <button type="button" class="bo-tab-btn ${tab === 'uikit' ? 'active' : ''}" data-bo-tab="uikit">
-          🎨 UI Kit & Personalización
+          ${icon('palette')} <span>UI Kit & Personalización</span>
         </button>
         <button type="button" class="bo-tab-btn ${tab === 'artists' ? 'active' : ''}" data-bo-tab="artists">
-          🎨 Artistas Globales
+          ${icon('users')} <span>Artistas Globales</span>
         </button>
         <button type="button" class="bo-tab-btn ${tab === 'users' ? 'active' : ''}" data-bo-tab="users">
-          👥 Usuarios y Estudios
+          ${icon('building')} <span>Usuarios y Estudios</span>
         </button>
         <button type="button" class="bo-tab-btn ${tab === 'guest-spots' ? 'active' : ''}" data-bo-tab="guest-spots">
-          📋 Solicitudes de Nómades
+          ${icon('plane')} <span>Solicitudes de Nómades</span>
         </button>
         <button type="button" class="bo-tab-btn ${tab === 'audit' ? 'active' : ''}" data-bo-tab="audit">
-          🛡️ Auditoría & Trazabilidad
+          ${icon('shield')} <span>Auditoría & Trazabilidad</span>
         </button>
         <button type="button" class="bo-tab-btn ${tab === 'database' ? 'active' : ''}" data-bo-tab="database">
-          🛠️ Operaciones de Base de Datos
+          ${icon('settings')} <span>Operaciones de Base de Datos</span>
         </button>
       </nav>
 
@@ -4359,18 +4382,18 @@ function renderBackofficeUIKitTab() {
       <!-- Toolbar with Actions -->
       <div class="uikit-toolbar">
         <div class="uikit-toolbar-info">
-          <h3>🎨 Sistema de Diseño Maestro & UI Kit</h3>
+          <h3 style="display: flex; align-items: center; gap: 6px;">${icon('palette')} <span>Sistema de Diseño Maestro & UI Kit</span></h3>
           <p>Personaliza tokens CSS globales, paletas cromáticas, bordes y tipografías en tiempo real.</p>
         </div>
         <div class="uikit-toolbar-actions">
-          <button type="button" class="secondary small-btn" id="btn-uikit-reset" title="Restaurar paleta original de fábrica">
-            🔄 Restablecer Original
+          <button type="button" class="secondary small-btn" id="btn-uikit-reset" title="Restaurar paleta original de fábrica" style="display: inline-flex; align-items: center; gap: 5px;">
+            ${icon('sync')} <span>Restablecer Original</span>
           </button>
-          <button type="button" class="secondary small-btn" id="btn-uikit-export-css" title="Copiar código CSS al portapapeles">
-            📋 Copiar CSS
+          <button type="button" class="secondary small-btn" id="btn-uikit-export-css" title="Copiar código CSS al portapapeles" style="display: inline-flex; align-items: center; gap: 5px;">
+            ${icon('copy')} <span>Copiar CSS</span>
           </button>
-          <button type="button" class="primary small-btn" id="btn-uikit-save" style="background: #10b981; border-color: #10b981;">
-            💾 Guardar Tema Global
+          <button type="button" class="primary small-btn" id="btn-uikit-save" style="background: #10b981; border-color: #10b981; display: inline-flex; align-items: center; gap: 5px;">
+            ${icon('check')} <span>Guardar Tema Global</span>
           </button>
         </div>
       </div>
@@ -4379,7 +4402,7 @@ function renderBackofficeUIKitTab() {
       <div class="uikit-section">
         <div class="uikit-section-header">
           <div>
-            <h2><span>🎨</span> Paletas Predefinidas de Marca</h2>
+            <h2 style="display: flex; align-items: center; gap: 8px;"><span class="uikit-h2-icon">${icon('palette')}</span> Paletas Predefinidas de Marca</h2>
             <p>Selecciona un tema curado para aplicar instantáneamente a todo el sistema.</p>
           </div>
         </div>
@@ -4407,7 +4430,7 @@ function renderBackofficeUIKitTab() {
       <div class="uikit-section">
         <div class="uikit-section-header">
           <div>
-            <h2><span>🎛️</span> Ajuste Fino de Tokens de Diseño</h2>
+            <h2 style="display: flex; align-items: center; gap: 8px;"><span class="uikit-h2-icon">${icon('sliders')}</span> Ajuste Fino de Tokens de Diseño</h2>
             <p>Modifica cualquier valor hexadecimal, radio de bordes o tipografía con vista previa instantánea.</p>
           </div>
         </div>
@@ -4506,7 +4529,7 @@ function renderBackofficeUIKitTab() {
       <div class="uikit-section">
         <div class="uikit-section-header">
           <div>
-            <h2><span>🧪</span> Sandbox de Componentes en Vivo</h2>
+            <h2 style="display: flex; align-items: center; gap: 8px;"><span class="uikit-h2-icon">${icon('box')}</span> Sandbox de Componentes en Vivo</h2>
             <p>Prueba en tiempo real cómo lucen los botones, chips, métricas y controles con tus tokens.</p>
           </div>
         </div>
@@ -4536,10 +4559,10 @@ function renderBackofficeUIKitTab() {
               <span class="status-chip status-completed">Listo / Efectuada</span>
               <span class="status-chip status-rescheduled">Reprogramada</span>
               <span class="status-chip status-cancelled">Cancelada / No llegó</span>
-              <span class="role-badge role-owner">👑 Propietario</span>
-              <span class="role-badge role-resident">🎨 Residente</span>
-              <span class="role-badge role-guest">✈️ Nómade</span>
-              <span class="role-badge role-superadmin">⚡ Root Master</span>
+              <span class="role-badge role-owner">${icon('crown')} Propietario</span>
+              <span class="role-badge role-resident">${icon('palette')} Residente</span>
+              <span class="role-badge role-guest">${icon('plane')} Nómade</span>
+              <span class="role-badge role-superadmin">${icon('zap')} Root Master</span>
             </div>
           </div>
 
@@ -4817,25 +4840,29 @@ function renderBackofficeStatsTab(data) {
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
           <div>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-              <span style="font-size: 20px;">🌐</span>
+              <span class="bo-feature-icon" style="color: var(--accent);">${icon('globe')}</span>
               <strong style="font-size: 15px; color: var(--ink);">Pequeño Sitio Web (Landing Pública de Artistas)</strong>
-              <span class="badge" style="background: ${isMicrositeOn ? '#d1fae5' : '#fee2e2'}; color: ${isMicrositeOn ? '#065f46' : '#991b1b'}; font-size: 11.5px; font-weight: 800;">
-                ${isMicrositeOn ? '🟢 ACTIVADO' : '🔴 DESACTIVADO TEMPORALMENTE'}
+              <span class="badge" style="background: ${isMicrositeOn ? '#d1fae5' : '#fee2e2'}; color: ${isMicrositeOn ? '#065f46' : '#991b1b'}; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; gap: 5px;">
+                <span class="status-dot ${isMicrositeOn ? 'online' : 'offline'}"></span>
+                ${isMicrositeOn ? 'ACTIVADO' : 'DESACTIVADO TEMPORALMENTE'}
               </span>
             </div>
             <p style="font-size: 12.5px; color: var(--muted); margin: 0; max-width: 660px; line-height: 1.4;">
               ${isMicrositeOn ? 'El pequeño sitio web y los portafolios públicos están disponibles para su uso y publicación.' : 'El pequeño sitio web se encuentra oculto para los usuarios y los accesos públicos están desactivados.'}
             </p>
           </div>
-          <button type="button" class="primary small" data-action="toggle-feature-microsite" data-current-state="${isMicrositeOn}" style="background: ${isMicrositeOn ? 'var(--red)' : '#10b981'}; border-color: transparent; font-weight: 700; padding: 8px 16px;">
-            ${isMicrositeOn ? '⏸️ Desactivar Pequeño Sitio Web' : '⚡ Activar Pequeño Sitio Web'}
+          <button type="button" class="primary small" data-action="toggle-feature-microsite" data-current-state="${isMicrositeOn}" style="background: ${isMicrositeOn ? 'var(--red)' : '#10b981'}; border-color: transparent; font-weight: 700; padding: 8px 16px; display: inline-flex; align-items: center; gap: 6px;">
+            ${isMicrositeOn ? `${icon('lock')} <span>Desactivar Pequeño Sitio Web</span>` : `${icon('zap')} <span>Activar Pequeño Sitio Web</span>`}
           </button>
         </div>
       </div>
 
       <!-- Law Compliance Info Notice -->
       <div class="terms-intro-box" style="border-left-color: var(--red);">
-        <p><strong>📜 Cumplimiento de Privacidad y Telemetría:</strong> ${data.system?.lawCompliance}</p>
+        <p class="compliance-notice-line" style="display: flex; align-items: center; gap: 6px;">
+          <span style="color: var(--ink);">${icon('fileText')}</span>
+          <span><strong>Cumplimiento de Privacidad y Telemetría:</strong> ${data.system?.lawCompliance}</span>
+        </p>
       </div>
 
       <!-- KPI Grid -->
@@ -4843,7 +4870,7 @@ function renderBackofficeStatsTab(data) {
         <div class="bo-kpi-card">
           <div class="bo-kpi-top">
             <span>Usuarios Registrados</span>
-            <span>👤</span>
+            <span class="bo-kpi-icon">${icon('user')}</span>
           </div>
           <p class="bo-kpi-num">${m.users?.total || 0}</p>
           <p class="bo-kpi-sub">+${m.users?.new_last_30_days || 0} en los últimos 30 días</p>
@@ -4852,7 +4879,7 @@ function renderBackofficeStatsTab(data) {
         <div class="bo-kpi-card">
           <div class="bo-kpi-top">
             <span>Estudios & Espacios</span>
-            <span>🏬</span>
+            <span class="bo-kpi-icon">${icon('building')}</span>
           </div>
           <p class="bo-kpi-num">${m.studios?.total || 0}</p>
           <p class="bo-kpi-sub">${m.studios?.studios || 0} estudios · ${m.studios?.independents || 0} independientes</p>
@@ -4861,7 +4888,7 @@ function renderBackofficeStatsTab(data) {
         <div class="bo-kpi-card">
           <div class="bo-kpi-top">
             <span>Artistas Activos</span>
-            <span>🎨</span>
+            <span class="bo-kpi-icon">${icon('palette')}</span>
           </div>
           <p class="bo-kpi-num">${m.memberships?.total || 0}</p>
           <p class="bo-kpi-sub">${m.memberships?.residents || 0} residentes · ${m.memberships?.nomads || 0} nómades</p>
@@ -4870,7 +4897,7 @@ function renderBackofficeStatsTab(data) {
         <div class="bo-kpi-card">
           <div class="bo-kpi-top">
             <span>Citas Agendadas</span>
-            <span>📅</span>
+            <span class="bo-kpi-icon">${icon('calendar')}</span>
           </div>
           <p class="bo-kpi-num">${m.appointments?.total || 0}</p>
           <p class="bo-kpi-sub">${m.appointments?.confirmed || 0} confirmadas · ${m.appointments?.completed || 0} listas</p>
@@ -4879,7 +4906,7 @@ function renderBackofficeStatsTab(data) {
         <div class="bo-kpi-card">
           <div class="bo-kpi-top">
             <span>Volumen Transaccional</span>
-            <span>💰</span>
+            <span class="bo-kpi-icon">${icon('dollar')}</span>
           </div>
           <p class="bo-kpi-num">${money(m.finances?.total_income || 0)}</p>
           <p class="bo-kpi-sub">Egresos: ${money(m.finances?.total_expense || 0)}</p>
@@ -4888,7 +4915,7 @@ function renderBackofficeStatsTab(data) {
         <div class="bo-kpi-card">
           <div class="bo-kpi-top">
             <span>Postulaciones Nómades</span>
-            <span>✈️</span>
+            <span class="bo-kpi-icon">${icon('plane')}</span>
           </div>
           <p class="bo-kpi-num">${m.guestSpots?.total || 0}</p>
           <p class="bo-kpi-sub">${m.guestSpots?.pending || 0} pendientes · ${m.guestSpots?.approved || 0} aprobadas</p>
@@ -5002,9 +5029,9 @@ function renderBackofficeArtistsTab(artists) {
                   <td><span class="artist-chip ${rInfo.class}">${rInfo.label}</span></td>
                   <td><span class="badge" style="background: var(--surface-high); border: 1px solid var(--line-soft); font-size: 11px;">${agreementLabel}</span></td>
                   <td>
-                    ${a.has_app_access ? '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; font-size: 11px;">📱 Habilitado</span>' : '<span class="badge" style="background: rgba(107, 114, 128, 0.15); color: #4b5563; font-size: 11px;">🔒 Solo Registro</span>'}
+                    ${a.has_app_access ? '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; font-size: 11px;">Habilitado</span>' : '<span class="badge" style="background: rgba(107, 114, 128, 0.15); color: #4b5563; font-size: 11px;">Solo Registro</span>'}
                   </td>
-                  <td>${a.responsible_name ? `👤 ${a.responsible_name}` : '<span style="color: var(--muted);">-</span>'}</td>
+                  <td>${a.responsible_name ? `<span style="display: inline-flex; align-items: center; gap: 4px;">${icon('user')} ${a.responsible_name}</span>` : '<span style="color: var(--muted);">-</span>'}</td>
                   <td><strong>${a.total_appointments || 0}</strong></td>
                 </tr>
               `;
@@ -5053,7 +5080,7 @@ function renderBackofficeUsersTab(users, studios) {
                   <tr>
                     <td>
                       <strong>${u.full_name}</strong>
-                      ${u.is_superadmin ? '<br/><span class="bo-badge root">⚡ Superadmin</span>' : ''}
+                      ${u.is_superadmin ? `<br/><span class="bo-badge root" style="display: inline-flex; align-items: center; gap: 4px;">${icon('zap')} Superadmin</span>` : ''}
                     </td>
                     <td><code>${u.email}</code></td>
                     <td>${studiosHtml}</td>
@@ -5062,12 +5089,12 @@ function renderBackofficeUsersTab(users, studios) {
                     <td>
                       <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                         ${firstStudio ? `
-                          <button type="button" class="secondary small" data-action="bo-impersonate" data-studio-id="${firstStudio.studio_id}" data-studio-name="${firstStudio.studio_name}" title="Ingresar y administrar este estudio">
-                            👑 Entrar al Estudio
+                          <button type="button" class="secondary small" data-action="bo-impersonate" data-studio-id="${firstStudio.studio_id}" data-studio-name="${firstStudio.studio_name}" title="Ingresar y administrar este estudio" style="display: inline-flex; align-items: center; gap: 5px;">
+                            ${icon('building')} <span>Entrar al Estudio</span>
                           </button>
                         ` : ''}
-                        <button type="button" class="outline-button small" data-action="bo-edit-user" data-user-id="${u.id}" data-user-name="${u.full_name}" data-user-email="${u.email}" data-is-root="${u.is_superadmin}">
-                          ✏️ Editar
+                        <button type="button" class="outline-button small" data-action="bo-edit-user" data-user-id="${u.id}" data-user-name="${u.full_name}" data-user-email="${u.email}" data-is-root="${u.is_superadmin}" style="display: inline-flex; align-items: center; gap: 5px;">
+                          ${icon('edit')} <span>Editar</span>
                         </button>
                       </div>
                     </td>
@@ -5188,20 +5215,22 @@ function renderBackofficeDatabaseTab() {
   return `
     <div style="display: flex; flex-direction: column; gap: 20px;">
       <div class="terms-intro-box" style="border-left-color: var(--red);">
-        <p><strong>🛠️ Panel de Control de Datos del Sistema:</strong> Utiliza estas herramientas para inicializar entornos de prueba o para dejar la base de datos completamente limpia antes del lanzamiento a producción real.</p>
+        <p style="display: flex; align-items: center; gap: 6px;">
+          ${icon('settings')} <span><strong>Panel de Control de Datos del Sistema:</strong> Utiliza estas herramientas para inicializar entornos de prueba o para dejar la base de datos completamente limpia antes del lanzamiento a producción real.</span>
+        </p>
       </div>
 
       <div class="bo-db-actions-grid">
         <!-- Seed Demo Card -->
         <article class="bo-action-card seed-card">
           <div class="bo-action-title">
-            <span style="font-size: 24px;">🌱</span>
+            <span class="bo-action-icon" style="color: #10b981;">${icon('sync')}</span>
             <h3>Poblar Sistema con Datos de Prueba</h3>
           </div>
           <p>Genera automáticamente el estudio demo <strong>Black Lotus Tattoo Studio</strong>, 5 boxes equipados, 4 artistas residentes con comisiones, 4 nómades, citas agendadas de la semana, transacciones de finanzas y portafolios de ejemplo.</p>
           <div style="margin-top: auto; padding-top: 14px;">
-            <button type="button" class="primary" data-action="bo-trigger-seed" style="width: 100%; background: #10b981; border-color: #059669; font-weight: 800;">
-              🚀 Poblar Datos Demo Ahora
+            <button type="button" class="primary" data-action="bo-trigger-seed" style="width: 100%; background: #10b981; border-color: #059669; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+              ${icon('sync')} <span>Poblar Datos Demo Ahora</span>
             </button>
           </div>
         </article>
@@ -5209,13 +5238,13 @@ function renderBackofficeDatabaseTab() {
         <!-- Purge Production Card -->
         <article class="bo-action-card purge-card">
           <div class="bo-action-title">
-            <span style="font-size: 24px;">🧹</span>
+            <span class="bo-action-icon" style="color: #dc2626;">${icon('trash')}</span>
             <h3>Limpiar Sistema para Producción</h3>
           </div>
           <p><strong>Acción destructiva segura:</strong> Elimina todas las citas, clientes, transacciones, boxes, solicitudes y usuarios de prueba. Deja el sistema 100% limpio y listo para registrar estudios y clientes reales. <em>La cuenta soyelroot@tatudin.cl se conservará intacta.</em></p>
           <div style="margin-top: auto; padding-top: 14px;">
-            <button type="button" class="secondary" data-action="bo-trigger-purge" style="width: 100%; color: #dc2626; border-color: #fca5a5; background: #fff1f2; font-weight: 800;">
-              ⚠️ Limpiar Base de Datos para Producción
+            <button type="button" class="secondary" data-action="bo-trigger-purge" style="width: 100%; color: #dc2626; border-color: #fca5a5; background: #fff1f2; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+              ${icon('alert')} <span>Limpiar Base de Datos para Producción</span>
             </button>
           </div>
         </article>
@@ -5229,7 +5258,9 @@ function renderBackofficeAuditTab(data) {
   return `
     <div style="display: flex; flex-direction: column; gap: 20px;">
       <div class="terms-intro-box">
-        <p><strong>🛡️ Trazabilidad y Registro de Auditoría:</strong> Historial inmutable de eventos sensibles del sistema (inicios de sesión, cambios de contraseña, transacciones financieras, modificaciones de artistas y purgas de base de datos), conforme a la Ley N° 19.628.</p>
+        <p style="display: flex; align-items: center; gap: 6px;">
+          ${icon('shield')} <span><strong>Trazabilidad y Registro de Auditoría:</strong> Historial inmutable de eventos sensibles del sistema (inicios de sesión, cambios de contraseña, transacciones financieras, modificaciones de artistas y purgas de base de datos), conforme a la Ley N° 19.628.</span>
+        </p>
       </div>
 
       <section class="panel" style="padding: 16px;">
@@ -5238,8 +5269,8 @@ function renderBackofficeAuditTab(data) {
             <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #fff;">Eventos Registrados</h3>
             <span style="font-size: 12px; color: var(--muted);">Total acumulado: ${data.total || logs.length} eventos</span>
           </div>
-          <button type="button" class="outline-button small" data-bo-tab="audit">
-            🔄 Actualizar Registro
+          <button type="button" class="outline-button small" data-bo-tab="audit" style="display: inline-flex; align-items: center; gap: 5px;">
+            ${icon('sync')} <span>Actualizar Registro</span>
           </button>
         </div>
 
@@ -5343,8 +5374,8 @@ async function renderArtists() {
               ${icon('plus')} <span>Agregar artista / Guest</span>
             </button>
             ${isMicrositeEnabled ? `
-              <button class="secondary" data-view="portafolio">
-                🌐 Ver / Editar Sitio Web
+              <button class="secondary" data-view="portafolio" style="display: inline-flex; align-items: center; gap: 6px;">
+                ${icon('globe')} <span>Ver / Editar Sitio Web</span>
               </button>
             ` : ''}
           </div>
@@ -5356,7 +5387,7 @@ async function renderArtists() {
         <article class="stat-card">
           <div class="stat-card-top">
             <p class="stat-card-title">Total Artistas</p>
-            <span class="stat-card-icon">👥</span>
+            <span class="stat-card-icon">${icon('users')}</span>
           </div>
           <p class="stat-card-value">${totalCount}</p>
           <p class="stat-card-change">Registrados en el estudio</p>
@@ -5365,7 +5396,7 @@ async function renderArtists() {
         <article class="stat-card">
           <div class="stat-card-top">
             <p class="stat-card-title">Residentes</p>
-            <span class="stat-card-icon">🏠</span>
+            <span class="stat-card-icon">${icon('building')}</span>
           </div>
           <p class="stat-card-value">${residentCount}</p>
           <p class="stat-card-change">Permanentes en el equipo</p>
@@ -5374,7 +5405,7 @@ async function renderArtists() {
         <article class="stat-card">
           <div class="stat-card-top">
             <p class="stat-card-title">Guests / Nómades</p>
-            <span class="stat-card-icon">✈️</span>
+            <span class="stat-card-icon">${icon('plane')}</span>
           </div>
           <p class="stat-card-value">${nomadCount}</p>
           <p class="stat-card-change">Invitados y visitantes</p>
@@ -5383,7 +5414,7 @@ async function renderArtists() {
         <article class="stat-card">
           <div class="stat-card-top">
             <p class="stat-card-title">Con Acceso a la App</p>
-            <span class="stat-card-icon">📱</span>
+            <span class="stat-card-icon">${icon('check')}</span>
           </div>
           <p class="stat-card-value">${appAccessCount} <span style="font-size: 13px; color: var(--muted); font-weight: 500;">/ ${totalCount}</span></p>
           <p class="stat-card-change">${totalCount - appAccessCount} solo para registro/agenda</p>
@@ -5394,7 +5425,7 @@ async function renderArtists() {
       <section class="panel" style="margin-bottom: 20px; padding: 14px 16px;">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: center;">
           <div style="position: relative;">
-            <input type="text" id="artists-search-input" value="${artistsSearchQuery}" placeholder="🔍 Buscar por nombre o email..." style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface);" />
+            <input type="text" id="artists-search-input" value="${artistsSearchQuery}" placeholder="Buscar por nombre o email..." style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface);" />
           </div>
 
           <div>
@@ -5444,12 +5475,12 @@ async function renderArtists() {
                       <h3 style="font-size: 16px; margin: 0; color: var(--ink); font-weight: 800;">${m.full_name}</h3>
                       <span class="artist-chip ${rInfo.class}">${rInfo.label}</span>
                       <span class="member-status ${m.status}">${m.status === 'active' ? 'Activo' : 'Inactivo'}</span>
-                      ${m.has_app_access ? '<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 11px; font-weight: 700;">📱 Acceso App</span>' : '<span class="badge" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; font-size: 11px; font-weight: 700;">🔒 Sin acceso app</span>'}
+                      ${m.has_app_access ? '<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 11px; font-weight: 700;">Acceso App</span>' : '<span class="badge" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; font-size: 11px; font-weight: 700;">Sin acceso app</span>'}
                     </div>
                     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted);">
-                      <span>📧 ${m.email}</span>
-                      <span>📅 ${m.appointment_count || 0} citas registradas</span>
-                      ${m.responsible_name ? `<span style="color: var(--ink);">👤 A cargo: <strong>${m.responsible_name}</strong></span>` : ''}
+                      <span style="display: inline-flex; align-items: center; gap: 4px;">${icon('mail')} ${m.email}</span>
+                      <span style="display: inline-flex; align-items: center; gap: 4px;">${icon('calendar')} ${m.appointment_count || 0} citas</span>
+                      ${m.responsible_name ? `<span style="color: var(--ink); display: inline-flex; align-items: center; gap: 4px;">${icon('user')} A cargo: <strong>${m.responsible_name}</strong></span>` : ''}
                     </div>
                   </div>
                 </div>
@@ -5472,8 +5503,9 @@ async function renderArtists() {
               </div>
 
               ${m.supplies_included ? `
-                <div style="font-size: 11.5px; color: var(--muted); background: var(--surface-high); padding: 6px 12px; border-radius: var(--radius-sm); border: 1px dashed var(--line-soft);">
-                  🧴 <strong>Insumos incluidos:</strong> ${m.supplies_included}
+                <div style="font-size: 11.5px; color: var(--muted); background: var(--surface-high); padding: 6px 12px; border-radius: var(--radius-sm); border: 1px dashed var(--line-soft); display: flex; align-items: center; gap: 6px;">
+                  <span style="color: var(--ink);">${icon('box')}</span>
+                  <span><strong>Insumos incluidos:</strong> ${m.supplies_included}</span>
                 </div>
               ` : ''}
             </article>
@@ -5548,15 +5580,15 @@ async function renderPortfolio() {
     if (!features.feature_microsite_enabled && !currentUser?.is_superadmin) {
       app.innerHTML = `
         <div class="empty" style="max-width: 520px; margin: 60px auto; text-align: center; padding: 40px 24px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius-lg);">
-          <div style="font-size: 44px; margin-bottom: 12px;">🌐</div>
+          <div style="display: flex; justify-content: center; margin-bottom: 12px; color: var(--accent);"><span style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">${icon('globe')}</span></div>
           <p class="eyebrow">FUNCIONALIDAD DESACTIVADA</p>
           <h2 style="margin: 8px 0 12px; font-size: 22px;">Pequeño Sitio Web Desactivado</h2>
           <p class="lead" style="font-size: 14px; line-height: 1.5; color: var(--muted); margin-bottom: 24px;">
             El módulo de pequeño sitio web y landing pública de artistas se encuentra temporalmente fuera de servicio. Puedes gestionar y consultar tu lista de artistas en la sección correspondiente.
           </p>
           <div style="display: flex; justify-content: center; gap: 10px;">
-            <button class="primary" data-view="artistas">
-              👥 Ver Listado de Artistas
+            <button class="primary" data-view="artistas" style="display: inline-flex; align-items: center; gap: 6px;">
+              ${icon('users')} <span>Ver Listado de Artistas</span>
             </button>
             <button class="secondary" data-view="dashboard">
               Volver al Inicio
@@ -5609,17 +5641,17 @@ async function renderPortfolio() {
         <div class="portfolio-nav-strip">
           <div class="portfolio-tab-dropdown-container">
             <button class="portfolio-tab-selector-btn" data-action="toggle-portfolio-tab-menu" id="portfolio-tab-selector-btn">
-              <span id="portfolio-active-tab-text">${portfolioCurrentTab === 'profile' ? '👤 Perfil' : '🖼️ Galería'}</span>
+              <span id="portfolio-active-tab-text">${portfolioCurrentTab === 'profile' ? 'Perfil' : 'Galería'}</span>
               <svg class="chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
 
             <div class="portfolio-tab-dropdown-popover" id="portfolio-tab-popover" hidden>
               <button class="portfolio-tab-popover-item ${portfolioCurrentTab === 'profile' ? 'active' : ''}" data-select-tab="profile">
-                <span>👤 Perfil</span>
+                <span style="display: inline-flex; align-items: center; gap: 6px;">${icon('user')} <span>Perfil</span></span>
                 ${portfolioCurrentTab === 'profile' ? '<span class="tab-check">✓</span>' : ''}
               </button>
               <button class="portfolio-tab-popover-item ${portfolioCurrentTab === 'gallery' ? 'active' : ''}" data-select-tab="gallery">
-                <span>🖼️ Galería</span>
+                <span style="display: inline-flex; align-items: center; gap: 6px;">${icon('image')} <span>Galería</span></span>
                 ${portfolioCurrentTab === 'gallery' ? '<span class="tab-check">✓</span>' : ''}
               </button>
             </div>
@@ -5630,7 +5662,7 @@ async function renderPortfolio() {
               ${icon('user')} Perfil & Marca
             </button>
             <button class="portfolio-desktop-tab-btn ${portfolioCurrentTab === 'gallery' ? 'active' : ''}" data-select-tab="gallery">
-              ${icon('box')} Galería (${gallery.length} fotos)
+              ${icon('image')} Galería (${gallery.length} fotos)
             </button>
           </div>
 
@@ -6149,13 +6181,13 @@ function openPublicPortfolioLanding(customData = null) {
 // ==========================================
 
 const INVENTORY_CATEGORIES = {
-  needles: { label: 'Agujas & Cartuchos', icon: '💉', color: '#7C3AED' },
-  inks: { label: 'Tintas & Pigmentos', icon: '🎨', color: '#0284C7' },
-  hygiene: { label: 'Higiene & Bioseguridad', icon: '🧼', color: '#059669' },
-  aftercare: { label: 'Cuidado & Aftercare', icon: '🧴', color: '#E11D48' },
-  equipment: { label: 'Máquinas & Equipamiento', icon: '⚡', color: '#D97706' },
-  merch: { label: 'Merchandising & Arte', icon: '👕', color: '#6366F1' },
-  other: { label: 'Otros Insumos', icon: '📦', color: '#64748B' }
+  needles: { label: 'Agujas & Cartuchos', color: '#7C3AED' },
+  inks: { label: 'Tintas & Pigmentos', color: '#0284C7' },
+  hygiene: { label: 'Higiene & Bioseguridad', color: '#059669' },
+  aftercare: { label: 'Cuidado & Aftercare', color: '#E11D48' },
+  equipment: { label: 'Máquinas & Equipamiento', color: '#D97706' },
+  merch: { label: 'Merchandising & Arte', color: '#6366F1' },
+  other: { label: 'Otros Insumos', color: '#64748B' }
 };
 
 const INVENTORY_UNITS = {
@@ -6168,12 +6200,12 @@ const INVENTORY_UNITS = {
 };
 
 const MOVEMENT_TYPES = {
-  purchase: { label: 'Compra de Stock', icon: '🛒', class: 'mov-purchase', badge: 'Entrada / Compra' },
-  consumption: { label: 'Consumo en Sesión', icon: '💉', class: 'mov-consumption', badge: 'Salida / Consumo' },
-  sale_external: { label: 'Venta a Cliente', icon: '🛍️', class: 'mov-sale', badge: 'Salida / Venta Cliente' },
-  transfer_internal: { label: 'Facilitación a Artista', icon: '🔄', class: 'mov-transfer', badge: 'Transferencia Interna' },
-  sale_internal: { label: 'Venta a Artista', icon: '🏷️', class: 'mov-sale-internal', badge: 'Venta Interna' },
-  adjustment: { label: 'Ajuste de Inventario', icon: '⚖️', class: 'mov-adjustment', badge: 'Ajuste / Conteo' }
+  purchase: { label: 'Compra de Stock', class: 'mov-purchase', badge: 'Entrada / Compra' },
+  consumption: { label: 'Consumo en Sesión', class: 'mov-consumption', badge: 'Salida / Consumo' },
+  sale_external: { label: 'Venta a Cliente', class: 'mov-sale', badge: 'Salida / Venta Cliente' },
+  transfer_internal: { label: 'Facilitación a Artista', class: 'mov-transfer', badge: 'Transferencia Interna' },
+  sale_internal: { label: 'Venta a Artista', class: 'mov-sale-internal', badge: 'Venta Interna' },
+  adjustment: { label: 'Ajuste de Inventario', class: 'mov-adjustment', badge: 'Ajuste / Conteo' }
 };
 
 let inventoryData = null;
@@ -6239,11 +6271,11 @@ async function renderInventory() {
 
     <!-- Top Action Bar -->
     <section class="actions inventory-top-actions">
-      <button class="primary" data-action="open-upload-screenshot">
-        ${icon('image')} <span>Subir Foto / Captura</span>
+      <button class="primary" data-action="open-upload-screenshot" title="Importar foto de insumos o boleta desde la galería o archivos">
+        ${icon('image')} <span>Importar Foto de Insumo</span>
       </button>
-      <button class="secondary" data-action="open-receipt-scanner">
-        ${icon('camera')} <span>Usar Cámara (OCR)</span>
+      <button class="secondary" data-action="open-receipt-scanner" title="Escanear insumos o boleta en vivo usando la cámara">
+        ${icon('scan')} <span>Escanear Producto (Cámara)</span>
       </button>
       <button class="secondary" data-action="open-new-item-modal">
         ${icon('plus')} <span>Nuevo insumo</span>
@@ -6266,7 +6298,7 @@ async function renderInventory() {
 
       <article class="stat-card">
         <div class="stat-card-header">
-          <span class="stat-icon-bubble green">${icon('artist')}</span>
+          <span class="stat-icon-bubble green">${icon('user')}</span>
           <p class="eyebrow">MI STOCK PERSONAL</p>
         </div>
         <strong>${stats.totalPersonalItems || personalItems.length}</strong>
@@ -6286,17 +6318,17 @@ async function renderInventory() {
     <!-- Inventory Context Tabs -->
     <div class="inventory-tabs-container">
       <div class="inventory-tabs-nav">
-        <button class="inv-tab-btn ${inventoryCurrentTab === 'studio' ? 'active' : ''}" data-inv-tab="studio">
-          🏢 Insumos del Estudio <span class="inv-tab-badge">${studioItems.length}</span>
+        <button class="inv-tab-btn ${inventoryCurrentTab === 'studio' ? 'active' : ''}" data-inv-tab="studio" style="display: inline-flex; align-items: center; gap: 6px;">
+          ${icon('building')} <span>Insumos del Estudio</span> <span class="inv-tab-badge">${studioItems.length}</span>
         </button>
-        <button class="inv-tab-btn ${inventoryCurrentTab === 'personal' ? 'active' : ''}" data-inv-tab="personal">
-          🎨 Mi Inventario Personal <span class="inv-tab-badge">${personalItems.length}</span>
+        <button class="inv-tab-btn ${inventoryCurrentTab === 'personal' ? 'active' : ''}" data-inv-tab="personal" style="display: inline-flex; align-items: center; gap: 6px;">
+          ${icon('user')} <span>Mi Inventario Personal</span> <span class="inv-tab-badge">${personalItems.length}</span>
         </button>
-        <button class="inv-tab-btn ${inventoryCurrentTab === 'movements' ? 'active' : ''}" data-inv-tab="movements">
-          🔄 Movimientos & Ventas <span class="inv-tab-badge">${inventoryMovements.length}</span>
+        <button class="inv-tab-btn ${inventoryCurrentTab === 'movements' ? 'active' : ''}" data-inv-tab="movements" style="display: inline-flex; align-items: center; gap: 6px;">
+          ${icon('sync')} <span>Movimientos & Ventas</span> <span class="inv-tab-badge">${inventoryMovements.length}</span>
         </button>
-        <button class="inv-tab-btn ${inventoryCurrentTab === 'alerts' ? 'active' : ''}" data-inv-tab="alerts">
-          ⚠️ Alertas Reposición <span class="inv-tab-badge ${lowStockItems.length > 0 ? 'badge-alert' : ''}">${lowStockItems.length}</span>
+        <button class="inv-tab-btn ${inventoryCurrentTab === 'alerts' ? 'active' : ''}" data-inv-tab="alerts" style="display: inline-flex; align-items: center; gap: 6px;">
+          ${icon('alert')} <span>Alertas Reposición</span> <span class="inv-tab-badge ${lowStockItems.length > 0 ? 'badge-alert' : ''}">${lowStockItems.length}</span>
         </button>
       </div>
 
@@ -6388,23 +6420,23 @@ function renderInventoryItemsGrid(items, currentTab) {
             </div>
 
             <div class="inv-card-actions">
-              <button type="button" class="inv-action-btn primary" data-action="consume-item" data-id="${item.id}" data-name="${item.name}" title="Registrar consumo en sesión">
-                💉 Consumir
+              <button type="button" class="inv-action-btn primary" data-action="consume-item" data-id="${item.id}" data-name="${item.name}" title="Registrar consumo en sesión" style="display: inline-flex; align-items: center; gap: 4px;">
+                ${icon('check')} <span>Consumir</span>
               </button>
               ${currentTab === 'studio' ? `
-                <button type="button" class="inv-action-btn secondary" data-action="transfer-item" data-id="${item.id}" data-name="${item.name}" title="Facilitar o vender a un artista residente/nómade">
-                  🔄 Transferir/Vender
+                <button type="button" class="inv-action-btn secondary" data-action="transfer-item" data-id="${item.id}" data-name="${item.name}" title="Facilitar o vender a un artista residente/nómade" style="display: inline-flex; align-items: center; gap: 4px;">
+                  ${icon('sync')} <span>Transferir</span>
                 </button>
               ` : `
-                <button type="button" class="inv-action-btn secondary" data-action="sell-item" data-id="${item.id}" data-name="${item.name}" title="Vender a cliente final">
-                  🛍️ Venta
+                <button type="button" class="inv-action-btn secondary" data-action="sell-item" data-id="${item.id}" data-name="${item.name}" title="Vender a cliente final" style="display: inline-flex; align-items: center; gap: 4px;">
+                  ${icon('dollar')} <span>Venta</span>
                 </button>
               `}
-              <button type="button" class="inv-action-btn icon-only" data-action="edit-item" data-id="${item.id}" title="Editar insumo">
-                ✏️
+              <button type="button" class="inv-action-btn icon-only" data-action="edit-item" data-id="${item.id}" title="Editar insumo" style="display: inline-flex; align-items: center; justify-content: center;">
+                ${icon('edit')}
               </button>
-              <button type="button" class="inv-action-btn icon-only danger" data-action="delete-item" data-id="${item.id}" data-name="${item.name}" title="Eliminar insumo">
-                🗑️
+              <button type="button" class="inv-action-btn icon-only danger" data-action="delete-item" data-id="${item.id}" data-name="${item.name}" title="Eliminar insumo" style="display: inline-flex; align-items: center; justify-content: center;">
+                ${icon('trash')}
               </button>
             </div>
           </article>
@@ -6495,6 +6527,21 @@ function openItemModal(item = null, isPersonal = false) {
     <form data-form="inventory-item">
       ${isEdit ? `<input type="hidden" name="id" value="${item.id}" />` : ''}
 
+      <div class="item-quick-scan-banner" style="background: var(--surface-high); border: 1px dashed var(--line-soft); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: var(--accent); display: flex;">${icon('image')}</span>
+          <span style="font-size: 12.5px; color: var(--ink);">¿Deseas autocompletar con una foto o escáner?</span>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="secondary small-btn" data-action="open-upload-screenshot" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 4px 10px;">
+            ${icon('image')} <span>Importar Foto</span>
+          </button>
+          <button type="button" class="secondary small-btn" data-action="open-receipt-scanner" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 4px 10px;">
+            ${icon('scan')} <span>Escanear</span>
+          </button>
+        </div>
+      </div>
+
       <label>Nombre del insumo / producto *
         <input name="name" required placeholder="Ej. Cartuchos Kwadron 03RL, Crema Cicatrizante 50g..." value="${item?.name || ''}" />
       </label>
@@ -6503,7 +6550,7 @@ function openItemModal(item = null, isPersonal = false) {
         <label>Categoría
           <select name="category">
             ${Object.entries(INVENTORY_CATEGORIES).map(([key, cat]) => `
-              <option value="${key}" ${key === selectedCat ? 'selected' : ''}>${cat.icon} ${cat.label}</option>
+              <option value="${key}" ${key === selectedCat ? 'selected' : ''}>${cat.label}</option>
             `).join('')}
           </select>
         </label>
@@ -6574,7 +6621,7 @@ function openMovementModal(preselectedItemId = null, preselectedType = 'consumpt
           <option value="">Selecciona un insumo...</option>
           ${allItems.map((i) => `
             <option value="${i.id}" data-qty="${i.quantity}" data-unit="${i.unit}" data-cost="${i.cost_price}" data-sale="${i.sale_price}" ${Number(preselectedItemId) === Number(i.id) ? 'selected' : ''}>
-              ${i.owner_user_id ? '🎨 [Personal] ' : '🏢 [Estudio] '} ${i.name} (Stock: ${i.quantity} ${INVENTORY_UNITS[i.unit] || i.unit})
+              ${i.owner_user_id ? '[Personal] ' : '[Estudio] '} ${i.name} (Stock: ${i.quantity} ${INVENTORY_UNITS[i.unit] || i.unit})
             </option>
           `).join('')}
         </select>
@@ -6582,12 +6629,12 @@ function openMovementModal(preselectedItemId = null, preselectedType = 'consumpt
 
       <label>Tipo de movimiento *
         <select name="movementType" id="mov-type-select" required>
-          <option value="consumption" ${preselectedType === 'consumption' ? 'selected' : ''}>💉 Consumo en sesión / cita de tatuaje</option>
-          <option value="purchase" ${preselectedType === 'purchase' ? 'selected' : ''}>🛒 Compra externa (Ingreso de stock)</option>
-          <option value="sale_external" ${preselectedType === 'sale_external' ? 'selected' : ''}>🛍️ Venta a cliente final (Aftercare / Merch)</option>
-          <option value="transfer_internal" ${preselectedType === 'transfer_internal' ? 'selected' : ''}>🔄 Facilitación / Préstamo de estudio a residente o nómade</option>
-          <option value="sale_internal" ${preselectedType === 'sale_internal' ? 'selected' : ''}>🏷️ Venta interna a artista residente o nómade</option>
-          <option value="adjustment" ${preselectedType === 'adjustment' ? 'selected' : ''}>⚖️ Ajuste manual de stock / Conteo físico</option>
+          <option value="consumption" ${preselectedType === 'consumption' ? 'selected' : ''}>Consumo en sesión / cita de tatuaje</option>
+          <option value="purchase" ${preselectedType === 'purchase' ? 'selected' : ''}>Compra externa (Ingreso de stock)</option>
+          <option value="sale_external" ${preselectedType === 'sale_external' ? 'selected' : ''}>Venta a cliente final (Aftercare / Merch)</option>
+          <option value="transfer_internal" ${preselectedType === 'transfer_internal' ? 'selected' : ''}>Facilitación / Préstamo de estudio a artista</option>
+          <option value="sale_internal" ${preselectedType === 'sale_internal' ? 'selected' : ''}>Venta interna a artista residente o nómade</option>
+          <option value="adjustment" ${preselectedType === 'adjustment' ? 'selected' : ''}>Ajuste manual de stock / Conteo físico</option>
         </select>
       </label>
 
@@ -6716,10 +6763,10 @@ function openUploadScreenshotModal(defaultTarget = 'studio') {
     <div style="display: flex; flex-direction: column; gap: 16px;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
-          <p class="eyebrow">LECTURA DE BOLETAS Y COMPROBANTES</p>
-          <h2 id="modal-title" style="margin: 0; font-size: 20px;">Cargar Foto o Captura de Pantalla</h2>
+          <p class="eyebrow">LECTURA DE INSUMOS, BOLETAS Y COMPROBANTES</p>
+          <h2 id="modal-title" style="margin: 0; font-size: 20px;">Importar Foto de Producto o Boleta</h2>
           <p style="font-size: 13px; color: var(--muted); margin: 4px 0 0 0;">
-            Sube o pega una imagen de tu boleta, factura o comprobante de transferencia para leer los montos con OCR.
+            Sube o pega una foto de tu producto, insumo o boleta de compra para leer montos y datos con OCR.
           </p>
         </div>
         <button type="button" class="scanner-close-btn" data-close-modal title="Cerrar">✕</button>
@@ -6727,21 +6774,21 @@ function openUploadScreenshotModal(defaultTarget = 'studio') {
 
       <!-- Drag & Drop / File Pick / Paste Area -->
       <div class="screenshot-dropzone" id="screenshot-dropzone">
-        <div class="screenshot-dropzone-icon">🖼️</div>
-        <h3 class="screenshot-dropzone-title">Haz clic para elegir foto o arrastra tu archivo aquí</h3>
+        <div class="screenshot-dropzone-icon" style="color: var(--accent);">${icon('image')}</div>
+        <h3 class="screenshot-dropzone-title">Haz clic para importar una foto o arrastra tu archivo aquí</h3>
         <p class="screenshot-dropzone-sub">
-          Formatos compatibles: JPG, PNG, WEBP, capturas de pantalla de celular o computador.
+          Formatos compatibles: JPG, PNG, WEBP, fotos de insumos o capturas de pantalla de celular y PC.
         </p>
-        <div class="paste-badge-hint">
-          <span>📋 También puedes presionar <strong>Ctrl + V</strong> para pegar una captura</span>
+        <div class="paste-badge-hint" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span>${icon('clipboard')} También puedes presionar <strong>Ctrl + V</strong> para pegar directamente</span>
         </div>
         <input type="file" accept="image/*" id="screenshot-dropzone-file-input" style="display: none;" />
       </div>
 
       <!-- Alternative options -->
       <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid var(--line-soft); flex-wrap: wrap; gap: 10px;">
-        <button type="button" class="secondary small-btn" data-action="open-receipt-scanner">
-          ${icon('camera')} <span>Prefiero usar la cámara en vivo</span>
+        <button type="button" class="secondary small-btn" data-action="open-receipt-scanner" style="display: inline-flex; align-items: center; gap: 6px;">
+          ${icon('camera')} <span>Prefiero escanear con la cámara</span>
         </button>
         <button type="button" class="secondary small-btn" data-close-modal>
           Cancelar
@@ -6786,8 +6833,8 @@ function openReceiptScannerModal(defaultTarget = 'studio') {
     <div class="receipt-scanner-container">
       <div class="scanner-modal-header">
         <div>
-          <p class="eyebrow">ESCÁNER OCR DE BOLETAS</p>
-          <h2 id="modal-title" style="margin: 0; font-size: 18px;">Tomar foto de boleta</h2>
+          <p class="eyebrow">ESCÁNER OCR DE PRODUCTOS & BOLETAS</p>
+          <h2 id="modal-title" style="margin: 0; font-size: 18px;">Escanear o Importar Foto</h2>
         </div>
         <button type="button" class="scanner-close-btn" data-close-modal title="Cerrar">✕</button>
       </div>
@@ -6800,7 +6847,7 @@ function openReceiptScannerModal(defaultTarget = 'studio') {
           <div class="scanner-frame-corner bottom-left"></div>
           <div class="scanner-frame-corner bottom-right"></div>
           <div class="scanner-scan-line"></div>
-          <p class="scanner-guideline-text">Encuadra la boleta o ticket de compra aquí</p>
+          <p class="scanner-guideline-text">Encuadra el producto, insumo o boleta aquí</p>
         </div>
         <div id="scanner-camera-error" class="scanner-error-overlay" style="display: none;"></div>
         <canvas id="scanner-capture-canvas" style="display:none;"></canvas>
@@ -6810,8 +6857,8 @@ function openReceiptScannerModal(defaultTarget = 'studio') {
       <div id="ocr-processing-overlay" class="ocr-processing-overlay" style="display: none;">
         <div class="ocr-progress-box">
           <div class="ocr-spinner"></div>
-          <strong id="ocr-status-title">Analizando boleta con OCR...</strong>
-          <p id="ocr-status-subtitle">Extrayendo texto, montos y productos</p>
+          <strong id="ocr-status-title">Analizando con OCR...</strong>
+          <p id="ocr-status-subtitle">Extrayendo texto, nombres y montos</p>
           <div class="ocr-progress-bar-wrap">
             <div id="ocr-progress-bar-fill" class="ocr-progress-bar-fill" style="width: 0%;"></div>
           </div>
@@ -6823,15 +6870,15 @@ function openReceiptScannerModal(defaultTarget = 'studio') {
       </div>
 
       <div class="scanner-control-bar">
-        <label class="secondary scanner-btn-icon" title="Cargar desde galería o archivos">
-          📁 <span>Subir Archivo</span>
-          <input type="file" accept="image/*" capture="environment" id="scanner-direct-file-input" style="display: none;" />
+        <label class="secondary scanner-btn-icon" title="Importar foto desde tu galería o archivos" style="cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+          ${icon('image')} <span>Importar Foto</span>
+          <input type="file" accept="image/*" id="scanner-direct-file-input" style="display: none;" />
         </label>
-        <button type="button" class="scanner-shutter-btn" id="btn-scanner-capture" title="Capturar Foto y Leer Boleta">
+        <button type="button" class="scanner-shutter-btn" id="btn-scanner-capture" title="Capturar Foto y Leer Producto">
           <span class="shutter-inner-circle"></span>
         </button>
-        <button type="button" class="secondary scanner-btn-icon" id="btn-scanner-flip" title="Cambiar Cámara Frontal / Trasera">
-          🔄 <span>Voltear</span>
+        <button type="button" class="secondary scanner-btn-icon" id="btn-scanner-flip" title="Cambiar Cámara Frontal / Trasera" style="display: inline-flex; align-items: center; gap: 5px;">
+          ${icon('sync')} <span>Voltear</span>
         </button>
       </div>
 
@@ -6839,7 +6886,7 @@ function openReceiptScannerModal(defaultTarget = 'studio') {
         <button type="button" class="secondary small-btn" data-close-modal>
           Cancelar
         </button>
-        <span style="font-size: 11px; color: var(--muted);">Presiona el botón blanco central para capturar</span>
+        <span style="font-size: 11px; color: var(--muted);">Presiona el obturador central o importa una foto</span>
       </div>
     </div>
   `);
@@ -7044,17 +7091,17 @@ function showReceiptConfirmationModal(data) {
     <form data-form="receipt-ocr-confirm">
       <label>Destino del inventario *
         <select name="targetInventory" id="ocr-target-inventory">
-          <option value="studio" ${data.defaultTarget === 'studio' ? 'selected' : ''}>🏢 Inventario del Estudio (Compartido)</option>
-          <option value="personal" ${data.defaultTarget === 'personal' ? 'selected' : ''}>🎨 Mi Inventario Personal</option>
+          <option value="studio" ${data.defaultTarget === 'studio' ? 'selected' : ''}>Inventario del Estudio (Compartido)</option>
+          <option value="personal" ${data.defaultTarget === 'personal' ? 'selected' : ''}>Mi Inventario Personal</option>
         </select>
       </label>
 
       <label>Vincular a insumo existente (o crear uno nuevo)
         <select name="existingItemId" id="ocr-existing-item">
-          <option value="">➕ Crear nuevo insumo con esta compra</option>
+          <option value="">+ Crear nuevo insumo con esta compra</option>
           ${existingItems.map(i => `
             <option value="${i.id}" data-cat="${i.category}" data-unit="${i.unit}" data-cost="${i.cost_price}">
-              ${i.owner_user_id ? '🎨 [Personal] ' : '🏢 [Estudio] '} ${i.name} (Stock actual: ${i.quantity})
+              ${i.owner_user_id ? '[Personal] ' : '[Estudio] '} ${i.name} (Stock actual: ${i.quantity})
             </option>
           `).join('')}
         </select>
@@ -7068,7 +7115,7 @@ function showReceiptConfirmationModal(data) {
         <label>Categoría
           <select name="category">
             ${Object.entries(INVENTORY_CATEGORIES).map(([key, cat]) => `
-              <option value="${key}">${cat.icon} ${cat.label}</option>
+              <option value="${key}">${cat.label}</option>
             `).join('')}
           </select>
         </label>
@@ -7101,7 +7148,9 @@ function showReceiptConfirmationModal(data) {
 
       <div class="modal-actions">
         <button type="button" class="secondary" data-close-modal>Descartar</button>
-        <button type="submit" class="primary">💾 Guardar en Inventario & Billetera</button>
+        <button type="submit" class="primary" style="display: inline-flex; align-items: center; gap: 6px;">
+          ${icon('check')} <span>Guardar en Inventario & Billetera</span>
+        </button>
       </div>
     </form>
   `);
@@ -7351,7 +7400,7 @@ function newMemberModal() {
             <span>Habilitar acceso a la plataforma (App)</span>
           </label>
           <span id="access-note" style="font-size: 11px; color: var(--muted); margin-top: 4px;">
-            🔒 Desactivado para Guests por defecto. Queda registrado en el sistema sin acceso a la interfaz.
+            Desactivado para Guests por defecto. Queda registrado en el sistema sin acceso a la interfaz.
           </span>
         </div>
       </div>
@@ -7371,8 +7420,8 @@ function newMemberModal() {
       </div>
 
       <details style="background: var(--surface-high); border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 10px 14px; margin-top: 10px;">
-        <summary style="font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--ink);">
-          ⚙️ Automatizaciones & Guía de Onboarding para el Guest (Opcional)
+        <summary style="font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--ink); display: flex; align-items: center; gap: 6px;">
+          ${icon('settings')} <span>Automatizaciones & Guía de Onboarding para el Guest (Opcional)</span>
         </summary>
         <div style="display: grid; gap: 10px; margin-top: 10px;">
           <label style="font-size: 12px;">Insumos incluidos en el arriendo
@@ -7407,14 +7456,14 @@ function newMemberModal() {
   roleSelect?.addEventListener('change', (e) => {
     if (e.target.value === 'nomad') {
       accessCheck.checked = false;
-      accessNote.textContent = '🔒 Desactivado para Guests por defecto. Queda registrado en el sistema sin acceso a la interfaz.';
+      accessNote.textContent = 'Desactivado para Guests por defecto. Queda registrado en el sistema sin acceso a la interfaz.';
       agreeSelect.value = 'fixed_daily';
       commField.style.display = 'none';
       fixedField.style.display = 'block';
       if (fixedLabel?.firstChild) fixedLabel.firstChild.textContent = 'Monto fijo por día (CLP)';
     } else {
       accessCheck.checked = true;
-      accessNote.textContent = '📱 Acceso completo a la plataforma Tatudin habilitado.';
+      accessNote.textContent = 'Acceso completo a la plataforma Tatudin habilitado.';
       if (e.target.value === 'resident') {
         agreeSelect.value = 'commission';
         commField.style.display = 'block';
@@ -7571,7 +7620,7 @@ async function openGuestGuideModal(membershipId) {
             <span style="font-size: 12px; color: var(--muted);">${guide.studio_name} · ${guide.agreement_text}</span>
           </div>
           <span class="badge" style="background: ${guide.has_app_access ? '#d1fae5' : '#f3f4f6'}; color: ${guide.has_app_access ? '#065f46' : '#4b5563'}; font-size: 11px;">
-            ${guide.has_app_access ? '📱 Acceso App Habilitado' : '🔒 Sin acceso app (Solo registro)'}
+            ${guide.has_app_access ? 'Acceso App Habilitado' : 'Sin acceso app (Solo registro)'}
           </span>
         </div>
       </div>
@@ -7579,35 +7628,35 @@ async function openGuestGuideModal(membershipId) {
       <div class="guest-guide-sections" style="display: grid; gap: 12px; margin-bottom: 18px;">
         <div class="guide-item" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
           <strong style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); margin-bottom: 4px;">
-            📍 1. Cómo llegar al estudio
+            ${icon('mapPin')} <span>1. Cómo llegar al estudio</span>
           </strong>
           <p style="font-size: 12px; color: var(--muted); margin: 0; line-height: 1.45;">${guide.arrival_info}</p>
         </div>
 
         <div class="guide-item" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
           <strong style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); margin-bottom: 4px;">
-            💼 2. Modalidad y forma de pago
+            ${icon('dollar')} <span>2. Modalidad y forma de pago</span>
           </strong>
           <p style="font-size: 12px; color: var(--muted); margin: 0; line-height: 1.45;">${guide.payment_info}</p>
         </div>
 
         <div class="guide-item" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
           <strong style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); margin-bottom: 4px;">
-            🧴 3. Insumos incluidos en el arriendo
+            ${icon('box')} <span>3. Insumos incluidos en el arriendo</span>
           </strong>
           <p style="font-size: 12px; color: var(--muted); margin: 0; line-height: 1.45;">${guide.supplies_info}</p>
         </div>
 
         <div class="guide-item" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
           <strong style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); margin-bottom: 4px;">
-            🔐 4. Apertura y cierre del estudio
+            ${icon('lock')} <span>4. Apertura y cierre del estudio</span>
           </strong>
           <p style="font-size: 12px; color: var(--muted); margin: 0; line-height: 1.45;">${guide.access_info}</p>
         </div>
 
         <div class="guide-item" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
           <strong style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); margin-bottom: 4px;">
-            👤 5. Persona responsable del Guest
+            ${icon('user')} <span>5. Persona responsable del Guest</span>
           </strong>
           <p style="font-size: 12px; color: var(--muted); margin: 0; line-height: 1.45;">
             <strong>${guide.responsible_name}</strong> (${guide.responsible_role}) ${guide.responsible_contact ? `· ${guide.responsible_contact}` : ''}
@@ -7616,8 +7665,8 @@ async function openGuestGuideModal(membershipId) {
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-        <button type="button" class="secondary" data-action="copy-guest-guide-text" data-text="${encodeURIComponent(guide.whatsapp_message)}">
-          📋 Copiar Guía completa
+        <button type="button" class="secondary" data-action="copy-guest-guide-text" data-text="${encodeURIComponent(guide.whatsapp_message)}" style="display: inline-flex; align-items: center; gap: 6px;">
+          ${icon('copy')} <span>Copiar Guía completa</span>
         </button>
         <div style="display: flex; gap: 8px;">
           <a href="${guide.whatsapp_url}" target="_blank" rel="noopener noreferrer" class="primary" style="background: #25D366; color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-md); font-weight: 700; font-size: 13px;">
@@ -7977,14 +8026,14 @@ async function openVoiceTranscriptModal({ apptId, title, kind, catName, clientNa
 
         <div class="voice-controls-group">
           ${isSupported ? `
-            <button type="button" class="primary small-btn" id="btn-voice-start" style="background: #ef4444; border-color: #ef4444;">
-              <span>🎙️ Iniciar Dictado</span>
+            <button type="button" class="primary small-btn" id="btn-voice-start" style="background: #ef4444; border-color: #ef4444; display: inline-flex; align-items: center; gap: 5px;">
+              ${icon('mic')} <span>Iniciar Dictado</span>
             </button>
             <button type="button" class="secondary small-btn" id="btn-voice-pause" style="display: none;">
-              <span>⏸️ Pausar</span>
+              <span>Pausar</span>
             </button>
             <button type="button" class="secondary small-btn" id="btn-voice-stop" style="display: none; color: #dc2626;">
-              <span>⏹️ Detener</span>
+              <span>Detener</span>
             </button>
           ` : `
             <span style="font-size: 12px; color: #f59e0b;">(Web Speech no soportado en este navegador; puedes escribir apuntes directamente)</span>
@@ -8006,25 +8055,27 @@ async function openVoiceTranscriptModal({ apptId, title, kind, catName, clientNa
       <!-- Quick Actions Row -->
       <div class="voice-tools-row">
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <button type="button" class="secondary small-btn" id="btn-structure-notes" title="Formatear como minuta con temas, acuerdos y tareas">
-            <span>⚡ Estructurar en Minuta</span>
+          <button type="button" class="secondary small-btn" id="btn-structure-notes" title="Formatear como minuta con temas, acuerdos y tareas" style="display: inline-flex; align-items: center; gap: 4px;">
+            ${icon('zap')} <span>Estructurar en Minuta</span>
           </button>
-          <button type="button" class="secondary small-btn" id="btn-copy-transcript" title="Copiar texto al portapapeles">
-            <span>📋 Copiar</span>
+          <button type="button" class="secondary small-btn" id="btn-copy-transcript" title="Copiar texto al portapapeles" style="display: inline-flex; align-items: center; gap: 4px;">
+            ${icon('copy')} <span>Copiar</span>
           </button>
-          <button type="button" class="secondary small-btn" id="btn-clear-transcript" style="color: var(--muted);" title="Limpiar texto">
-            <span>🗑️ Limpiar</span>
+          <button type="button" class="secondary small-btn" id="btn-clear-transcript" style="color: var(--muted); display: inline-flex; align-items: center; gap: 4px;" title="Limpiar texto">
+            ${icon('trash')} <span>Limpiar</span>
           </button>
         </div>
 
-        <button type="button" class="primary small-btn" id="btn-save-transcript" style="font-weight: 700;">
-          <span>💾 Guardar Apuntes</span>
+        <button type="button" class="primary small-btn" id="btn-save-transcript" style="font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+          ${icon('check')} <span>Guardar Apuntes</span>
         </button>
       </div>
 
       <!-- Past Transcripts History for this appointment -->
       <div style="margin-top: 14px; border-top: 1px solid var(--line-soft); padding-top: 14px;">
-        <h3 style="font-size: 14px; margin: 0 0 10px 0; color: var(--ink);">📜 Historial de Apuntes de esta Cita</h3>
+        <h3 style="font-size: 14px; margin: 0 0 10px 0; color: var(--ink); display: flex; align-items: center; gap: 6px;">
+          ${icon('fileText')} <span>Historial de Apuntes de esta Cita</span>
+        </h3>
         <div id="past-transcripts-list">
           ${pastTranscripts.length > 0 ? pastTranscripts.map((t) => `
             <article class="transcript-history-card">
@@ -8614,7 +8665,7 @@ document.addEventListener('click', async (event) => {
     const popover = document.querySelector('#portfolio-tab-popover');
     if (popover) popover.hidden = true;
     const activeText = document.querySelector('#portfolio-active-tab-text');
-    if (activeText) activeText.textContent = portfolioCurrentTab === 'profile' ? '👤 Perfil' : '🖼️ Galería';
+    if (activeText) activeText.textContent = portfolioCurrentTab === 'profile' ? 'Perfil' : 'Galería';
     document.querySelectorAll('.portfolio-desktop-tab-btn, .portfolio-tab-popover-item').forEach((b) => {
       b.classList.toggle('active', b.dataset.selectTab === portfolioCurrentTab);
     });
