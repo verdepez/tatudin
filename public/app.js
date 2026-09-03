@@ -2562,127 +2562,50 @@ async function renderAgenda() {
         <p class="lead">Gestiona tus compromisos, disponibilidad semanal y páginas de reserva con clientes.</p>
       </div>
 
-      <!-- Google Calendar Style + Crear Dropdown Menu -->
-      <div class="create-menu-wrapper">
-        <button type="button" class="primary create-menu-btn" data-action="toggle-create-menu">
-          ${icon('plus')} <span>Crear</span> ${icon('chevronDown')}
+      <!-- Actions: Configuración de Agenda + Google Calendar Style Crear Dropdown Menu -->
+      <div class="calendar-heading-actions">
+        <button type="button" class="cal-top-icon-btn" data-action="open-booking-pages-modal" title="Configuración de agendas de citas y páginas de reserva" aria-label="Configuración de agenda">
+          ${icon('settings')}
         </button>
-        <div class="create-menu-dropdown hidden" id="create-menu-dropdown">
-          <button type="button" class="create-menu-item" data-action="new-booking">
-            <span class="menu-item-icon" style="color: #7C3AED;">${icon('calendar')}</span>
-            <div class="menu-item-text">
-              <strong>Compromiso / Cita</strong>
-              <small>Agendar sesión con cliente</small>
-            </div>
+        <div class="create-menu-wrapper">
+          <button type="button" class="primary create-menu-btn" data-action="toggle-create-menu">
+            ${icon('plus')} <span>Crear</span> ${icon('chevronDown')}
           </button>
-          <button type="button" class="create-menu-item" data-action="new-quick-task">
-            <span class="menu-item-icon" style="color: #0284C7;">${icon('check')}</span>
-            <div class="menu-item-text">
-              <strong>Tarea / Bloqueo</strong>
-              <small>Bloqueo de horario personal</small>
-            </div>
-          </button>
-          <div class="create-menu-divider"></div>
-          <button type="button" class="create-menu-item highlight-sched" data-action="open-schedule-configurator">
-            <span class="menu-item-icon" style="color: #10B981;">${icon('calendarCheck')}</span>
-            <div class="menu-item-text">
-              <strong>Agenda de citas</strong>
-              <small>Configurar disponibilidad y reservas</small>
-            </div>
-          </button>
+          <div class="create-menu-dropdown hidden" id="create-menu-dropdown">
+            <button type="button" class="create-menu-item" data-action="new-booking">
+              <span class="menu-item-icon" style="color: #7C3AED;">${icon('calendar')}</span>
+              <div class="menu-item-text">
+                <strong>Compromiso / Cita</strong>
+                <small>Agendar sesión con cliente</small>
+              </div>
+            </button>
+            <button type="button" class="create-menu-item" data-action="new-quick-task">
+              <span class="menu-item-icon" style="color: #0284C7;">${icon('check')}</span>
+              <div class="menu-item-text">
+                <strong>Tarea / Bloqueo</strong>
+                <small>Bloqueo de horario personal</small>
+              </div>
+            </button>
+            <div class="create-menu-divider"></div>
+            <button type="button" class="create-menu-item highlight-sched" data-action="open-schedule-configurator">
+              <span class="menu-item-icon" style="color: #10B981;">${icon('calendarCheck')}</span>
+              <div class="menu-item-text">
+                <strong>Agenda de citas</strong>
+                <small>Configurar disponibilidad y reservas</small>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Liquid Two-Panel Layout (Sidebar + Calendar) -->
-    <div class="agenda-liquid-layout">
-      <!-- Left: Sidebar with Booking Pages & Calendars (Captura 1) -->
-      <aside class="agenda-sidebar-bar">
-        <!-- 1. Páginas de reserva / Agendas de citas -->
-        <div class="panel sidebar-block">
-          <div class="sidebar-block-header">
-            <div>
-              <p class="eyebrow" style="margin: 0; font-size: 10px;">PÁGINAS DE RESERVA</p>
-              <h4 style="margin: 2px 0 0; font-size: 13.5px; font-weight: 800;">Agendas de citas</h4>
-            </div>
-            <button type="button" class="icon-circle-btn" data-action="open-schedule-configurator" title="Crear nueva agenda de citas">
-              ${icon('plus')}
-            </button>
-          </div>
-          
-          <div class="schedules-sidebar-list">
-            ${appointmentSchedules.length > 0 ? appointmentSchedules.map((sched) => `
-              <div class="sched-sidebar-card ${sched.is_locked ? 'is-locked' : ''}">
-                <div class="sched-card-top">
-                  <span class="sched-swatch" style="background: ${sched.color || '#7C3AED'};"></span>
-                  <div class="sched-info">
-                    <strong class="sched-name" title="${sched.title}">${sched.title}</strong>
-                    <div class="sched-meta">
-                      <span>${sched.duration_minutes} min</span>
-                      <span class="sched-status-badge ${sched.is_locked ? 'locked' : 'active'}">
-                        ${sched.is_locked ? 'Bloqueada' : 'Activa'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div class="sched-card-actions">
-                  <button type="button" class="sched-btn ${sched.is_locked ? 'unlock-style' : 'lock-style'}" data-action="toggle-schedule-lock" data-schedule-id="${sched.id}" title="${sched.is_locked ? 'Desbloquear agenda para permitir reservas' : 'Bloquear agenda para pausar reservas'}">
-                    ${sched.is_locked ? `${icon('unlock')} Desbloquear` : `${icon('lock')} Bloquear`}
-                  </button>
-                  <button type="button" class="sched-btn" data-action="edit-schedule" data-schedule-id="${sched.id}" title="Editar horarios y disponibilidad">
-                    ${icon('edit')} Editar
-                  </button>
-                  <button type="button" class="sched-btn" data-action="open-public-booking" data-schedule-slug="${sched.slug}" title="Ver página de reserva y copiar enlace">
-                    ${icon('link')} Link
-                  </button>
-                </div>
-              </div>
-            `).join('') : `
-              <div class="sched-empty-box">
-                <p style="margin: 0; font-size: 12px; color: var(--muted);">No hay agendas de citas creadas.</p>
-                <button type="button" class="text-button" data-action="open-schedule-configurator" style="color: var(--accent); font-weight: 800; font-size: 12px; margin-top: 6px;">
-                  + Crear primera agenda
-                </button>
-              </div>
-            `}
-          </div>
-        </div>
-
-        <!-- 2. Mis Calendarios / Categorías (Capas estilo Google Calendar) -->
-        <div class="panel sidebar-block">
-          <div class="sidebar-block-header">
-            <p class="eyebrow" style="margin: 0; font-size: 10px;">MIS CALENDARIOS</p>
-            <button type="button" class="btn-ghost sched-btn" data-action="open-calendar-sync" title="Sincronizar y enlazar con Google / Apple Calendar">
-              ${icon('upload')} <span>Importar / Sync</span>
-            </button>
-          </div>
-          <div class="calendar-layers-list">
-            ${categories.map((c) => {
-              const isHidden = (agendaFilter.hiddenCategories || []).includes(String(c.id));
-              const catColor = c.color || '#7C3AED';
-              return `
-                <div class="cal-layer-row" data-cat-id="${c.id}">
-                  <label class="cal-layer-item">
-                    <input type="checkbox" class="cal-layer-input" data-category-layer="${c.id}" ${isHidden ? '' : 'checked'} />
-                    <span class="cal-layer-box" style="--cat-layer-color: ${catColor};"></span>
-                    <span class="cal-layer-title">${c.name}</span>
-                  </label>
-                  <label class="cal-layer-color-trigger" title="Cambiar color del filtro ${c.name}">
-                    <input type="color" class="cal-layer-color-input" data-category-id="${c.id}" value="${catColor}" />
-                    <span class="cal-layer-color-swatch" style="background: ${catColor};"></span>
-                  </label>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-      </aside>
-
-      <!-- Right: Main Calendar Area -->
+    <!-- Full-Width Calendar Layout -->
+    <div class="agenda-liquid-layout single-panel">
+      <!-- Main Calendar Area -->
       <main class="agenda-main-calendar">
         <section class="panel calendar-card">
           <div class="calendar-header-bar">
-            <!-- View Toggle: Horaria | Semana | Mes -->
+            <!-- View Toggle: Horaria | Mensual + Filtros + Config -->
             <div style="display: flex; align-items: center; gap: 8px;">
               <div class="calendar-view-toggle">
                 <button class="cal-view-btn ${isTimeGrid ? 'active' : ''}" data-cal-view="timegrid">
@@ -2696,6 +2619,10 @@ async function renderAgenda() {
               <button type="button" class="cal-filter-trigger-btn ${hasActiveFilters ? 'has-active' : ''}" data-action="open-agenda-filter-modal" title="Filtrar agenda" aria-label="Filtrar agenda">
                 ${icon('sliders')}
                 ${hasActiveFilters ? `<span class="filter-badge-dot"></span>` : ''}
+              </button>
+
+              <button type="button" class="cal-filter-trigger-btn" data-action="open-booking-pages-modal" title="Configuración de agenda y páginas de reserva" aria-label="Configuración de agenda">
+                ${icon('settings')}
               </button>
             </div>
 
@@ -2868,6 +2795,32 @@ function openAgendaFilterModal() {
         </select>
       </div>
 
+      <!-- Capas de compromisos (Mostrar / Ocultar en calendario) -->
+      ${categories && categories.length > 0 ? `
+        <div class="field" style="margin-top: 2px;">
+          <label style="font-weight: 700; font-size: 12px; margin-bottom: 6px; display: block;">Capas visibles en calendario:</label>
+          <div class="calendar-layers-list" style="display: grid; gap: 8px; max-height: 160px; overflow-y: auto; padding: 10px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius-md);">
+            ${categories.map((c) => {
+              const isHidden = (agendaFilter.hiddenCategories || []).includes(String(c.id));
+              const catColor = c.color || '#7C3AED';
+              return `
+                <div class="cal-layer-row" data-cat-id="${c.id}" style="display: flex; align-items: center; justify-content: space-between;">
+                  <label class="cal-layer-item" style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" class="cal-layer-input" data-category-layer="${c.id}" ${isHidden ? '' : 'checked'} />
+                    <span class="cal-layer-box" style="--cat-layer-color: ${catColor};"></span>
+                    <span class="cal-layer-title" style="font-size: 13px; font-weight: 600;">${c.name}</span>
+                  </label>
+                  <label class="cal-layer-color-trigger" title="Cambiar color de ${c.name}">
+                    <input type="color" class="cal-layer-color-input" data-category-id="${c.id}" value="${catColor}" />
+                    <span class="cal-layer-color-swatch" style="background: ${catColor};"></span>
+                  </label>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
+
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
         <button type="button" class="text-button" data-action="reset-agenda-filter-form" style="color: var(--red); font-size: 13px; font-weight: 700;">
           Restablecer filtros
@@ -2897,9 +2850,71 @@ function openAgendaFilterModal() {
     agendaFilter.artistId = 'all';
     agendaFilter.spaceId = 'all';
     agendaFilter.status = 'all';
+    agendaFilter.hiddenCategories = [];
     closeModal();
     renderAgenda();
   });
+}
+
+function openBookingPagesModal() {
+  openModal(`
+    <div class="modal-header-with-action" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 12px;">
+      <div>
+        <p class="eyebrow" style="margin: 0; font-size: 10.5px;">DISPONIBILIDAD & RESERVAS</p>
+        <h2 id="modal-title" style="margin: 2px 0 0; font-size: 18px; font-weight: 800;">Configuración de Agenda</h2>
+        <p class="lead" style="margin: 4px 0 0; font-size: 12px;">Gestiona tus páginas de reserva, enlaces públicos para clientes y disponibilidad semanal.</p>
+      </div>
+      <button type="button" class="primary small-btn" data-action="open-schedule-configurator" style="display: inline-flex; align-items: center; gap: 4px; padding: 7px 12px; font-size: 12px; white-space: nowrap; flex-shrink: 0;">
+        ${icon('plus')} <span>Nueva Agenda</span>
+      </button>
+    </div>
+
+    <div class="schedules-modal-list" style="display: flex; flex-direction: column; gap: 10px; margin: 14px 0; max-height: 52vh; overflow-y: auto;">
+      ${appointmentSchedules && appointmentSchedules.length > 0 ? appointmentSchedules.map((sched) => `
+        <div class="sched-sidebar-card ${sched.is_locked ? 'is-locked' : ''}" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
+          <div class="sched-card-top" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <span class="sched-swatch" style="background: ${sched.color || '#7C3AED'}; width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0;"></span>
+            <div class="sched-info" style="flex: 1; min-width: 0;">
+              <strong class="sched-name" style="font-size: 13.5px; color: var(--ink); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${sched.title}">${sched.title}</strong>
+              <div class="sched-meta" style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 2px;">
+                <span>${sched.duration_minutes} min</span>
+                <span class="sched-status-badge ${sched.is_locked ? 'locked' : 'active'}" style="font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${sched.is_locked ? '#fee2e2' : '#dcfce7'}; color: ${sched.is_locked ? '#991b1b' : '#166534'};">
+                  ${sched.is_locked ? 'Bloqueada' : 'Activa'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="sched-card-actions" style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="sched-btn ${sched.is_locked ? 'unlock-style' : 'lock-style'}" data-action="toggle-schedule-lock" data-schedule-id="${sched.id}" title="${sched.is_locked ? 'Desbloquear agenda para permitir reservas' : 'Bloquear agenda para pausar reservas'}" style="padding: 5px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+              ${sched.is_locked ? `${icon('unlock')} Desbloquear` : `${icon('lock')} Bloquear`}
+            </button>
+            <button type="button" class="sched-btn" data-action="edit-schedule" data-schedule-id="${sched.id}" title="Editar horarios y disponibilidad" style="padding: 5px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+              ${icon('edit')} Editar
+            </button>
+            <button type="button" class="sched-btn" data-action="open-public-booking" data-schedule-slug="${sched.slug}" title="Ver página de reserva y copiar enlace" style="padding: 5px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+              ${icon('link')} Link
+            </button>
+          </div>
+        </div>
+      `).join('') : `
+        <div class="sched-empty-box" style="text-align: center; padding: 24px 16px; background: var(--surface); border: 1px dashed var(--line-soft); border-radius: var(--radius-md);">
+          <p style="margin: 0; font-size: 13px; color: var(--muted);">No hay agendas de citas creadas.</p>
+          <button type="button" class="primary small-btn" data-action="open-schedule-configurator" style="margin-top: 10px;">
+            + Crear primera agenda
+          </button>
+        </div>
+      `}
+    </div>
+
+    <div style="border-top: 1px solid var(--line-soft); padding-top: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <button type="button" class="secondary small-btn" data-action="open-calendar-sync" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px;">
+        ${icon('sync')} <span>Sincronizar Google / Apple Calendar</span>
+      </button>
+      <button type="button" class="secondary" data-close-modal style="padding: 6px 14px; font-size: 12px;">
+        Cerrar
+      </button>
+    </div>
+  `);
 }
 
 function openAppointmentOutcomeModal(appt) {
@@ -8945,21 +8960,31 @@ document.addEventListener('click', async (event) => {
     return newQuickTaskModal();
   }
   if (event.target.closest('[data-action="open-schedule-configurator"]')) {
+    closeModal();
     if (createMenuDropdown) {
       createMenuDropdown.classList.remove('is-open');
       createMenuDropdown.classList.add('hidden');
     }
     return await renderScheduleConfigurator();
   }
+  if (event.target.closest('[data-action="open-booking-pages-modal"]')) {
+    return openBookingPagesModal();
+  }
   const editSchedBtn = event.target.closest('[data-action="edit-schedule"]');
   if (editSchedBtn) {
+    closeModal();
     return await renderScheduleConfigurator(editSchedBtn.dataset.scheduleId);
   }
   const lockSchedBtn = event.target.closest('[data-action="toggle-schedule-lock"]');
   if (lockSchedBtn) {
     const schedId = lockSchedBtn.dataset.scheduleId;
     await api(`/api/schedules/${schedId}/lock`, { method: 'PATCH' });
-    return await renderAgenda();
+    appointmentSchedules = await api('/api/schedules').catch(() => []);
+    const modalTitle = document.querySelector('#modal-title');
+    if (modalTitle && modalTitle.textContent.includes('Configuración de Agenda')) {
+      openBookingPagesModal();
+    }
+    return await renderAgenda({ animate: false });
   }
   const pubBookingBtn = event.target.closest('[data-action="open-public-booking"]');
   if (pubBookingBtn) {
