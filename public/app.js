@@ -8200,23 +8200,38 @@ document.addEventListener('click', async (event) => {
 
   // Create Dropdown Menu
   const createMenuBtn = event.target.closest('[data-action="toggle-create-menu"]');
+  const createMenuDropdown = document.querySelector('#create-menu-dropdown');
   if (createMenuBtn) {
-    const dropdown = document.querySelector('#create-menu-dropdown');
-    if (dropdown) dropdown.classList.toggle('hidden');
+    if (createMenuDropdown) {
+      const isOpen = createMenuDropdown.classList.contains('is-open');
+      if (isOpen) {
+        createMenuDropdown.classList.remove('is-open');
+        createMenuDropdown.classList.add('hidden');
+      } else {
+        createMenuDropdown.classList.add('is-open');
+        createMenuDropdown.classList.remove('hidden');
+      }
+    }
     return;
   }
-  const createMenuDropdown = document.querySelector('#create-menu-dropdown');
-  if (createMenuDropdown && !createMenuDropdown.classList.contains('hidden') && !event.target.closest('.create-menu-wrapper')) {
+  if (createMenuDropdown && createMenuDropdown.classList.contains('is-open') && !event.target.closest('.create-menu-wrapper')) {
+    createMenuDropdown.classList.remove('is-open');
     createMenuDropdown.classList.add('hidden');
   }
 
   // Google Calendar style schedule actions
   if (event.target.closest('[data-action="new-quick-task"]')) {
-    if (createMenuDropdown) createMenuDropdown.classList.add('hidden');
+    if (createMenuDropdown) {
+      createMenuDropdown.classList.remove('is-open');
+      createMenuDropdown.classList.add('hidden');
+    }
     return newQuickTaskModal();
   }
   if (event.target.closest('[data-action="open-schedule-configurator"]')) {
-    if (createMenuDropdown) createMenuDropdown.classList.add('hidden');
+    if (createMenuDropdown) {
+      createMenuDropdown.classList.remove('is-open');
+      createMenuDropdown.classList.add('hidden');
+    }
     return await renderScheduleConfigurator();
   }
   const editSchedBtn = event.target.closest('[data-action="edit-schedule"]');
@@ -8246,7 +8261,10 @@ document.addEventListener('click', async (event) => {
 
   // Modals trigger buttons
   if (event.target.closest('[data-action="new-booking"]')) {
-    if (createMenuDropdown) createMenuDropdown.classList.add('hidden');
+    if (createMenuDropdown) {
+      createMenuDropdown.classList.remove('is-open');
+      createMenuDropdown.classList.add('hidden');
+    }
     return await newBookingModal();
   }
   if (event.target.closest('[data-action="new-category"]')) return newCategoryModal();
