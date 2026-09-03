@@ -2108,7 +2108,7 @@ app.patch('/api/schedules/:id/lock', requireAuth, async (request, response) => {
     );
     if (!current.rowCount) return response.status(404).json({ error: 'Agenda no encontrada' });
 
-    const newLockState = request.body.isLocked !== undefined ? Boolean(request.body.isLocked) : !current.rows[0].is_locked;
+    const newLockState = request.body?.isLocked !== undefined ? Boolean(request.body.isLocked) : !current.rows[0].is_locked;
 
     const updated = await pool.query(
       'UPDATE appointment_schedules SET is_locked = $1, updated_at = NOW() WHERE id = $2 AND studio_id = $3 RETURNING *',
@@ -2117,6 +2117,7 @@ app.patch('/api/schedules/:id/lock', requireAuth, async (request, response) => {
 
     if (typeof logAuditEvent === 'function') {
       await logAuditEvent({
+        pool,
         userId: request.userId,
         studioId: request.studioId,
         action: newLockState ? 'lock_appointment_schedule' : 'unlock_appointment_schedule',

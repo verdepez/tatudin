@@ -1345,7 +1345,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                   <div class="avail-window-label">
                     <span class="avail-pill-dot" style="background: ${b.schedule.color || '#7C3AED'};"></span>
                     <strong class="avail-sched-name">${b.schedule.title}</strong>
-                    ${b.schedule.is_locked ? `<span class="avail-locked-badge">${icon('lock')}</span>` : ''}
+                    ${b.schedule.is_locked ? `<span class="avail-locked-badge">${icon('lock')} Bloqueada</span>` : ''}
                   </div>
                 </div>
               `).join('')}
@@ -1399,7 +1399,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                   <div class="avail-window-label">
                     <span class="avail-pill-dot" style="background: ${b.schedule.color || '#7C3AED'};"></span>
                     <strong class="avail-sched-name">${b.schedule.title}</strong>
-                    ${b.schedule.is_locked ? `<span class="avail-locked-badge">${icon('lock')}</span>` : ''}
+                    ${b.schedule.is_locked ? `<span class="avail-locked-badge">${icon('lock')} Bloqueada</span>` : ''}
                   </div>
                 </div>
               `).join('')}
@@ -2888,27 +2888,27 @@ function openBookingPagesModal() {
 
     <div class="schedules-modal-list" style="display: flex; flex-direction: column; gap: 10px; margin: 14px 0; max-height: 52vh; overflow-y: auto;">
       ${appointmentSchedules && appointmentSchedules.length > 0 ? appointmentSchedules.map((sched) => `
-        <div class="sched-sidebar-card ${sched.is_locked ? 'is-locked' : ''}" style="border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface);">
+        <div class="sched-sidebar-card ${sched.is_locked ? 'is-locked' : ''}" style="border: 1.5px solid ${sched.is_locked ? '#FCA5A5' : 'var(--line-soft)'}; border-radius: var(--radius-md); padding: 12px 14px; background: ${sched.is_locked ? 'repeating-linear-gradient(-45deg, var(--surface), var(--surface) 10px, rgba(239, 68, 68, 0.05) 10px, rgba(239, 68, 68, 0.05) 20px)' : 'var(--surface)'};">
           <div class="sched-card-top" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
             <span class="sched-swatch" style="background: ${sched.color || '#7C3AED'}; width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0;"></span>
             <div class="sched-info" style="flex: 1; min-width: 0;">
               <strong class="sched-name" style="font-size: 13.5px; color: var(--ink); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${sched.title}">${sched.title}</strong>
               <div class="sched-meta" style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 2px;">
                 <span>${sched.duration_minutes} min</span>
-                <span class="sched-status-badge ${sched.is_locked ? 'locked' : 'active'}" style="font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${sched.is_locked ? '#fee2e2' : '#dcfce7'}; color: ${sched.is_locked ? '#991b1b' : '#166534'};">
-                  ${sched.is_locked ? 'Bloqueada' : 'Activa'}
+                <span class="sched-status-badge ${sched.is_locked ? 'locked' : 'active'}" style="font-weight: 800; font-size: 10px; padding: 2px 7px; border-radius: 4px; background: ${sched.is_locked ? '#fee2e2' : '#dcfce7'}; color: ${sched.is_locked ? '#991b1b' : '#166534'}; border: 1px solid ${sched.is_locked ? '#fca5a5' : '#86efac'}; display: inline-flex; align-items: center; gap: 4px;">
+                  ${sched.is_locked ? `${icon('lock')} BLOQUEADA` : `${icon('check')} ACTIVA`}
                 </span>
               </div>
             </div>
           </div>
           <div class="sched-card-actions" style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <button type="button" class="sched-btn ${sched.is_locked ? 'unlock-style' : 'lock-style'}" data-action="toggle-schedule-lock" data-schedule-id="${sched.id}" title="${sched.is_locked ? 'Desbloquear agenda para permitir reservas' : 'Bloquear agenda para pausar reservas'}" style="padding: 5px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+            <button type="button" class="sched-btn ${sched.is_locked ? 'unlock-style' : 'lock-style'}" data-action="toggle-schedule-lock" data-schedule-id="${sched.id}" title="${sched.is_locked ? 'Desbloquear agenda para permitir reservas' : 'Bloquear agenda para pausar reservas'}" style="padding: 6px 12px; font-size: 11.5px; font-weight: 700; border-radius: var(--radius-sm); border: 1.5px solid ${sched.is_locked ? '#fca5a5' : 'var(--line-soft)'}; background: ${sched.is_locked ? '#fee2e2' : 'var(--surface-high)'}; color: ${sched.is_locked ? '#991b1b' : 'inherit'}; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
               ${sched.is_locked ? `${icon('unlock')} Desbloquear` : `${icon('lock')} Bloquear`}
             </button>
-            <button type="button" class="sched-btn" data-action="edit-schedule" data-schedule-id="${sched.id}" title="Editar horarios y disponibilidad" style="padding: 5px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+            <button type="button" class="sched-btn" data-action="edit-schedule" data-schedule-id="${sched.id}" title="Editar horarios y disponibilidad" style="padding: 6px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
               ${icon('edit')} Editar
             </button>
-            <button type="button" class="sched-btn" data-action="open-public-booking" data-schedule-slug="${sched.slug}" title="Ver página de reserva y copiar enlace" style="padding: 5px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+            <button type="button" class="sched-btn" data-action="open-public-booking" data-schedule-slug="${sched.slug}" title="Ver página de reserva y copiar enlace" style="padding: 6px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
               ${icon('link')} Link
             </button>
           </div>
@@ -8983,13 +8983,41 @@ document.addEventListener('click', async (event) => {
   const lockSchedBtn = event.target.closest('[data-action="toggle-schedule-lock"]');
   if (lockSchedBtn) {
     const schedId = lockSchedBtn.dataset.scheduleId;
-    await api(`/api/schedules/${schedId}/lock`, { method: 'PATCH' });
-    appointmentSchedules = await api('/api/schedules').catch(() => []);
-    const modalTitle = document.querySelector('#modal-title');
-    if (modalTitle && modalTitle.textContent.includes('Configuración de Agenda')) {
-      openBookingPagesModal();
+    const originalHtml = lockSchedBtn.innerHTML;
+    lockSchedBtn.disabled = true;
+    lockSchedBtn.style.opacity = '0.6';
+    lockSchedBtn.textContent = 'Actualizando...';
+    try {
+      const currentSched = (appointmentSchedules || []).find(s => String(s.id) === String(schedId));
+      const targetState = currentSched ? !currentSched.is_locked : true;
+
+      const res = await api(`/api/schedules/${schedId}/lock`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isLocked: targetState })
+      });
+
+      // Update in-memory schedule list immediately
+      if (res && res.id) {
+        appointmentSchedules = (appointmentSchedules || []).map(s => String(s.id) === String(schedId) ? { ...s, is_locked: res.is_locked } : s);
+      } else {
+        appointmentSchedules = await api('/api/schedules', { skipCache: true }).catch(() => []);
+      }
+
+      // Re-render modal if open
+      const modalTitle = document.querySelector('#modal-title');
+      if (modalTitle && modalTitle.textContent.includes('Configuración de Agenda')) {
+        openBookingPagesModal();
+      }
+
+      // Re-render calendar timeline with updated lock state
+      await renderAgenda();
+    } catch (err) {
+      alert('Error al cambiar bloqueo de agenda: ' + err.message);
+      lockSchedBtn.disabled = false;
+      lockSchedBtn.style.opacity = '1';
+      lockSchedBtn.innerHTML = originalHtml;
     }
-    return await renderAgenda({ animate: false });
+    return;
   }
   const pubBookingBtn = event.target.closest('[data-action="open-public-booking"]');
   if (pubBookingBtn) {
