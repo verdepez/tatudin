@@ -2818,8 +2818,8 @@ function openAgendaFilterModal(initialTab = 'filters') {
   if (validHiddenCount > 0) activeFiltersCount += validHiddenCount;
 
   openModal(`
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1.5px solid var(--line-soft); padding-bottom: 8px;">
-      <div style="display: flex; gap: 4px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1.5px solid var(--line-soft); padding-bottom: 8px; padding-right: 32px;">
+      <div style="display: flex; gap: 4px; flex-wrap: wrap;">
         <button type="button" class="agenda-modal-tab-btn ${initialTab === 'filters' ? 'active' : ''}" data-agenda-tab="filters">
           Filtros de Agenda ${activeFiltersCount > 0 ? `<span class="badge" style="background: var(--red, #ef4444); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 999px; margin-left: 4px;">${activeFiltersCount}</span>` : ''}
         </button>
@@ -2827,7 +2827,6 @@ function openAgendaFilterModal(initialTab = 'filters') {
           Disponibilidad & Reservas (${(appointmentSchedules || []).length})
         </button>
       </div>
-      <button type="button" class="text-button" data-close-modal style="color: var(--muted); font-size: 18px; line-height: 1; padding: 4px 8px;" title="Cerrar modal">×</button>
     </div>
 
     <!-- PANE 1: FILTROS DE AGENDA -->
@@ -7298,7 +7297,7 @@ async function openCamera(facingMode = 'environment') {
 function openUploadScreenshotModal(defaultTarget = 'studio') {
   openModal(`
     <div style="display: flex; flex-direction: column; gap: 16px;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-right: 32px;">
         <div>
           <p class="eyebrow">LECTURA DE INSUMOS, BOLETAS Y COMPROBANTES</p>
           <h2 id="modal-title" style="margin: 0; font-size: 20px;">Importar Foto de Producto o Boleta</h2>
@@ -7306,7 +7305,6 @@ function openUploadScreenshotModal(defaultTarget = 'studio') {
             Sube o pega una foto de tu producto, insumo o boleta de compra para leer montos y datos con OCR.
           </p>
         </div>
-        <button type="button" class="scanner-close-btn" data-close-modal title="Cerrar">✕</button>
       </div>
 
       <!-- Drag & Drop / File Pick / Paste Area -->
@@ -7368,12 +7366,11 @@ function openUploadScreenshotModal(defaultTarget = 'studio') {
 function openReceiptScannerModal(defaultTarget = 'studio') {
   openModal(`
     <div class="receipt-scanner-container">
-      <div class="scanner-modal-header">
+      <div class="scanner-modal-header" style="padding-right: 32px;">
         <div>
           <p class="eyebrow">ESCÁNER OCR DE PRODUCTOS & BOLETAS</p>
           <h2 id="modal-title" style="margin: 0; font-size: 18px;">Escanear o Importar Foto</h2>
         </div>
-        <button type="button" class="scanner-close-btn" data-close-modal title="Cerrar">✕</button>
       </div>
 
       <div class="scanner-viewport-box">

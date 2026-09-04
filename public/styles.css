@@ -2398,6 +2398,7 @@ footer {
   place-items: center;
   color: var(--muted);
   font-size: 22px;
+  z-index: 10;
 }
 
 .modal-close:hover {
