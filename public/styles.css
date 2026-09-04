@@ -898,39 +898,73 @@ svg {
 .appointment-outcome-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: var(--radius-pill, 9999px);
-  border: 1px solid var(--line-soft);
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-soft);
   background: var(--surface);
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 700;
+  color: var(--muted);
   cursor: pointer;
-  white-space: nowrap;
   transition: all var(--transition-fast);
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .appointment-outcome-btn:hover {
-  background: var(--surface-high);
-  border-color: var(--ink);
+  transform: scale(1.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
+/* 1. Pendiente: circulo con check gris */
+.appointment-outcome-btn.is-pending {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+.appointment-outcome-btn.is-pending:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #334155;
+}
+
+/* 2. Efectuada: circulo con check verde */
 .appointment-outcome-btn.is-completed {
-  background: var(--green-bg);
-  border-color: rgba(16, 185, 129, 0.4);
-  color: var(--green-text);
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #059669;
 }
 
+.appointment-outcome-btn.is-completed:hover {
+  background: #bbf7d0;
+  border-color: #4ade80;
+  color: #047857;
+}
+
+/* 3. Reprogramada: circulo con icono azul */
 .appointment-outcome-btn.is-rescheduled {
   background: #e0f2fe;
   border-color: #bae6fd;
+  color: #0284c7;
+}
+
+.appointment-outcome-btn.is-rescheduled:hover {
+  background: #bae6fd;
+  border-color: #7dd3fc;
   color: #0369a1;
 }
 
+/* 4. Cancelada: circulo con exclamacion roja */
 .appointment-outcome-btn.is-cancelled {
   background: #fee2e2;
-  border-color: #fecaca;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.appointment-outcome-btn.is-cancelled:hover {
+  background: #fecaca;
+  border-color: #f87171;
   color: #b91c1c;
 }
 

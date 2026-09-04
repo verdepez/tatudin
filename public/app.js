@@ -740,9 +740,9 @@ function appointmentCard(item) {
   const statusInfo = STATUS_MAP[item.status] || { label: item.status?.replace('_', ' ') || 'Confirmado', class: 'status-default' };
   const roleInfo = ROLE_MAP[item.artist_role] || { label: 'Artista', class: 'role-resident' };
   const timeFormatted = formatTime(item.starts_at);
-  const isCompleted = item.status === 'completed';
-  const isRescheduled = item.status === 'rescheduled';
-  const isCancelled = item.status === 'cancelled' || item.status === 'no_show';
+  const isCompleted = item.status === 'completed' || item.outcome === 'completed';
+  const isRescheduled = item.status === 'rescheduled' || item.outcome === 'rescheduled';
+  const isCancelled = item.status === 'cancelled' || item.status === 'no_show' || item.outcome === 'cancelled';
   const cleanPhone = (item.client_phone || '').replace(/[^0-9+]/g, '');
   const catColor = item.category_color || '#7C3AED';
   const catName = item.category_name || 'Compromiso';
@@ -752,17 +752,22 @@ function appointmentCard(item) {
     ? `${item.title} · ${item.duration_minutes || 60} min`
     : `${item.notes ? item.notes + ' · ' : ''}${item.duration_minutes || 60} min`;
 
-  let outcomeLabel = '¿Qué ocurrió?';
-  let outcomeClass = '';
-  if (item.outcome === 'completed') {
-    outcomeLabel = 'Listo';
+  let outcomeClass = 'is-pending';
+  let outcomeTitle = '¿Qué ocurrió con esta cita? (Sin marcar)';
+  let outcomeIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>';
+
+  if (isCompleted) {
     outcomeClass = 'is-completed';
-  } else if (item.outcome === 'rescheduled') {
-    outcomeLabel = 'Reprog.';
+    outcomeTitle = 'Cita efectuada con éxito';
+    outcomeIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  } else if (isRescheduled) {
     outcomeClass = 'is-rescheduled';
-  } else if (item.outcome === 'cancelled') {
-    outcomeLabel = 'Cancelada';
+    outcomeTitle = 'Cita reprogramada';
+    outcomeIcon = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+  } else if (isCancelled) {
     outcomeClass = 'is-cancelled';
+    outcomeTitle = 'Cita cancelada / No llegó';
+    outcomeIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
   }
 
   return `
@@ -845,9 +850,9 @@ function appointmentCard(item) {
             data-price="${item.price || 0}"
             data-deposit="${item.deposit || 0}"
             data-status="${item.status}"
-            title="Indicar estado: ¿Qué ocurrió con esta cita?">
-            <span>${outcomeLabel}</span>
-            ${icon('chevronDown')}
+            title="${outcomeTitle}"
+            aria-label="${outcomeTitle}">
+            ${outcomeIcon}
           </button>
         </div>
       </div>
