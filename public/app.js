@@ -7897,6 +7897,103 @@ function newClientModal() {
   `);
 }
 
+async function newTransactionModal() {
+  if (!members || !members.length) {
+    members = await api('/api/members').catch(() => []);
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const eligibleArtists = (members || []).filter((m) => m.id);
+
+  openModal(`
+    <p class="eyebrow">FINANZAS & BILLETERA</p>
+    <h2 id="modal-title">Registrar movimiento</h2>
+    <p class="lead" style="margin-bottom: 16px;">Ingresa un movimiento financiero manual en los registros del estudio.</p>
+    <form data-form="transaction">
+      <div class="form-grid">
+        <label>Tipo de movimiento *
+          <select name="kind" id="tx-kind-select" required>
+            <option value="income">Ingreso (+)</option>
+            <option value="expense" selected>Egreso / Gasto (-)</option>
+          </select>
+        </label>
+        <label>Fecha del movimiento *
+          <input name="occurredOn" type="date" value="${today}" required />
+        </label>
+      </div>
+
+      <label>Concepto o descripción *
+        <input name="description" required placeholder="Ej. Compra de agujas y guantes, Insumos médicos, Arriendo de box..." />
+      </label>
+
+      <div class="form-grid">
+        <label>Monto total (CLP) *
+          <input name="amount" type="number" min="0" step="100" required placeholder="25000" />
+        </label>
+        <label>Artista asociado (Opcional)
+          <select name="artistId">
+            <option value="">General / Estudio</option>
+            ${eligibleArtists.map((m) => `<option value="${m.id}">${m.full_name} (${ROLE_MAP[m.role]?.label || m.role})</option>`).join('')}
+          </select>
+        </label>
+      </div>
+
+      <button class="primary" type="submit" style="margin-top: 14px;">${icon('plus')} Registrar movimiento</button>
+      <p class="form-error"></p>
+    </form>
+  `);
+}
+
+function settleArtistModal(artistId, artistName, pending = 0) {
+  const pendingAmount = Math.max(0, Number(pending) || 0);
+  openModal(`
+    <p class="eyebrow">FINANZAS & LIQUIDACIÓN</p>
+    <h2 id="modal-title">Liquidar a ${artistName || 'Artista'}</h2>
+    <p class="lead" style="margin-bottom: 16px;">Registra el pago de comisiones pendientes al artista.</p>
+    <form data-form="settle-artist">
+      <input type="hidden" name="artistId" value="${artistId}" />
+      <div class="form-grid">
+        <label>Monto a liquidar (CLP) *
+          <input name="amount" type="number" min="1" step="100" value="${pendingAmount > 0 ? pendingAmount : ''}" required placeholder="50000" />
+        </label>
+        <label>Pendiente acumulado
+          <input type="text" value="${money(pendingAmount)}" disabled style="background: var(--surface-low); color: var(--muted);" />
+        </label>
+      </div>
+      <label>Notas adicionales (Opcional)
+        <input name="notes" placeholder="Ej. Transferencia Banco Estado, liquidación semanal..." />
+      </label>
+      <button class="primary" type="submit" style="margin-top: 14px;">${icon('check')} Confirmar liquidación</button>
+      <p class="form-error"></p>
+    </form>
+  `);
+}
+
+function newSpaceModal() {
+  openModal(`
+    <p class="eyebrow">BOXES & ESPACIOS</p>
+    <h2 id="modal-title">Nuevo Box de Trabajo</h2>
+    <p class="lead" style="margin-bottom: 16px;">Agrega un puesto de tatuaje o espacio físico para asignar a residentes y guests.</p>
+    <form data-form="space">
+      <label>Nombre del Box / Puesto *
+        <input name="name" required placeholder="Ej. Box 3 · Ventana Norte" />
+      </label>
+      <label>Descripción o equipamiento (Opcional)
+        <textarea name="description" rows="2" placeholder="Camilla hidráulica, lámpara ring light, apoyabrazos..."></textarea>
+      </label>
+      <div class="form-grid">
+        <label>Tarifa por día (CLP)
+          <input name="pricePerDay" type="number" min="0" step="1000" value="25000" placeholder="25000" />
+        </label>
+        <label>Tarifa por hora (CLP)
+          <input name="pricePerHour" type="number" min="0" step="500" value="0" placeholder="0" />
+        </label>
+      </div>
+      <button class="primary" type="submit" style="margin-top: 14px;">${icon('plus')} Crear Box</button>
+      <p class="form-error"></p>
+    </form>
+  `);
+}
+
 function newMemberModal() {
   const eligibleManagers = (members || []).filter((m) => m.role === 'owner' || m.role === 'admin' || m.role === 'resident');
 
@@ -9521,7 +9618,7 @@ document.addEventListener('click', async (event) => {
   if (event.target.closest('[data-action="new-client"]')) return newClientModal();
   if (event.target.closest('[data-action="new-member"]')) return newMemberModal();
   if (event.target.closest('[data-action="new-space"]')) return newSpaceModal();
-  if (event.target.closest('[data-action="new-transaction"]')) return newTransactionModal();
+  if (event.target.closest('[data-action="new-transaction"]')) return await newTransactionModal();
   if (event.target.closest('[data-action="open-agenda-filter-modal"]')) return openAgendaFilterModal();
   if (event.target.closest('[data-close-modal]') || event.target === modal) return closeModal();
 
@@ -9948,17 +10045,41 @@ document.addEventListener('submit', async (event) => {
       return await render(currentActiveView);
     }
     if (form.dataset.form === 'space') {
-      await api('/api/spaces', { method: 'POST', body: JSON.stringify(body) });
-      closeModal();
-      return await renderSettings();
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creando...';
+      }
+      try {
+        await api('/api/spaces', { method: 'POST', body: JSON.stringify(body) });
+        closeModal();
+        return await renderSettings();
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = `${icon('plus')} Crear Box`;
+        }
+      }
     }
     if (form.dataset.form === 'settle-artist') {
-      await api('/api/finances/settle', {
-        method: 'POST',
-        body: JSON.stringify({ artistId: Number(body.artistId), amount: Number(body.amount), notes: body.notes })
-      });
-      closeModal();
-      return await render('finanzas');
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Liquidando...';
+      }
+      try {
+        await api('/api/finances/settle', {
+          method: 'POST',
+          body: JSON.stringify({ artistId: Number(body.artistId), amount: Number(body.amount), notes: body.notes })
+        });
+        closeModal();
+        return await render('finanzas');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = `${icon('check')} Confirmar liquidación`;
+        }
+      }
     }
     if (form.dataset.form === 'guest-spot-request') {
       await api('/api/public/guest-spots', {
@@ -10054,12 +10175,24 @@ document.addEventListener('submit', async (event) => {
       return;
     }
     if (form.dataset.form === 'transaction') {
-      await api('/api/transactions', {
-        method: 'POST',
-        body: JSON.stringify({ ...body, amount: Number(body.amount), artistId: body.artistId ? Number(body.artistId) : null })
-      });
-      closeModal();
-      return await render('finanzas');
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Registrando...';
+      }
+      try {
+        await api('/api/transactions', {
+          method: 'POST',
+          body: JSON.stringify({ ...body, amount: Number(body.amount), artistId: body.artistId ? Number(body.artistId) : null })
+        });
+        closeModal();
+        return await render('finanzas');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = `${icon('plus')} Registrar movimiento`;
+        }
+      }
     }
     if (form.dataset.form === 'inventory-item') {
       const isPersonal = Boolean(form.querySelector('[name="isPersonal"]')?.checked);

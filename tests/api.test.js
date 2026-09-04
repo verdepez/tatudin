@@ -554,6 +554,23 @@ test('Transactions: Filter by date range and sort order /api/transactions', asyn
   assert.ok(resRange.data.every(t => t.occurred_on >= '2026-08-10' && t.occurred_on <= '2026-08-25'));
 });
 
+test('Transactions: Create manual transaction with artist association', async () => {
+  const res = await request('/api/transactions', {
+    method: 'POST',
+    body: JSON.stringify({
+      kind: 'income',
+      description: 'Abono en efectivo sesión Alex',
+      amount: 45000,
+      artistId: null,
+      occurredOn: '2026-09-01'
+    })
+  });
+  assert.equal(res.status, 201);
+  assert.equal(res.data.kind, 'income');
+  assert.equal(Number(res.data.amount), 45000);
+  assert.equal(res.data.description, 'Abono en efectivo sesión Alex');
+});
+
 test.after(() => {
   setTimeout(() => process.exit(0), 100);
 });
