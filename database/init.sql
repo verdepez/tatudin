@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS appointments (
   notes TEXT NOT NULL DEFAULT '',
   starts_at TIMESTAMPTZ NOT NULL,
   duration_minutes INTEGER NOT NULL DEFAULT 180 CHECK (duration_minutes > 0),
-  status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled')),
+  status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled', 'rescheduled', 'no_show')),
   price NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (price >= 0),
   deposit NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (deposit >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

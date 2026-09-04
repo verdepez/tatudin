@@ -3796,7 +3796,7 @@ async function ensureAuthSchema() {
     notes TEXT NOT NULL DEFAULT '',
     starts_at TIMESTAMPTZ NOT NULL,
     duration_minutes INTEGER NOT NULL DEFAULT 180 CHECK (duration_minutes > 0),
-    status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled')),
+    status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled', 'rescheduled', 'no_show')),
     price NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (price >= 0),
     deposit NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (deposit >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -3810,6 +3810,10 @@ async function ensureAuthSchema() {
   await safeExec('ALTER TABLE appointments external_uid', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS external_uid TEXT DEFAULT NULL`);
   await safeExec('ALTER TABLE appointments external_calendar_name', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS external_calendar_name TEXT DEFAULT NULL`);
   await safeExec('ALTER TABLE appointments synced_at', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ DEFAULT NULL`);
+  await safeExec('ALTER TABLE appointments status constraint', `
+    ALTER TABLE appointments DROP CONSTRAINT IF EXISTS appointments_status_check;
+    ALTER TABLE appointments ADD CONSTRAINT appointments_status_check CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled', 'rescheduled', 'no_show'));
+  `);
 
   // 10. Transactions
   await safeExec('CREATE TABLE transactions', `CREATE TABLE IF NOT EXISTS transactions (

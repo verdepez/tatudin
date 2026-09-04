@@ -3143,39 +3143,88 @@ function openAppointmentOutcomeModal(appt) {
   `);
 
   // Event handlers for each outcome
-  document.querySelector('[data-apply-outcome="completed"]')?.addEventListener('click', async () => {
-    await api(`/api/appointments/${appt.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'completed' })
-    });
-    closeModal();
-    const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
-    await render(currentActiveView);
-  });
-
-  document.querySelector('[data-apply-outcome="rescheduled"]')?.addEventListener('click', async () => {
-    const newDateVal = document.querySelector('#outcome-reschedule-datetime')?.value;
-    const body = { status: 'rescheduled' };
-    if (newDateVal) {
-      body.startsAt = new Date(newDateVal).toISOString();
+  document.querySelector('[data-apply-outcome="completed"]')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+    try {
+      await api(`/api/appointments/${appt.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'completed' })
+      });
+      closeModal();
+      const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
+      await render(currentActiveView);
+    } catch (err) {
+      alert(err.message || 'Error al confirmar la cita efectuada');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origText;
     }
-    await api(`/api/appointments/${appt.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(body)
-    });
-    closeModal();
-    const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
-    await render(currentActiveView);
   });
 
-  document.querySelector('[data-apply-outcome="cancelled"]')?.addEventListener('click', async () => {
-    await api(`/api/appointments/${appt.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'cancelled' })
-    });
-    closeModal();
-    const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
-    await render(currentActiveView);
+  document.querySelector('[data-apply-outcome="rescheduled"]')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const dateInput = document.querySelector('#outcome-reschedule-datetime');
+    const newDateVal = dateInput?.value;
+    if (!newDateVal) {
+      alert('Por favor selecciona una fecha y horario para la reprogramación.');
+      return;
+    }
+    const selectedDate = new Date(newDateVal);
+    if (isNaN(selectedDate.getTime())) {
+      alert('La fecha y hora seleccionada no es válida.');
+      return;
+    }
+
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+
+    try {
+      await api(`/api/appointments/${appt.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'rescheduled',
+          startsAt: selectedDate.toISOString()
+        })
+      });
+      // Navegar automáticamente a la nueva fecha en el calendario para ver la cita reprogramada
+      if (typeof agendaFilter !== 'undefined') {
+        agendaFilter.currentDate = new Date(selectedDate);
+        agendaFilter.date = newDateVal.split('T')[0];
+      }
+      closeModal();
+      const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
+      await render(currentActiveView);
+    } catch (err) {
+      alert(err.message || 'Error al guardar la reprogramación');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
+  });
+
+  document.querySelector('[data-apply-outcome="cancelled"]')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+    try {
+      await api(`/api/appointments/${appt.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'cancelled' })
+      });
+      closeModal();
+      const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
+      await render(currentActiveView);
+    } catch (err) {
+      alert(err.message || 'Error al cancelar la cita');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
   });
 }
 
@@ -9670,8 +9719,8 @@ document.addEventListener('click', async (event) => {
     const { apptId, clientName, title, startsAt, price, deposit, status } = outcomeBtn.dataset;
     return openAppointmentOutcomeModal({
       id: apptId,
-      client_name: clientName,
-      title,
+      client_name: clientName && clientName.includes('%') ? decodeURIComponent(clientName) : (clientName || ''),
+      title: title && title.includes('%') ? decodeURIComponent(title) : (title || ''),
       starts_at: startsAt,
       price: Number(price),
       deposit: Number(deposit),

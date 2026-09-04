@@ -171,6 +171,32 @@ test('Appointments: Create initial appointment', async () => {
   assert.equal(completeRes.status, 200);
 });
 
+test('Appointment Status: Reschedule appointment updates status and startsAt', async () => {
+  const createRes = await request('/api/appointments', {
+    method: 'POST',
+    body: JSON.stringify({
+      title: 'Sesión para reprogramar',
+      startsAt: '2026-11-25T10:00:00.000Z',
+      durationMinutes: 60,
+      price: 50000
+    })
+  });
+  assert.equal(createRes.status, 201);
+  const apptId = createRes.data.id;
+
+  const newStartsAt = '2026-11-26T15:00:00.000Z';
+  const rescheduleRes = await request(`/api/appointments/${apptId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      status: 'rescheduled',
+      startsAt: newStartsAt
+    })
+  });
+  assert.equal(rescheduleRes.status, 200);
+  assert.equal(rescheduleRes.data.status, 'rescheduled');
+  assert.equal(new Date(rescheduleRes.data.starts_at).toISOString(), newStartsAt);
+});
+
 test('Conflict Engine: Reject appointment overlapping on same box / artist (HTTP 409)', async () => {
   // Overlaps with 14:00 - 17:00
   const conflictingStartsAt = '2026-11-15T15:30:00Z';
