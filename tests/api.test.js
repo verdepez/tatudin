@@ -571,6 +571,249 @@ test('Transactions: Create manual transaction with artist association', async ()
   assert.equal(res.data.description, 'Abono en efectivo sesión Alex');
 });
 
+test('Inventory: Studio Owner creates item with imageUrl and queries inventory', async () => {
+  const res = await request('/api/inventory/items', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'Agujas Bishop DaVinci 03RL',
+      category: 'needles',
+      unit: 'box',
+      quantity: 15,
+      minStockAlert: 4,
+      costPrice: 22000,
+      salePrice: 28000,
+      sku: 'BISH-03RL',
+      imageUrl: 'https://images.unsplash.com/photo-needles.jpg'
+    })
+  });
+
+  assert.equal(res.status, 201);
+  assert.ok(res.data.id);
+  assert.equal(res.data.name, 'Agujas Bishop DaVinci 03RL');
+  assert.equal(res.data.image_url, 'https://images.unsplash.com/photo-needles.jpg');
+
+  const listRes = await request('/api/inventory');
+  assert.equal(listRes.status, 200);
+  const found = listRes.data.items.find(i => i.id === res.data.id);
+  assert.ok(found);
+  assert.equal(found.image_url, 'https://images.unsplash.com/photo-needles.jpg');
+});
+
+test('Inventory: Studio Owner updates item details and imageUrl', async () => {
+  const listRes = await request('/api/inventory');
+  const item = listRes.data.items.find(i => i.sku === 'BISH-03RL');
+  assert.ok(item);
+
+  const res = await request('/api/inventory/items', {
+    method: 'POST',
+    body: JSON.stringify({
+      id: item.id,
+      name: 'Agujas Bishop DaVinci 03RL Pro',
+      category: 'needles',
+      unit: 'box',
+      quantity: 18,
+      minStockAlert: 5,
+      costPrice: 23000,
+      salePrice: 30000,
+      sku: 'BISH-03RL',
+      imageUrl: 'https://images.unsplash.com/photo-needles-updated.jpg'
+    })
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.data.name, 'Agujas Bishop DaVinci 03RL Pro');
+  assert.equal(res.data.image_url, 'https://images.unsplash.com/photo-needles-updated.jpg');
+});
+
+test('Inventory: Studio Owner imports products via CSV endpoint', async () => {
+  const importRes = await request('/api/inventory/import-csv', {
+    method: 'POST',
+    body: JSON.stringify({
+      items: [
+        {
+          name: 'Cartuchos Kwadron 05RS',
+          category: 'needles',
+          unit: 'box',
+          quantity: 25,
+          minStockAlert: 6,
+          costPrice: 21000,
+          salePrice: 27000,
+          sku: 'KW-05RS',
+          imageUrl: 'https://example.com/kwadron.jpg'
+        },
+        {
+          name: 'Tinta Kuro Sumi Imperial Black 6oz',
+          category: 'inks',
+          unit: 'bottle',
+          quantity: 8,
+          minStockAlert: 2,
+          costPrice: 29000,
+          salePrice: 38000,
+          sku: 'KS-IMP-BLK',
+          imageUrl: ''
+        }
+      ]
+    })
+  });
+
+  assert.equal(importRes.status, 200);
+  assert.equal(importRes.data.importedCount, 2);
+
+  const listRes = await request('/api/inventory');
+  const kwadron = listRes.data.items.find(i => i.sku === 'KW-05RS');
+  assert.ok(kwadron);
+  assert.equal(kwadron.image_url, 'https://example.com/kwadron.jpg');
+});
+
+test('Inventory: Role-based permissions in Studio (Owner vs Resident vs Guest)', async () => {
+  // 1. Register a dedicated studio account
+  const studioOwnerEmail = `studio_owner_${Date.now()}@tatudintest.com`;
+  const registerRes = await request('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      fullName: 'Studio Boss',
+      email: studioOwnerEmail,
+      password: 'password123',
+      studioName: 'Perms Tattoo Studio',
+      accountType: 'studio'
+    })
+  });
+  assert.equal(registerRes.status, 201);
+  const studioOwnerCookie = cookieHeader;
+
+  // 2. Create a studio inventory item as Owner
+  const studioItemRes = await request('/api/inventory/items', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'Papel Hectográfico Spirit',
+      category: 'equipment',
+      unit: 'box',
+      quantity: 50,
+      minStockAlert: 10,
+      costPrice: 15000,
+      salePrice: 0,
+      sku: 'SPIRIT-BOX'
+    })
+  });
+  assert.equal(studioItemRes.status, 201);
+  const studioItemId = studioItemRes.data.id;
+
+  // 3. Add Resident and Guest members
+  const residentEmail = `resident_${Date.now()}@tatudintest.com`;
+  const guestEmail = `guest_${Date.now()}@tatudintest.com`;
+
+  await request('/api/members', {
+    method: 'POST',
+    body: JSON.stringify({
+      fullName: 'Resident Tattooist',
+      email: residentEmail,
+      role: 'resident',
+      commissionPercent: 60,
+      hasAppAccess: true,
+      password: 'residentpass123'
+    })
+  });
+
+  await request('/api/members', {
+    method: 'POST',
+    body: JSON.stringify({
+      fullName: 'Guest Spot Artist',
+      email: guestEmail,
+      role: 'guest',
+      commissionPercent: 70,
+      hasAppAccess: true,
+      password: 'guestpass123'
+    })
+  });
+
+  // 4. Test Resident session
+  cookieHeader = '';
+  const residentLogin = await request('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email: residentEmail, password: 'residentpass123' })
+  });
+  assert.equal(residentLogin.status, 200);
+
+  // Resident cannot delete studio item (CR: cannot D)
+  const resDelStudio = await request(`/api/inventory/items/${studioItemId}`, {
+    method: 'DELETE'
+  });
+  assert.equal(resDelStudio.status, 403);
+
+  // Resident can record consumption (CR: can C)
+  const resConsume = await request('/api/inventory/movements', {
+    method: 'POST',
+    body: JSON.stringify({
+      itemId: studioItemId,
+      movementType: 'consumption',
+      quantity: 2,
+      notes: 'Consumo para sesión dragón'
+    })
+  });
+  assert.equal(resConsume.status, 201);
+
+  // Resident can create their own personal item
+  const resPersonalItem = await request('/api/inventory/items', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'Mis Guantes Nitrilo Negros',
+      category: 'hygiene',
+      unit: 'box',
+      quantity: 5,
+      isPersonal: true
+    })
+  });
+  assert.equal(resPersonalItem.status, 201);
+  assert.ok(resPersonalItem.data.owner_user_id, 'Personal item must have owner_user_id set');
+
+  // Resident can delete their own personal item
+  const resDelPersonal = await request(`/api/inventory/items/${resPersonalItem.data.id}`, {
+    method: 'DELETE'
+  });
+  assert.equal(resDelPersonal.status, 200);
+
+  // 5. Test Guest session
+  cookieHeader = '';
+  const guestLogin = await request('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email: guestEmail, password: 'guestpass123' })
+  });
+  assert.equal(guestLogin.status, 200);
+
+  // Guest can read inventory (C)
+  const guestList = await request('/api/inventory');
+  assert.equal(guestList.status, 200);
+
+  // Guest cannot directly consume studio items
+  const guestConsume = await request('/api/inventory/movements', {
+    method: 'POST',
+    body: JSON.stringify({
+      itemId: studioItemId,
+      movementType: 'consumption',
+      quantity: 1
+    })
+  });
+  assert.equal(guestConsume.status, 403);
+  assert.ok(guestConsume.data.error.toLowerCase().includes('guest'));
+
+  // Guest can submit a supply request (Solicitar)
+  const guestRequest = await request('/api/inventory/movements', {
+    method: 'POST',
+    body: JSON.stringify({
+      itemId: studioItemId,
+      movementType: 'request',
+      quantity: 3,
+      notes: 'Solicito papel hectográfico para guest spot'
+    })
+  });
+  assert.equal(guestRequest.status, 201);
+  const movementType = guestRequest.data.movement?.movement_type || guestRequest.data.movement_type;
+  assert.equal(movementType, 'request');
+
+  // Restore owner session for remaining tests / cleanup
+  cookieHeader = studioOwnerCookie;
+});
+
 test.after(() => {
   setTimeout(() => process.exit(0), 100);
 });
