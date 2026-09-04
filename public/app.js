@@ -2527,12 +2527,17 @@ async function renderAgenda() {
     categories = categoriesList || [];
     appointmentSchedules = schedulesList || [];
   }
-  const appointmentsList = isSameParams ? rangeAppointments : (rawAppointmentsList || []);
+  const rawList = isSameParams ? rangeAppointments : (rawAppointmentsList || []);
+  const appointmentsList = rawList.filter((a) => {
+    if (a.category_id && (agendaFilter.hiddenCategories || []).includes(String(a.category_id))) return false;
+    return true;
+  });
 
   // Build appointments count and categories map per day for colored indicators
   const dayApptsMap = {};
   rangeAppointments.forEach((a) => {
     if (!a.starts_at) return;
+    if (a.category_id && (agendaFilter.hiddenCategories || []).includes(String(a.category_id))) return;
     const dayISO = formatDateISO(a.starts_at);
     if (!dayApptsMap[dayISO]) {
       dayApptsMap[dayISO] = {
@@ -2563,14 +2568,17 @@ async function renderAgenda() {
   });
 
   const todayISO = formatDateISO(new Date());
-  const hasActiveFilters = agendaFilter.categoryId !== 'all' || agendaFilter.artistId !== 'all' || agendaFilter.spaceId !== 'all' || agendaFilter.status !== 'all';
+  const validHiddenCount = (agendaFilter.hiddenCategories || []).filter(hid => (categories || []).some(c => String(c.id) === String(hid))).length;
+  let activeFiltersCount = 0;
+  if (agendaFilter.artistId !== 'all') activeFiltersCount++;
+  if (agendaFilter.spaceId !== 'all') activeFiltersCount++;
+  if (agendaFilter.status !== 'all') activeFiltersCount++;
+  if (agendaFilter.date) activeFiltersCount++;
+  if (validHiddenCount > 0) activeFiltersCount += validHiddenCount;
+  const hasActiveFilters = activeFiltersCount > 0;
 
   // Build active filter summary chips
   const activeFiltersLabels = [];
-  if (agendaFilter.categoryId !== 'all') {
-    const cat = categories.find((c) => String(c.id) === String(agendaFilter.categoryId));
-    if (cat) activeFiltersLabels.push(`Categoría: ${cat.name}`);
-  }
   if (agendaFilter.artistId !== 'all') {
     const art = members.find((m) => String(m.id) === String(agendaFilter.artistId));
     if (art) activeFiltersLabels.push(`Artista: ${art.full_name}`);
@@ -2583,6 +2591,15 @@ async function renderAgenda() {
     const statusObj = STATUS_MAP[agendaFilter.status];
     if (statusObj) activeFiltersLabels.push(`Estado: ${statusObj.label}`);
   }
+  if (agendaFilter.date) {
+    activeFiltersLabels.push(`Día: ${agendaFilter.date}`);
+  }
+  if (validHiddenCount > 0) {
+    const hiddenNames = (categories || []).filter(c => (agendaFilter.hiddenCategories || []).includes(String(c.id))).map(c => c.name);
+    if (hiddenNames.length > 0) {
+      activeFiltersLabels.push(`Capas ocultas: ${hiddenNames.join(', ')}`);
+    }
+  }
 
   app.innerHTML = `
     <section class="page-heading">
@@ -2594,8 +2611,9 @@ async function renderAgenda() {
 
       <!-- Actions: Configuración de Agenda + Google Calendar Style Crear Dropdown Menu -->
       <div class="calendar-heading-actions">
-        <button type="button" class="cal-top-icon-btn" data-action="open-booking-pages-modal" title="Configuración de agendas de citas y páginas de reserva" aria-label="Configuración de agenda">
+        <button type="button" class="cal-top-icon-btn ${hasActiveFilters ? 'has-active' : ''}" data-action="open-agenda-filter-modal" title="Configuración y filtros de agenda" aria-label="Configuración de agenda">
           ${icon('settings')}
+          ${activeFiltersCount > 0 ? `<span class="cal-gear-badge">${activeFiltersCount}</span>` : ''}
         </button>
         <div class="create-menu-wrapper">
           <button type="button" class="primary create-menu-btn" data-action="toggle-create-menu">
@@ -2635,7 +2653,7 @@ async function renderAgenda() {
       <main class="agenda-main-calendar">
         <section class="panel calendar-card">
           <div class="calendar-header-bar">
-            <!-- View Toggle: Horaria | Mensual + Filtros + Config -->
+            <!-- View Toggle: Horaria | Mensual + Config & Filtros en el Engrane -->
             <div style="display: flex; align-items: center; gap: 8px;">
               <div class="calendar-view-toggle">
                 <button class="cal-view-btn ${isTimeGrid ? 'active' : ''}" data-cal-view="timegrid">
@@ -2646,13 +2664,9 @@ async function renderAgenda() {
                 </button>
               </div>
 
-              <button type="button" class="cal-filter-trigger-btn ${hasActiveFilters ? 'has-active' : ''}" data-action="open-agenda-filter-modal" title="Filtrar agenda" aria-label="Filtrar agenda">
-                ${icon('sliders')}
-                ${hasActiveFilters ? `<span class="filter-badge-dot"></span>` : ''}
-              </button>
-
-              <button type="button" class="cal-filter-trigger-btn" data-action="open-booking-pages-modal" title="Configuración de agenda y páginas de reserva" aria-label="Configuración de agenda">
+              <button type="button" class="cal-filter-trigger-btn ${hasActiveFilters ? 'has-active' : ''}" data-action="open-agenda-filter-modal" title="Configuración y filtros de agenda" aria-label="Configuración y filtros de agenda">
                 ${icon('settings')}
+                ${activeFiltersCount > 0 ? `<span class="cal-gear-badge">${activeFiltersCount}</span>` : ''}
               </button>
             </div>
 
@@ -2670,24 +2684,6 @@ async function renderAgenda() {
               <strong class="cal-current-label">${rangeInfo.label}</strong>
             </div>
           </div>
-
-          <!-- Category Color Legend Bar -->
-          ${categories && categories.length > 0 ? `
-            <div class="calendar-category-legend-bar" aria-label="Leyenda de categorías">
-              <span class="cal-legend-title">Categorías:</span>
-              <div class="cal-legend-items">
-                ${categories.map((c) => {
-                  const isActive = String(agendaFilter.categoryId) === String(c.id);
-                  return `
-                    <button type="button" class="cal-legend-chip ${isActive ? 'active' : ''}" data-select-category="${c.id}" title="Filtrar por ${c.name}">
-                      <span class="cal-legend-dot" style="background: ${c.color}"></span>
-                      <span class="cal-legend-label">${c.name}</span>
-                    </button>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-          ` : ''}
 
           ${agendaFilter.date ? `
             <div class="cal-selected-day-banner">
@@ -2806,112 +2802,225 @@ async function renderAgenda() {
   `;
 }
 
-function openAgendaFilterModal() {
+function openAgendaFilterModal(initialTab = 'filters') {
+  const validHiddenCount = (agendaFilter.hiddenCategories || []).filter(hid => (categories || []).some(c => String(c.id) === String(hid))).length;
+  let activeFiltersCount = 0;
+  if (agendaFilter.artistId !== 'all') activeFiltersCount++;
+  if (agendaFilter.spaceId !== 'all') activeFiltersCount++;
+  if (agendaFilter.status !== 'all') activeFiltersCount++;
+  if (agendaFilter.date) activeFiltersCount++;
+  if (validHiddenCount > 0) activeFiltersCount += validHiddenCount;
+
   openModal(`
-    <p class="eyebrow">FILTROS AVANZADOS</p>
-    <h2 id="modal-title">Filtrar Agenda</h2>
-    <p class="lead" style="margin-bottom: 16px;">Ajusta los filtros para visualizar compromisos específicos en tu calendario:</p>
-
-    <form id="agenda-filter-form" style="display: grid; gap: 14px;">
-      <div class="field">
-        <label for="modal-agenda-category">Categoría:</label>
-        <select id="modal-agenda-category" name="categoryId">
-          <option value="all" ${agendaFilter.categoryId === 'all' ? 'selected' : ''}>Todas las categorías</option>
-          ${categories.map((c) => `
-            <option value="${c.id}" ${String(agendaFilter.categoryId) === String(c.id) ? 'selected' : ''}>
-              ${c.name} (${c.appointment_count || 0})
-            </option>
-          `).join('')}
-        </select>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1.5px solid var(--line-soft); padding-bottom: 8px;">
+      <div style="display: flex; gap: 4px;">
+        <button type="button" class="agenda-modal-tab-btn ${initialTab === 'filters' ? 'active' : ''}" data-agenda-tab="filters">
+          Filtros de Agenda ${activeFiltersCount > 0 ? `<span class="badge" style="background: var(--red, #ef4444); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 999px; margin-left: 4px;">${activeFiltersCount}</span>` : ''}
+        </button>
+        <button type="button" class="agenda-modal-tab-btn ${initialTab === 'schedules' ? 'active' : ''}" data-agenda-tab="schedules">
+          Disponibilidad & Reservas (${(appointmentSchedules || []).length})
+        </button>
       </div>
+      <button type="button" class="text-button" data-close-modal style="color: var(--muted); font-size: 18px; line-height: 1; padding: 4px 8px;" title="Cerrar modal">×</button>
+    </div>
 
-      <div class="field">
-        <label for="modal-agenda-artist">Artista / Responsable:</label>
-        <select id="modal-agenda-artist" name="artistId">
-          <option value="all" ${agendaFilter.artistId === 'all' ? 'selected' : ''}>Todos los artistas (${members.length})</option>
-          ${members.map((m) => `
-            <option value="${m.id}" ${String(agendaFilter.artistId) === String(m.id) ? 'selected' : ''}>
-              ${m.full_name}
-            </option>
-          `).join('')}
-        </select>
-      </div>
+    <!-- PANE 1: FILTROS DE AGENDA -->
+    <div id="agenda-modal-filters-pane" style="display: ${initialTab === 'filters' ? 'block' : 'none'};">
+      <form id="agenda-filter-form" style="display: grid; gap: 14px;">
+        
+        <!-- Capas visibles en calendario (Selector por checks y colores) -->
+        <div class="field" style="margin-bottom: 2px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <label style="font-weight: 800; font-size: 13px; color: var(--ink);">Capas visibles en calendario:</label>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="text-button" id="btn-select-all-layers" style="font-size: 11.5px; font-weight: 700; color: var(--accent);">
+                Marcar todas
+              </button>
+              <span style="color: var(--line-mid);">·</span>
+              <button type="button" class="text-button" id="btn-deselect-all-layers" style="font-size: 11.5px; font-weight: 700; color: var(--muted);">
+                Desmarcar todas
+              </button>
+            </div>
+          </div>
 
-      <div class="field">
-        <label for="modal-agenda-space">Box / Espacio:</label>
-        <select id="modal-agenda-space" name="spaceId">
-          <option value="all" ${agendaFilter.spaceId === 'all' ? 'selected' : ''}>Todos los boxes (${spaces.length})</option>
-          ${spaces.map((s) => `
-            <option value="${s.id}" ${String(agendaFilter.spaceId) === String(s.id) ? 'selected' : ''}>
-              ${s.name}
-            </option>
-          `).join('')}
-        </select>
-      </div>
-
-      <div class="field">
-        <label for="modal-agenda-status">Estado del compromiso:</label>
-        <select id="modal-agenda-status" name="status">
-          <option value="all" ${agendaFilter.status === 'all' ? 'selected' : ''}>Todos los estados</option>
-          <option value="confirmed" ${agendaFilter.status === 'confirmed' ? 'selected' : ''}>Confirmadas</option>
-          <option value="deposit_paid" ${agendaFilter.status === 'deposit_paid' ? 'selected' : ''}>Seña pagada</option>
-          <option value="in_session" ${agendaFilter.status === 'in_session' ? 'selected' : ''}>En sesión</option>
-          <option value="completed" ${agendaFilter.status === 'completed' ? 'selected' : ''}>Completadas</option>
-          <option value="cancelled" ${agendaFilter.status === 'cancelled' ? 'selected' : ''}>Canceladas</option>
-        </select>
-      </div>
-
-      <!-- Capas de compromisos (Mostrar / Ocultar en calendario) -->
-      ${categories && categories.length > 0 ? `
-        <div class="field" style="margin-top: 2px;">
-          <label style="font-weight: 700; font-size: 12px; margin-bottom: 6px; display: block;">Capas visibles en calendario:</label>
-          <div class="calendar-layers-list" style="display: grid; gap: 8px; max-height: 160px; overflow-y: auto; padding: 10px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius-md);">
-            ${categories.map((c) => {
+          <div class="calendar-layers-list" style="display: grid; gap: 8px; max-height: 175px; overflow-y: auto; padding: 10px; background: var(--surface-high, #f8fafc); border: 1px solid var(--line-soft); border-radius: var(--radius-md);">
+            ${categories && categories.length > 0 ? categories.map((c) => {
               const isHidden = (agendaFilter.hiddenCategories || []).includes(String(c.id));
               const catColor = c.color || '#7C3AED';
               return `
-                <div class="cal-layer-row" data-cat-id="${c.id}" style="display: flex; align-items: center; justify-content: space-between;">
-                  <label class="cal-layer-item" style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" class="cal-layer-input" data-category-layer="${c.id}" ${isHidden ? '' : 'checked'} />
-                    <span class="cal-layer-box" style="--cat-layer-color: ${catColor};"></span>
-                    <span class="cal-layer-title" style="font-size: 13px; font-weight: 600;">${c.name}</span>
+                <div class="cal-layer-row" data-cat-id="${c.id}" style="display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; border-radius: 6px;">
+                  <label class="cal-layer-item" style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; user-select: none;">
+                    <input type="checkbox" class="cal-layer-input" data-category-layer="${c.id}" ${isHidden ? '' : 'checked'} style="width: 17px; height: 17px; cursor: pointer; accent-color: var(--accent);" />
+                    <span class="cal-layer-box" style="--cat-layer-color: ${catColor}; width: 12px; height: 12px; border-radius: 3px; background: ${catColor}; flex-shrink: 0;"></span>
+                    <span class="cal-layer-title" style="font-size: 13px; font-weight: 600; color: var(--ink);">${c.name}</span>
                   </label>
-                  <label class="cal-layer-color-trigger" title="Cambiar color de ${c.name}">
-                    <input type="color" class="cal-layer-color-input" data-category-id="${c.id}" value="${catColor}" />
-                    <span class="cal-layer-color-swatch" style="background: ${catColor};"></span>
+                  <label class="cal-layer-color-trigger" title="Cambiar color de ${c.name}" style="display: flex; align-items: center; gap: 6px; cursor: pointer; position: relative;">
+                    <input type="color" class="cal-layer-color-input" data-category-id="${c.id}" value="${catColor}" style="opacity: 0; position: absolute; width: 0; height: 0;" />
+                    <span class="cal-layer-color-swatch" style="background: ${catColor}; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1px var(--line-soft); display: inline-block;"></span>
                   </label>
                 </div>
               `;
-            }).join('')}
+            }).join('') : '<p class="empty-note" style="font-size: 12px; margin: 4px 0;">No hay categorías configuradas.</p>'}
+          </div>
+          <small style="color: var(--muted); font-size: 11px; margin-top: 4px; display: block;">
+            Desmarca las casillas para ocultar compromisos del calendario. Toca el círculo de color para cambiarlo.
+          </small>
+        </div>
+
+        <div class="field">
+          <label for="modal-agenda-artist" style="font-weight: 700; font-size: 12px;">Artista / Responsable:</label>
+          <select id="modal-agenda-artist" name="artistId">
+            <option value="all" ${agendaFilter.artistId === 'all' ? 'selected' : ''}>Todos los artistas (${members.length})</option>
+            ${members.map((m) => `
+              <option value="${m.id}" ${String(agendaFilter.artistId) === String(m.id) ? 'selected' : ''}>
+                ${m.full_name}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="modal-agenda-space" style="font-weight: 700; font-size: 12px;">Box / Espacio:</label>
+          <select id="modal-agenda-space" name="spaceId">
+            <option value="all" ${agendaFilter.spaceId === 'all' ? 'selected' : ''}>Todos los boxes (${spaces.length})</option>
+            ${spaces.map((s) => `
+              <option value="${s.id}" ${String(agendaFilter.spaceId) === String(s.id) ? 'selected' : ''}>
+                ${s.name}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="modal-agenda-status" style="font-weight: 700; font-size: 12px;">Estado del compromiso:</label>
+          <select id="modal-agenda-status" name="status">
+            <option value="all" ${agendaFilter.status === 'all' ? 'selected' : ''}>Todos los estados</option>
+            <option value="confirmed" ${agendaFilter.status === 'confirmed' ? 'selected' : ''}>Confirmadas</option>
+            <option value="deposit_paid" ${agendaFilter.status === 'deposit_paid' ? 'selected' : ''}>Seña pagada</option>
+            <option value="in_session" ${agendaFilter.status === 'in_session' ? 'selected' : ''}>En sesión</option>
+            <option value="completed" ${agendaFilter.status === 'completed' ? 'selected' : ''}>Completadas</option>
+            <option value="cancelled" ${agendaFilter.status === 'cancelled' ? 'selected' : ''}>Canceladas</option>
+          </select>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+          <button type="button" class="text-button" data-action="reset-agenda-filter-form" style="color: var(--red); font-size: 13px; font-weight: 700;">
+            Restablecer filtros
+          </button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="secondary" data-close-modal>Cerrar</button>
+            <button type="submit" class="primary">Aplicar filtros</button>
           </div>
         </div>
-      ` : ''}
+      </form>
+    </div>
 
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
-        <button type="button" class="text-button" data-action="reset-agenda-filter-form" style="color: var(--red); font-size: 13px; font-weight: 700;">
-          Restablecer filtros
-        </button>
-        <div style="display: flex; gap: 8px;">
-          <button type="button" class="secondary" data-close-modal>Cerrar</button>
-          <button type="submit" class="primary">Aplicar filtros</button>
+    <!-- PANE 2: DISPONIBILIDAD & RESERVAS -->
+    <div id="agenda-modal-schedules-pane" style="display: ${initialTab === 'schedules' ? 'block' : 'none'};">
+      <div class="modal-header-with-action" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 12px;">
+        <div>
+          <p class="lead" style="margin: 0; font-size: 12.5px;">Gestiona tus páginas de reserva, enlaces públicos para clientes y disponibilidad semanal.</p>
         </div>
+        <button type="button" class="primary small-btn" data-action="open-schedule-configurator" style="display: inline-flex; align-items: center; gap: 4px; padding: 7px 12px; font-size: 12px; white-space: nowrap; flex-shrink: 0;">
+          ${icon('plus')} <span>Nueva Agenda</span>
+        </button>
       </div>
-    </form>
+
+      <div class="schedules-modal-list" style="display: flex; flex-direction: column; gap: 10px; margin: 14px 0; max-height: 46vh; overflow-y: auto;">
+        ${appointmentSchedules && appointmentSchedules.length > 0 ? appointmentSchedules.map((sched) => `
+          <div class="sched-sidebar-card ${sched.is_locked ? 'is-locked' : ''}" style="border: 1.5px solid ${sched.is_locked ? '#FCA5A5' : 'var(--line-soft)'}; border-radius: var(--radius-md); padding: 12px 14px; background: ${sched.is_locked ? 'repeating-linear-gradient(-45deg, var(--surface), var(--surface) 10px, rgba(239, 68, 68, 0.05) 10px, rgba(239, 68, 68, 0.05) 20px)' : 'var(--surface)'};">
+            <div class="sched-card-top" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <span class="sched-swatch" style="background: ${sched.color || '#7C3AED'}; width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0;"></span>
+              <div class="sched-info" style="flex: 1; min-width: 0;">
+                <strong class="sched-name" style="font-size: 13.5px; color: var(--ink); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${sched.title}">${sched.title}</strong>
+                <div class="sched-meta" style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 2px;">
+                  <span>${sched.duration_minutes} min</span>
+                  <span class="sched-status-badge ${sched.is_locked ? 'locked' : 'active'}" style="font-weight: 800; font-size: 10px; padding: 2px 7px; border-radius: 4px; background: ${sched.is_locked ? '#fee2e2' : '#dcfce7'}; color: ${sched.is_locked ? '#991b1b' : '#166534'}; border: 1px solid ${sched.is_locked ? '#fca5a5' : '#86efac'}; display: inline-flex; align-items: center; gap: 4px;">
+                    ${sched.is_locked ? `${icon('lock')} BLOQUEADA` : `${icon('check')} ACTIVA`}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="sched-card-actions" style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="sched-btn ${sched.is_locked ? 'unlock-style' : 'lock-style'}" data-action="toggle-schedule-lock" data-schedule-id="${sched.id}" title="${sched.is_locked ? 'Desbloquear agenda para permitir reservas' : 'Bloquear agenda para pausar reservas'}" style="padding: 6px 12px; font-size: 11.5px; font-weight: 700; border-radius: var(--radius-sm); border: 1.5px solid ${sched.is_locked ? '#fca5a5' : 'var(--line-soft)'}; background: ${sched.is_locked ? '#fee2e2' : 'var(--surface-high)'}; color: ${sched.is_locked ? '#991b1b' : 'inherit'}; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+                ${sched.is_locked ? `${icon('unlock')} Desbloquear` : `${icon('lock')} Bloquear`}
+              </button>
+              <button type="button" class="sched-btn" data-action="edit-schedule" data-schedule-id="${sched.id}" title="Editar horarios y disponibilidad" style="padding: 6px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+                ${icon('edit')} Editar
+              </button>
+              <button type="button" class="sched-btn" data-action="open-public-booking" data-schedule-slug="${sched.slug}" title="Ver página de reserva y copiar enlace" style="padding: 6px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+                ${icon('link')} Link
+              </button>
+            </div>
+          </div>
+        `).join('') : `
+          <div class="sched-empty-box" style="text-align: center; padding: 24px 16px; background: var(--surface); border: 1px dashed var(--line-soft); border-radius: var(--radius-md);">
+            <p style="margin: 0; font-size: 13px; color: var(--muted);">No hay agendas de citas creadas.</p>
+            <button type="button" class="primary small-btn" data-action="open-schedule-configurator" style="margin-top: 10px;">
+              + Crear primera agenda
+            </button>
+          </div>
+        `}
+      </div>
+
+      <div style="border-top: 1px solid var(--line-soft); padding-top: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <button type="button" class="secondary small-btn" data-action="open-calendar-sync" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px;">
+          ${icon('sync')} <span>Sincronizar Google / Apple Calendar</span>
+        </button>
+        <button type="button" class="secondary" data-close-modal style="padding: 6px 14px; font-size: 12px;">
+          Cerrar
+        </button>
+      </div>
+    </div>
   `);
 
+  // Tab switching handlers
+  document.querySelectorAll('[data-agenda-tab]').forEach((tabBtn) => {
+    tabBtn.addEventListener('click', () => {
+      const targetTab = tabBtn.dataset.agendaTab;
+      document.querySelectorAll('[data-agenda-tab]').forEach(b => b.classList.remove('active'));
+      tabBtn.classList.add('active');
+
+      const filtersPane = document.querySelector('#agenda-modal-filters-pane');
+      const schedulesPane = document.querySelector('#agenda-modal-schedules-pane');
+      if (targetTab === 'filters') {
+        if (filtersPane) filtersPane.style.display = 'block';
+        if (schedulesPane) schedulesPane.style.display = 'none';
+      } else {
+        if (filtersPane) filtersPane.style.display = 'none';
+        if (schedulesPane) schedulesPane.style.display = 'block';
+      }
+    });
+  });
+
+  // Category layers select all / deselect all
+  document.querySelector('#btn-select-all-layers')?.addEventListener('click', () => {
+    document.querySelectorAll('#agenda-filter-form .cal-layer-input').forEach(cb => { cb.checked = true; });
+  });
+  document.querySelector('#btn-deselect-all-layers')?.addEventListener('click', () => {
+    document.querySelectorAll('#agenda-filter-form .cal-layer-input').forEach(cb => { cb.checked = false; });
+  });
+
+  // Filter form submit
   const form = document.querySelector('#agenda-filter-form');
   form?.addEventListener('submit', (e) => {
     e.preventDefault();
     const formData = new FormData(form);
-    agendaFilter.categoryId = formData.get('categoryId') || 'all';
     agendaFilter.artistId = formData.get('artistId') || 'all';
     agendaFilter.spaceId = formData.get('spaceId') || 'all';
     agendaFilter.status = formData.get('status') || 'all';
+    agendaFilter.categoryId = 'all';
+
+    // Read all checked categories
+    const checkedCategories = Array.from(form.querySelectorAll('.cal-layer-input:checked')).map(cb => String(cb.dataset.categoryLayer));
+    const allCatIds = (categories || []).map(c => String(c.id));
+    agendaFilter.hiddenCategories = allCatIds.filter(id => !checkedCategories.includes(id));
     agendaFilter.offset = 0;
     closeModal();
     renderAgenda();
   });
 
+  // Reset filters
   document.querySelector('[data-action="reset-agenda-filter-form"]')?.addEventListener('click', () => {
     agendaFilter.categoryId = 'all';
     agendaFilter.artistId = 'all';
@@ -2925,64 +3034,7 @@ function openAgendaFilterModal() {
 }
 
 function openBookingPagesModal() {
-  openModal(`
-    <div class="modal-header-with-action" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 12px;">
-      <div>
-        <p class="eyebrow" style="margin: 0; font-size: 10.5px;">DISPONIBILIDAD & RESERVAS</p>
-        <h2 id="modal-title" style="margin: 2px 0 0; font-size: 18px; font-weight: 800;">Configuración de Agenda</h2>
-        <p class="lead" style="margin: 4px 0 0; font-size: 12px;">Gestiona tus páginas de reserva, enlaces públicos para clientes y disponibilidad semanal.</p>
-      </div>
-      <button type="button" class="primary small-btn" data-action="open-schedule-configurator" style="display: inline-flex; align-items: center; gap: 4px; padding: 7px 12px; font-size: 12px; white-space: nowrap; flex-shrink: 0;">
-        ${icon('plus')} <span>Nueva Agenda</span>
-      </button>
-    </div>
-
-    <div class="schedules-modal-list" style="display: flex; flex-direction: column; gap: 10px; margin: 14px 0; max-height: 52vh; overflow-y: auto;">
-      ${appointmentSchedules && appointmentSchedules.length > 0 ? appointmentSchedules.map((sched) => `
-        <div class="sched-sidebar-card ${sched.is_locked ? 'is-locked' : ''}" style="border: 1.5px solid ${sched.is_locked ? '#FCA5A5' : 'var(--line-soft)'}; border-radius: var(--radius-md); padding: 12px 14px; background: ${sched.is_locked ? 'repeating-linear-gradient(-45deg, var(--surface), var(--surface) 10px, rgba(239, 68, 68, 0.05) 10px, rgba(239, 68, 68, 0.05) 20px)' : 'var(--surface)'};">
-          <div class="sched-card-top" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-            <span class="sched-swatch" style="background: ${sched.color || '#7C3AED'}; width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0;"></span>
-            <div class="sched-info" style="flex: 1; min-width: 0;">
-              <strong class="sched-name" style="font-size: 13.5px; color: var(--ink); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${sched.title}">${sched.title}</strong>
-              <div class="sched-meta" style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 2px;">
-                <span>${sched.duration_minutes} min</span>
-                <span class="sched-status-badge ${sched.is_locked ? 'locked' : 'active'}" style="font-weight: 800; font-size: 10px; padding: 2px 7px; border-radius: 4px; background: ${sched.is_locked ? '#fee2e2' : '#dcfce7'}; color: ${sched.is_locked ? '#991b1b' : '#166534'}; border: 1px solid ${sched.is_locked ? '#fca5a5' : '#86efac'}; display: inline-flex; align-items: center; gap: 4px;">
-                  ${sched.is_locked ? `${icon('lock')} BLOQUEADA` : `${icon('check')} ACTIVA`}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div class="sched-card-actions" style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <button type="button" class="sched-btn ${sched.is_locked ? 'unlock-style' : 'lock-style'}" data-action="toggle-schedule-lock" data-schedule-id="${sched.id}" title="${sched.is_locked ? 'Desbloquear agenda para permitir reservas' : 'Bloquear agenda para pausar reservas'}" style="padding: 6px 12px; font-size: 11.5px; font-weight: 700; border-radius: var(--radius-sm); border: 1.5px solid ${sched.is_locked ? '#fca5a5' : 'var(--line-soft)'}; background: ${sched.is_locked ? '#fee2e2' : 'var(--surface-high)'}; color: ${sched.is_locked ? '#991b1b' : 'inherit'}; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
-              ${sched.is_locked ? `${icon('unlock')} Desbloquear` : `${icon('lock')} Bloquear`}
-            </button>
-            <button type="button" class="sched-btn" data-action="edit-schedule" data-schedule-id="${sched.id}" title="Editar horarios y disponibilidad" style="padding: 6px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
-              ${icon('edit')} Editar
-            </button>
-            <button type="button" class="sched-btn" data-action="open-public-booking" data-schedule-slug="${sched.slug}" title="Ver página de reserva y copiar enlace" style="padding: 6px 10px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--surface-high); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
-              ${icon('link')} Link
-            </button>
-          </div>
-        </div>
-      `).join('') : `
-        <div class="sched-empty-box" style="text-align: center; padding: 24px 16px; background: var(--surface); border: 1px dashed var(--line-soft); border-radius: var(--radius-md);">
-          <p style="margin: 0; font-size: 13px; color: var(--muted);">No hay agendas de citas creadas.</p>
-          <button type="button" class="primary small-btn" data-action="open-schedule-configurator" style="margin-top: 10px;">
-            + Crear primera agenda
-          </button>
-        </div>
-      `}
-    </div>
-
-    <div style="border-top: 1px solid var(--line-soft); padding-top: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-      <button type="button" class="secondary small-btn" data-action="open-calendar-sync" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px;">
-        ${icon('sync')} <span>Sincronizar Google / Apple Calendar</span>
-      </button>
-      <button type="button" class="secondary" data-close-modal style="padding: 6px 14px; font-size: 12px;">
-        Cerrar
-      </button>
-    </div>
-  `);
+  return openAgendaFilterModal('schedules');
 }
 
 function openAppointmentOutcomeModal(appt) {
@@ -10078,7 +10130,9 @@ document.addEventListener('change', async (event) => {
     } else {
       agendaFilter.hiddenCategories = agendaFilter.hiddenCategories.filter((id) => id !== catId);
     }
-    return await renderAgenda();
+    if (!event.target.closest('#agenda-filter-form')) {
+      return await renderAgenda();
+    }
   }
 });
 
