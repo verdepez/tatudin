@@ -64,7 +64,7 @@ export async function seedStudioData(passedPool = null) {
       { name: 'Box 2 · Blackwork & Geometría', desc: 'Cabina aislada, apoyabrazos rotatorio y bandeja de acero quirúrgico.', day: 45000, hour: 10000 },
       { name: 'Box 3 · Fineline & Micro', desc: 'Lámpara con lupa de precisión, camilla ergonómica y luz natural.', day: 45000, hour: 10000 },
       { name: 'Box 4 · Realismo & Sombras', desc: 'Pantalla 4K para referencias, estación de pigmentos y soporte Pro.', day: 50000, hour: 12000 },
-      { name: 'Box 5 · Guest Spot & Nómades', desc: 'Puesto flexible multi-estilo totalmente equipado para artistas visitantes.', day: 30000, hour: 10000 },
+      { name: 'Box 5 · Guest Spot', desc: 'Puesto flexible multi-estilo totalmente equipado para artistas visitantes.', day: 30000, hour: 10000 },
       { name: 'Sala de Consulta 1 · Bocetos & Diseño', desc: 'Mesa de dibujo digital con iPads Pro, proyector y mesa de calco.', day: 25000, hour: 8000 },
       { name: 'Sala de Reuniones 2 · Estudio & Equipo', desc: 'Sala para briefings con clientes, acuerdos de proyectos y reuniones del staff.', day: 25000, hour: 8000 }
     ];
@@ -88,7 +88,7 @@ export async function seedStudioData(passedPool = null) {
     const categoriesDef = [
       { name: 'Cita de Tatuaje', kind: 'tattoo', color: '#7C3AED', icon: 'check', reqClient: true, reqSpace: true, system: true },
       { name: 'Bocetos y Diseño con Cliente', kind: 'custom', color: '#059669', icon: 'edit', reqClient: true, reqSpace: true, system: false },
-      { name: 'Arriendo de Box Nómada (3h)', kind: 'space_rental', color: '#2563EB', icon: 'box', reqClient: false, reqSpace: true, system: true },
+      { name: 'Arriendo de Box Guest (3h)', kind: 'space_rental', color: '#2563EB', icon: 'box', reqClient: false, reqSpace: true, system: true },
       { name: 'Reunión de Equipo & Estrategia', kind: 'meeting', color: '#D97706', icon: 'clients', reqClient: false, reqSpace: true, system: true },
       { name: 'Marketing & Flash Day', kind: 'marketing', color: '#0284C7', icon: 'bell', reqClient: false, reqSpace: false, system: true }
     ];
@@ -135,7 +135,7 @@ export async function seedStudioData(passedPool = null) {
       `, [uId, studioId, r.comm]);
     }
 
-    // 6. Crear 4 Artistas Nómades / Guest Spot
+    // 6. Crear 4 Artistas Guests / Guest Spot
     const nomadsDef = [
       { name: 'Lucas Nomad (BsAs)', email: 'lucas.nomad@gmail.com', ig: '@lucas.nomad.tattoo', dates: ['2026-08-31', '2026-09-06'], notes: 'Especialista en Neotradicional, invitado desde Argentina.' },
       { name: 'Elena Guest (Berlin)', email: 'elena.guest@berlin-ink.de', ig: '@elena_guest_art', dates: ['2026-08-31', '2026-09-06'], notes: 'Tatuadora invitada de Berlín, estilo Blackout & Ignorant Art.' },
@@ -169,7 +169,7 @@ export async function seedStudioData(passedPool = null) {
         WHERE NOT EXISTS (
           SELECT 1 FROM guest_spot_requests WHERE studio_id = $1 AND artist_email = $3
         )
-      `, [studioId, n.name, n.email, n.ig, spaceMap['Box 5 · Guest Spot & Nómades'], n.dates[0], n.dates[1], n.notes]);
+      `, [studioId, n.name, n.email, n.ig, spaceMap['Box 5 · Guest Spot'], n.dates[0], n.dates[1], n.notes]);
     }
 
     // 7. Crear Base de Datos de Clientes
@@ -184,7 +184,7 @@ export async function seedStudioData(passedPool = null) {
       { name: 'Tomas Gomez', email: 'tomas.g@gmail.com', phone: '+56910987654', notes: 'Cover-up de tatuaje antiguo en hombro con blackwork.' },
       { name: 'Constanza Diaz', email: 'coni.diaz@gmail.com', phone: '+56998765432', notes: 'Boceto y consulta previa para proyecto de manga completa.' },
       { name: 'Alonso Vega', email: 'alonso.v@gmail.com', phone: '+56987654320', notes: 'Reunión de diseño conceptual para tatuaje conmemorativo.' },
-      { name: 'Javiera Munoz', email: 'javi.munoz@gmail.com', phone: '+56976543211', notes: 'Flash tattoo de artista nómade Lucas (Buenos Aires).' },
+      { name: 'Javiera Munoz', email: 'javi.munoz@gmail.com', phone: '+56976543211', notes: 'Flash tattoo de artista guest Lucas (Buenos Aires).' },
       { name: 'Rodrigo Fernandez', email: 'rodrigo.f@gmail.com', phone: '+56965432100', notes: 'Sesión especial con artista invitada Elena de Berlín.' },
       { name: 'Camila Navarro', email: 'cami.navarro@gmail.com', phone: '+56954321011', notes: 'Diseño botánico con Valeria Traveling.' },
       { name: 'Mateo Riquelme', email: 'mateo.r@gmail.com', phone: '+56943210922', notes: 'Lettering chicano con Gabriel de CDMX.' }
@@ -219,7 +219,7 @@ export async function seedStudioData(passedPool = null) {
         status: 'completed',
         price: 0,
         deposit: 0,
-        notes: 'Revisión de agenda semanal, insumos y bienvenida a los 4 nómades invitados.'
+        notes: 'Revisión de agenda semanal, insumos y bienvenida a los 4 guests invitados.'
       },
       {
         title: 'Manga Oriental · Sesión 1 Líneas y Fondos',
@@ -249,16 +249,16 @@ export async function seedStudioData(passedPool = null) {
       },
       {
         title: 'Arriendo Box 3h · Lucas Nomad (Guest Spot BsAs)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Lucas Nomad (BsAs)',
         client: 'Javiera Munoz',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-08-31T11:00:00-04:00',
         dur: 180,
         status: 'completed',
         price: 30000,
         deposit: 30000,
-        notes: 'Arriendo de 3 horas cobrado al nómade por el estudio ($30.000 fijo).'
+        notes: 'Arriendo de 3 horas cobrado al guest por el estudio ($30.000 fijo).'
       },
       {
         title: 'Boceto y Consulta Personalizada Manga Cobertura',
@@ -275,10 +275,10 @@ export async function seedStudioData(passedPool = null) {
       },
       {
         title: 'Arriendo Box 3h · Elena Guest (Guest Spot Berlín)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Elena Guest (Berlin)',
         client: 'Rodrigo Fernandez',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-08-31T15:00:00-04:00',
         dur: 180,
         status: 'completed',
@@ -316,16 +316,16 @@ export async function seedStudioData(passedPool = null) {
       },
       {
         title: 'Arriendo Box 3h · Valeria Traveling (Microrealismo)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Valeria Traveling',
         client: 'Camila Navarro',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-09-01T11:00:00-04:00',
         dur: 180,
         status: 'completed',
         price: 30000,
         deposit: 30000,
-        notes: 'Cobro de arriendo nómade: $30.000 por 3h.'
+        notes: 'Cobro de arriendo guest: $30.000 por 3h.'
       },
       {
         title: 'Reunión de Bocetos y Proyecto Gran Formato',
@@ -342,16 +342,16 @@ export async function seedStudioData(passedPool = null) {
       },
       {
         title: 'Arriendo Box 3h · Gabriel Guest (CDMX Lettering)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Gabriel Guest (CDMX)',
         client: 'Mateo Riquelme',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-09-01T15:30:00-04:00',
         dur: 180,
         status: 'completed',
         price: 30000,
         deposit: 30000,
-        notes: 'Lettering estilo Chicano. Cobro estudio nómade: $30.000.'
+        notes: 'Lettering estilo Chicano. Cobro estudio guest: $30.000.'
       },
 
       // --- MIÉRCOLES 02 DE SEPTIEMBRE ---
@@ -383,10 +383,10 @@ export async function seedStudioData(passedPool = null) {
       },
       {
         title: 'Arriendo Box 3h · Lucas Nomad (Guest Spot BsAs)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Lucas Nomad (BsAs)',
         client: 'Catalina Soto',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-09-02T11:00:00-04:00',
         dur: 180,
         status: 'confirmed',
@@ -409,16 +409,16 @@ export async function seedStudioData(passedPool = null) {
       },
       {
         title: 'Arriendo Box 3h · Elena Guest (Guest Spot Berlín)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Elena Guest (Berlin)',
         client: 'Ignacio Silva',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-09-02T15:30:00-04:00',
         dur: 180,
         status: 'confirmed',
         price: 30000,
         deposit: 30000,
-        notes: 'Pieza avant-garde. Arriendo nómade: $30.000.'
+        notes: 'Pieza avant-garde. Arriendo guest: $30.000.'
       },
 
       // --- JUEVES 03 DE SEPTIEMBRE ---
@@ -450,16 +450,16 @@ export async function seedStudioData(passedPool = null) {
       },
       {
         title: 'Arriendo Box 3h · Valeria Traveling (Microrealismo)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Valeria Traveling',
         client: 'Francisca Rojas',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-09-03T11:00:00-04:00',
         dur: 180,
         status: 'confirmed',
         price: 30000,
         deposit: 30000,
-        notes: 'Arriendo nómade: $30.000 por 3h.'
+        notes: 'Arriendo guest: $30.000 por 3h.'
       },
       {
         title: 'Reunión de Bocetos y Proyecto Animal Mitológico',
@@ -476,16 +476,16 @@ export async function seedStudioData(passedPool = null) {
       },
       {
         title: 'Arriendo Box 3h · Gabriel Guest (CDMX Lettering)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Gabriel Guest (CDMX)',
         client: 'Benjamin Castro',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-09-03T15:30:00-04:00',
         dur: 180,
         status: 'confirmed',
         price: 30000,
         deposit: 30000,
-        notes: 'Arriendo nómade: $30.000 por 3 horas.'
+        notes: 'Arriendo guest: $30.000 por 3 horas.'
       },
 
       // --- VIERNES 04 DE SEPTIEMBRE ---
@@ -517,16 +517,16 @@ export async function seedStudioData(passedPool = null) {
       },
       {
         title: 'Arriendo Box 3h · Lucas Nomad (Guest Spot BsAs)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Lucas Nomad (BsAs)',
         client: 'Valentina Morales',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-09-04T11:00:00-04:00',
         dur: 180,
         status: 'confirmed',
         price: 30000,
         deposit: 30000,
-        notes: 'Arriendo nómade: $30.000 por 3 horas.'
+        notes: 'Arriendo guest: $30.000 por 3 horas.'
       },
       {
         title: 'Planificación de Flash Day y Campaña en Redes',
@@ -539,7 +539,7 @@ export async function seedStudioData(passedPool = null) {
         status: 'confirmed',
         price: 0,
         deposit: 0,
-        notes: 'Reunión de todo el equipo y nómades para coordinar posts y reels del fin de semana.'
+        notes: 'Reunión de todo el equipo y guests para coordinar posts y reels del fin de semana.'
       },
 
       // --- SÁBADO 05 DE SEPTIEMBRE ---
@@ -571,38 +571,38 @@ export async function seedStudioData(passedPool = null) {
       },
       {
         title: 'Arriendo Box 3h · Elena Guest (Guest Spot Berlín)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Elena Guest (Berlin)',
         client: 'Martina Perez',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-09-05T11:00:00-04:00',
         dur: 180,
         status: 'confirmed',
         price: 30000,
         deposit: 30000,
-        notes: 'Flash Day nómade. Arriendo estudio: $30.000.'
+        notes: 'Flash Day guest. Arriendo estudio: $30.000.'
       },
       {
         title: 'Arriendo Box 3h · Gabriel Guest (CDMX Lettering)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Gabriel Guest (CDMX)',
         client: 'Tomas Gomez',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-09-05T15:00:00-04:00',
         dur: 180,
         status: 'confirmed',
         price: 30000,
         deposit: 30000,
-        notes: 'Flash Day nómade tarde. Arriendo estudio: $30.000.'
+        notes: 'Flash Day guest tarde. Arriendo estudio: $30.000.'
       },
 
       // --- DOMINGO 06 DE SEPTIEMBRE ---
       {
         title: 'Arriendo Box 3h · Valeria Traveling (Fin de Gira)',
-        cat: 'Arriendo de Box Nómada (3h)',
+        cat: 'Arriendo de Box Guest (3h)',
         artist: 'Valeria Traveling',
         client: 'Ignacio Silva',
-        space: 'Box 5 · Guest Spot & Nómades',
+        space: 'Box 5 · Guest Spot',
         date: '2026-09-06T11:00:00-04:00',
         dur: 180,
         status: 'confirmed',
@@ -621,7 +621,7 @@ export async function seedStudioData(passedPool = null) {
         status: 'confirmed',
         price: 0,
         deposit: 0,
-        notes: 'Revisión de liquidaciones a residentes, cobros de arriendos nómades y métricas de la semana.'
+        notes: 'Revisión de liquidaciones a residentes, cobros de arriendos guests y métricas de la semana.'
       }
     ];
 
@@ -643,16 +643,16 @@ export async function seedStudioData(passedPool = null) {
     }
 
     // 9. Registrar Transacciones Financieras y Liquidaciones (Ingresos y Egresos)
-    // A) Ingresos por Arriendo de Boxes a Nómades ($30.000 c/u)
+    // A) Ingresos por Arriendo de Boxes a Guests ($30.000 c/u)
     const nomadIncomes = [
-      { desc: 'Arriendo Box Nómada 3h · Lucas Nomad (BsAs)', amount: 30000, date: '2026-08-31', artist: nomadMap['Lucas Nomad (BsAs)'] },
-      { desc: 'Arriendo Box Nómada 3h · Elena Guest (Berlín)', amount: 30000, date: '2026-08-31', artist: nomadMap['Elena Guest (Berlin)'] },
-      { desc: 'Arriendo Box Nómada 3h · Valeria Traveling', amount: 30000, date: '2026-09-01', artist: nomadMap['Valeria Traveling'] },
-      { desc: 'Arriendo Box Nómada 3h · Gabriel Guest (CDMX)', amount: 30000, date: '2026-09-01', artist: nomadMap['Gabriel Guest (CDMX)'] },
-      { desc: 'Arriendo Box Nómada 3h · Lucas Nomad (BsAs)', amount: 30000, date: '2026-09-02', artist: nomadMap['Lucas Nomad (BsAs)'] },
-      { desc: 'Arriendo Box Nómada 3h · Elena Guest (Berlín)', amount: 30000, date: '2026-09-02', artist: nomadMap['Elena Guest (Berlin)'] },
-      { desc: 'Arriendo Box Nómada 3h · Valeria Traveling', amount: 30000, date: '2026-09-03', artist: nomadMap['Valeria Traveling'] },
-      { desc: 'Arriendo Box Nómada 3h · Gabriel Guest (CDMX)', amount: 30000, date: '2026-09-03', artist: nomadMap['Gabriel Guest (CDMX)'] }
+      { desc: 'Arriendo Box Guest 3h · Lucas Nomad (BsAs)', amount: 30000, date: '2026-08-31', artist: nomadMap['Lucas Nomad (BsAs)'] },
+      { desc: 'Arriendo Box Guest 3h · Elena Guest (Berlín)', amount: 30000, date: '2026-08-31', artist: nomadMap['Elena Guest (Berlin)'] },
+      { desc: 'Arriendo Box Guest 3h · Valeria Traveling', amount: 30000, date: '2026-09-01', artist: nomadMap['Valeria Traveling'] },
+      { desc: 'Arriendo Box Guest 3h · Gabriel Guest (CDMX)', amount: 30000, date: '2026-09-01', artist: nomadMap['Gabriel Guest (CDMX)'] },
+      { desc: 'Arriendo Box Guest 3h · Lucas Nomad (BsAs)', amount: 30000, date: '2026-09-02', artist: nomadMap['Lucas Nomad (BsAs)'] },
+      { desc: 'Arriendo Box Guest 3h · Elena Guest (Berlín)', amount: 30000, date: '2026-09-02', artist: nomadMap['Elena Guest (Berlin)'] },
+      { desc: 'Arriendo Box Guest 3h · Valeria Traveling', amount: 30000, date: '2026-09-03', artist: nomadMap['Valeria Traveling'] },
+      { desc: 'Arriendo Box Guest 3h · Gabriel Guest (CDMX)', amount: 30000, date: '2026-09-03', artist: nomadMap['Gabriel Guest (CDMX)'] }
     ];
 
     for (const inc of nomadIncomes) {

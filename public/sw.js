@@ -1,9 +1,9 @@
-const CACHE_NAME = 'tatudin-shell-v30';
+const CACHE_NAME = 'tatudin-shell-v31';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
-  '/styles.css?v=50',
-  '/app.js?v=50',
+  '/styles.css?v=51',
+  '/app.js?v=51',
   '/offline-store.js',
   '/manifest.webmanifest',
   '/favicon.svg',

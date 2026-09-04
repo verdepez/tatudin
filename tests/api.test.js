@@ -250,13 +250,13 @@ test('Finances & Settlements: Calculate commissions and record settlement payout
   assert.equal(Number(updatedRow.pending_settlement), 62500);
 });
 
-test('Guest Spots: Submit public nomad application and studio approves it', async () => {
-  // Public nomad submission
+test('Guest Spots: Submit public guest application and studio approves it', async () => {
+  // Public guest submission
   const publicRes = await request('/api/public/guest-spots', {
     method: 'POST',
     body: JSON.stringify({
       studioId: currentStudioId,
-      artistName: 'Sofi Nómada Ink',
+      artistName: 'Sofi Guest Ink',
       artistEmail: `sofi_${Date.now()}@nomadtattoo.com`,
       artistInstagram: '@sofi.guest',
       spaceId: createdSpaceId,
@@ -286,10 +286,10 @@ test('Guest Spots: Submit public nomad application and studio approves it', asyn
   assert.equal(approveRes.status, 200);
   assert.equal(approveRes.data.status, 'approved');
 
-  // Check that the nomad artist is now in the studio members list
+  // Check that the guest artist is now in the studio members list
   const membersRes = await request('/api/members');
   const nomadMember = membersRes.data.find((m) => m.email === found.artist_email);
-  assert.ok(nomadMember, 'Approved nomad must be added to studio memberships');
+  assert.ok(nomadMember, 'Approved guest must be added to studio memberships');
   assert.equal(nomadMember.role, 'nomad');
 });
 

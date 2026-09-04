@@ -181,7 +181,7 @@ INSERT INTO spaces (id, studio_id, name, description, price_per_day, price_per_h
 VALUES 
   (1, 1, 'Box 1 · Luz Natural', 'Camilla ergonómica, lámpara de alta potencia y luz natural directa.', 45000, 10000, TRUE),
   (2, 1, 'Box 2 · Privado', 'Cabina cerrada acústicamente para piezas grandes o clientes reservados.', 55000, 12000, TRUE),
-  (3, 1, 'Puesto Nómade A', 'Estación flexible equipada para artistas visitantes.', 40000, 9000, TRUE)
+  (3, 1, 'Puesto Guest A', 'Estación flexible equipada para artistas visitantes.', 40000, 9000, TRUE)
 ON CONFLICT (id) DO NOTHING;
 
 -- Demo users

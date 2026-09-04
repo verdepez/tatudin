@@ -118,7 +118,8 @@ const ROLE_MAP = {
   owner: { label: 'Propietario', class: 'role-owner' },
   admin: { label: 'Administrador', class: 'role-admin' },
   resident: { label: 'Residente', class: 'role-resident' },
-  nomad: { label: 'Nómade', class: 'role-nomad' }
+  nomad: { label: 'Guest', class: 'role-nomad' },
+  guest: { label: 'Guest', class: 'role-nomad' }
 };
 
 const GUEST_SPOT_STATUS_MAP = {
@@ -471,7 +472,7 @@ function renderOnboarding(step = 0, authMode = 'register') {
   if (step === 2) {
     const roles = [
       ['independent', '◉', 'Artista independiente', 'Gestiona tu agenda, clientes y finanzas con facilidad.'],
-      ['studio_owner', '▦', 'Studio owner', 'Coordina artistas residentes, nómades y el crecimiento del estudio.'],
+      ['studio_owner', '▦', 'Studio owner', 'Coordina artistas residentes, guests y el crecimiento del estudio.'],
       ['apprentice', '◇', 'Aprendiz', 'Organiza tus referencias y lleva el registro de tus horas de aprendizaje.']
     ];
     app.innerHTML = `
@@ -609,7 +610,7 @@ function updateDrawerUI() {
   
   let roleLabel = 'Artist Owner';
   if (currentUser.role === 'resident') roleLabel = 'Residente';
-  else if (currentUser.role === 'nomad') roleLabel = 'Nómade (Visitante)';
+  else if (currentUser.role === 'nomad' || currentUser.role === 'guest') roleLabel = 'Guest (Visitante)';
   else if (currentUser.role === 'admin') roleLabel = 'Manager / Administrador';
   else if (currentUser.role === 'owner') roleLabel = activeStudio?.account_type === 'independent' ? 'Artista Independiente' : `Artist Owner · ${activeStudio?.name || 'Estudio'}`;
   else if (activeStudio?.name) roleLabel = activeStudio.account_type === 'independent' ? 'Artista Independiente' : `Estudio · ${activeStudio.name}`;
@@ -1098,7 +1099,7 @@ async function render(view = 'dashboard', options = {}) {
         <div>
           <p class="eyebrow">OPERACIÓN</p>
           <h2>Tu espacio crece contigo</h2>
-          <p>Artistas residentes, nómades, boxes y finanzas en un solo lugar.</p>
+          <p>Artistas residentes, guests, boxes y finanzas en un solo lugar.</p>
         </div>
         <span class="arrow">${icon('arrowRight')}</span>
       </section>
@@ -3791,7 +3792,7 @@ async function renderSettings() {
       <div>
         <p class="eyebrow">AJUSTES Y GESTIÓN</p>
         <h1>Tu estudio, a tu manera<span class="dot">.</span></h1>
-        <p class="lead">Administra tu equipo, categorías de agenda, boxes de arriendo y solicitudes de nómades.</p>
+        <p class="lead">Administra tu equipo, categorías de agenda, boxes de arriendo y solicitudes de guests.</p>
       </div>
     </section>
 
@@ -3964,15 +3965,15 @@ async function renderSettings() {
         </div>
       </section>
 
-      <!-- Guest Spots / Nomad requests Panel -->
+      <!-- Guest Spots Panel -->
       <section class="panel">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">VISITAS Y NÓMADES</p>
+            <p class="eyebrow">VISITAS Y GUESTS</p>
             <h2>Solicitudes de Guest Spots</h2>
           </div>
           <div class="section-heading-actions">
-            <button class="secondary small-btn" data-action="copy-guest-spot-link" title="Copiar enlace de postulación para nómades">
+            <button class="secondary small-btn" data-action="copy-guest-spot-link" title="Copiar enlace de postulación para guests">
               ${icon('link')} <span>Copiar enlace</span>
             </button>
             <button class="primary small-btn" data-action="new-guest-spot">
@@ -4011,7 +4012,7 @@ async function renderSettings() {
                 </div>
               </article>
             `;
-          }).join('') || emptyState('Sin solicitudes de nómades', 'Comparte tu enlace de estudio para que artistas nómades postulen a tus boxes.')}
+          }).join('') || emptyState('Sin solicitudes de guests', 'Comparte tu enlace de estudio para que artistas guests postulen a tus boxes.')}
         </div>
       </section>
 
@@ -4358,7 +4359,7 @@ async function renderManagers() {
       <div>
         <p class="eyebrow">EQUIPO Y GESTIÓN DE ROLES</p>
         <h1>Managers & Equipo<span class="dot">.</span></h1>
-        <p class="lead">Administra los accesos, administradores del estudio, artistas residentes y nómades.</p>
+        <p class="lead">Administra los accesos, administradores del estudio, artistas residentes y guests.</p>
       </div>
       <button class="primary" data-action="new-member">${icon('plus')} <span>Agregar miembro</span></button>
     </section>
@@ -4378,7 +4379,7 @@ async function renderManagers() {
         <strong>${residents.length}</strong>
       </div>
       <div class="client-mini-stat panel">
-        <span class="eyebrow">NÓMADES</span>
+        <span class="eyebrow">GUESTS</span>
         <strong>${nomads.length}</strong>
       </div>
     </section>
@@ -4844,7 +4845,7 @@ async function renderBackoffice(tab = currentBackofficeTab) {
           ${icon('building')} <span>Usuarios y Estudios</span>
         </button>
         <button type="button" class="bo-tab-btn ${tab === 'guest-spots' ? 'active' : ''}" data-bo-tab="guest-spots">
-          ${icon('plane')} <span>Solicitudes de Nómades</span>
+          ${icon('plane')} <span>Solicitudes de Guests</span>
         </button>
         <button type="button" class="bo-tab-btn ${tab === 'audit' ? 'active' : ''}" data-bo-tab="audit">
           ${icon('shield')} <span>Auditoría & Trazabilidad</span>
@@ -5091,7 +5092,7 @@ function renderBackofficeUIKitTab() {
               <span class="status-chip status-cancelled">Cancelada / No llegó</span>
               <span class="role-badge role-owner">${icon('crown')} Propietario</span>
               <span class="role-badge role-resident">${icon('palette')} Residente</span>
-              <span class="role-badge role-guest">${icon('plane')} Nómade</span>
+              <span class="role-badge role-guest">${icon('plane')} Guest</span>
               <span class="role-badge role-superadmin">${icon('zap')} Root Master</span>
             </div>
           </div>
@@ -5421,7 +5422,7 @@ function renderBackofficeStatsTab(data) {
             <span class="bo-kpi-icon">${icon('palette')}</span>
           </div>
           <p class="bo-kpi-num">${m.memberships?.total || 0}</p>
-          <p class="bo-kpi-sub">${m.memberships?.residents || 0} residentes · ${m.memberships?.nomads || 0} nómades</p>
+          <p class="bo-kpi-sub">${m.memberships?.residents || 0} residentes · ${m.memberships?.nomads || 0} guests</p>
         </div>
 
         <div class="bo-kpi-card">
@@ -5444,7 +5445,7 @@ function renderBackofficeStatsTab(data) {
 
         <div class="bo-kpi-card">
           <div class="bo-kpi-top">
-            <span>Postulaciones Nómades</span>
+            <span>Postulaciones Guests</span>
             <span class="bo-kpi-icon">${icon('plane')}</span>
           </div>
           <p class="bo-kpi-num">${m.guestSpots?.total || 0}</p>
@@ -5485,7 +5486,7 @@ function renderBackofficeStatsTab(data) {
         <section class="panel">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">SOLICITUDES DE NÓMADES</p>
+              <p class="eyebrow">SOLICITUDES DE GUESTS</p>
               <h2>Últimas postulaciones</h2>
             </div>
             <button type="button" class="secondary small-btn" data-bo-tab="guest-spots">Ver todas →</button>
@@ -5685,7 +5686,7 @@ function renderBackofficeGuestSpotsTab(requests) {
     <section class="panel">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">GESTIÓN DE SOLICITUDES DE NÓMADES (${requests.length})</p>
+          <p class="eyebrow">GESTIÓN DE SOLICITUDES DE GUESTS (${requests.length})</p>
           <h2>Postulaciones de Artistas Visitantes en la Red</h2>
         </div>
       </div>
@@ -5731,7 +5732,7 @@ function renderBackofficeGuestSpotsTab(requests) {
                   </td>
                 </tr>
               `;
-            }).join('') || '<tr><td colspan="7" style="text-align: center; padding: 30px; color: var(--muted);">No hay solicitudes de nómades registradas en la plataforma.</td></tr>'}
+            }).join('') || '<tr><td colspan="7" style="text-align: center; padding: 30px; color: var(--muted);">No hay solicitudes de guests registradas en la plataforma.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -5755,7 +5756,7 @@ function renderBackofficeDatabaseTab() {
             <span class="bo-action-icon" style="color: #10b981;">${icon('sync')}</span>
             <h3>Poblar Sistema con Datos de Prueba</h3>
           </div>
-          <p>Genera automáticamente el estudio demo <strong>Black Lotus Tattoo Studio</strong>, 5 boxes equipados, 4 artistas residentes con comisiones, 4 nómades, citas agendadas de la semana, transacciones de finanzas y portafolios de ejemplo.</p>
+          <p>Genera automáticamente el estudio demo <strong>Black Lotus Tattoo Studio</strong>, 5 boxes equipados, 4 artistas residentes con comisiones, 4 guests, citas agendadas de la semana, transacciones de finanzas y portafolios de ejemplo.</p>
           <div style="margin-top: auto; padding-top: 14px;">
             <button type="button" class="primary" data-action="bo-trigger-seed" style="width: 100%; background: #10b981; border-color: #059669; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
               ${icon('sync')} <span>Poblar Datos Demo Ahora</span>
@@ -5932,7 +5933,7 @@ async function renderArtists() {
 
         <article class="stat-card">
           <div class="stat-card-top">
-            <p class="stat-card-title">Guests / Nómades</p>
+            <p class="stat-card-title">Guests</p>
             <span class="stat-card-icon">${icon('plane')}</span>
           </div>
           <p class="stat-card-value">${nomadCount}</p>
@@ -5960,7 +5961,7 @@ async function renderArtists() {
             <select id="artists-role-filter" style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface);">
               <option value="all" ${artistsFilterRole === 'all' ? 'selected' : ''}>Todos los roles</option>
               <option value="resident" ${artistsFilterRole === 'resident' ? 'selected' : ''}>Residentes</option>
-              <option value="nomad" ${artistsFilterRole === 'nomad' ? 'selected' : ''}>Guests / Nómades</option>
+              <option value="nomad" ${artistsFilterRole === 'nomad' ? 'selected' : ''}>Guests</option>
               <option value="admin" ${artistsFilterRole === 'admin' ? 'selected' : ''}>Administradores</option>
             </select>
           </div>
@@ -6960,7 +6961,7 @@ function renderInventoryItemsGrid(items, currentTab) {
                 ${icon('check')} <span>Consumir</span>
               </button>
               ${currentTab === 'studio' ? `
-                <button type="button" class="inv-action-btn secondary" data-action="transfer-item" data-id="${item.id}" data-name="${item.name}" title="Facilitar o vender a un artista residente/nómade" style="display: inline-flex; align-items: center; gap: 4px;">
+                <button type="button" class="inv-action-btn secondary" data-action="transfer-item" data-id="${item.id}" data-name="${item.name}" title="Facilitar o vender a un artista residente/guest" style="display: inline-flex; align-items: center; gap: 4px;">
                   ${icon('sync')} <span>Transferir</span>
                 </button>
               ` : `
@@ -7169,7 +7170,7 @@ function openMovementModal(preselectedItemId = null, preselectedType = 'consumpt
           <option value="purchase" ${preselectedType === 'purchase' ? 'selected' : ''}>Compra externa (Ingreso de stock)</option>
           <option value="sale_external" ${preselectedType === 'sale_external' ? 'selected' : ''}>Venta a cliente final (Aftercare / Merch)</option>
           <option value="transfer_internal" ${preselectedType === 'transfer_internal' ? 'selected' : ''}>Facilitación / Préstamo de estudio a artista</option>
-          <option value="sale_internal" ${preselectedType === 'sale_internal' ? 'selected' : ''}>Venta interna a artista residente o nómade</option>
+          <option value="sale_internal" ${preselectedType === 'sale_internal' ? 'selected' : ''}>Venta interna a artista residente o guest</option>
           <option value="adjustment" ${preselectedType === 'adjustment' ? 'selected' : ''}>Ajuste manual de stock / Conteo físico</option>
         </select>
       </label>
@@ -7186,7 +7187,7 @@ function openMovementModal(preselectedItemId = null, preselectedType = 'consumpt
 
       <!-- Target Artist Selector (For transfer or internal sale) -->
       <div id="mov-target-user-field" class="form-section ${['transfer_internal', 'sale_internal'].includes(preselectedType) ? '' : 'hidden'}">
-        <label>Artista receptor (Residente o Nómade) *
+        <label>Artista receptor (Residente o Guest) *
           <select name="toUserId">
             <option value="">Selecciona al artista...</option>
             ${members.map((m) => `
@@ -7910,7 +7911,7 @@ function newMemberModal() {
         <label>Tipo de relación / Rol
           <select name="role" id="new-member-role">
             <option value="resident">Residente (permanente)</option>
-            <option value="nomad" selected>Nómade / Guest (visitante)</option>
+            <option value="nomad" selected>Guest (visitante)</option>
             <option value="admin">Administrador del estudio</option>
           </select>
         </label>
@@ -8228,9 +8229,9 @@ function editCommissionModal(membershipId, artistName, currentPercent) {
 
 function newGuestSpotModal() {
   openModal(`
-    <p class="eyebrow">PORTAL DE NÓMADES</p>
+    <p class="eyebrow">PORTAL DE GUESTS</p>
     <h2 id="modal-title">Solicitud de Guest Spot</h2>
-    <p class="lead" style="margin-bottom: 16px;">Postulación de artista nómade o visitante para arrendar un puesto en el estudio.</p>
+    <p class="lead" style="margin-bottom: 16px;">Postulación de artista guest o visitante para arrendar un puesto en el estudio.</p>
     <form data-form="guest-spot-request">
       <label>Nombre del artista
         <input name="artistName" required placeholder="Ej. Valentina Ink" />

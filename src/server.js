@@ -1610,13 +1610,14 @@ app.post('/api/members', requireAuth, async (request, response) => {
     password = 'tatudin123'
   } = request.body;
 
+  const normalizedRole = role === 'guest' ? 'nomad' : role;
   if (!fullName?.trim() || !email?.trim()) return response.status(400).json({ error: 'Nombre completo y email son requeridos' });
-  if (!['admin', 'resident', 'nomad'].includes(role)) return response.status(400).json({ error: 'Rol inválido' });
+  if (!['admin', 'resident', 'nomad'].includes(normalizedRole)) return response.status(400).json({ error: 'Rol inválido' });
 
   const validAgreementTypes = ['commission', 'fixed_daily', 'fixed_monthly'];
   const cleanAgreementType = validAgreementTypes.includes(agreementType) ? agreementType : 'commission';
-  // If role is nomad and hasAppAccess is not explicitly passed as true, default to false (safe Guest mode)
-  const cleanHasAppAccess = hasAppAccess !== undefined ? Boolean(hasAppAccess) : (role !== 'nomad');
+  // If role is nomad/guest and hasAppAccess is not explicitly passed as true, default to false (safe Guest mode)
+  const cleanHasAppAccess = hasAppAccess !== undefined ? Boolean(hasAppAccess) : (normalizedRole !== 'nomad');
 
   const client = await pool.connect();
   try {
@@ -1649,7 +1650,7 @@ app.post('/api/members', requireAuth, async (request, response) => {
       RETURNING *`, [
         userId,
         request.studioId,
-        role,
+        normalizedRole,
         cleanAgreementType,
         Number(commissionPercent || 70),
         Number(fixedAmount || 0),
@@ -1686,6 +1687,7 @@ app.patch('/api/members/:id', requireAuth, async (request, response) => {
   } = request.body;
 
   try {
+    const cleanRole = role ? (role === 'guest' ? 'nomad' : role) : null;
     const result = await pool.query(`UPDATE studio_memberships SET
       role = COALESCE($1, role),
       status = COALESCE($2, status),
@@ -1699,7 +1701,7 @@ app.patch('/api/members/:id', requireAuth, async (request, response) => {
       arrival_instructions = COALESCE($10, arrival_instructions),
       access_instructions = COALESCE($11, access_instructions)
       WHERE id = $12 AND studio_id = $13 RETURNING *`, [
-        role || null,
+        cleanRole,
         status || null,
         agreementType || null,
         commissionPercent !== undefined ? Number(commissionPercent) : null,

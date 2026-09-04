@@ -2,7 +2,7 @@
 
 > **Plataforma web progresiva (PWA) para la gestión integral de agenda, operaciones, artistas y finanzas en estudios de tatuaje y artistas independientes.**
 
-Tatudin simplifica y centraliza la administración operativa del tatuaje profesional: control de agendas y citas, coordinación de boxes o espacios de trabajo, gestión diferenciada de artistas (residentes y nómades), liquidación automática de comisiones, registro de clientes y finanzas con soporte offline nativo.
+Tatudin simplifica y centraliza la administración operativa del tatuaje profesional: control de agendas y citas, coordinación de boxes o espacios de trabajo, gestión diferenciada de artistas (residentes y guests), liquidación automática de comisiones, registro de clientes y finanzas con soporte offline nativo.
 
 ---
 
@@ -17,7 +17,7 @@ Tatudin simplifica y centraliza la administración operativa del tatuaje profesi
 
 - 👥 **Modelo Multidisciplinario de Artistas:**
   - **Residentes:** Artistas permanentes del estudio con acuerdos de porcentaje o tarifa fija, liquidaciones periódicas y acceso compartido.
-  - **Nómades (Guest Spots):** Artistas visitantes que postulan a través de enlaces públicos para arrendar espacios en fechas definidas, con instrucciones de llegada, acceso y pago independientes.
+  - **Guests (Guest Spots):** Artistas visitantes que postulan a través de enlaces públicos para arrendar espacios en fechas definidas, con instrucciones de llegada, acceso y pago independientes.
 
 - 🏢 **Gestión de Espacios y Boxes:**
   - Prevención automática de colisiones y sobreventa de camillas o estaciones de trabajo.
