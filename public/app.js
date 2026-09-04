@@ -39,6 +39,17 @@ const compactMoney = (value) => {
 // Default money formatter now applies the abbreviation format across the entire system
 const money = (value) => compactMoney(value);
 
+// HTML escaping helper to prevent XSS and template injection
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // SVG Icons library
 const ICONS = {
   home: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
@@ -6717,13 +6728,13 @@ function openPublicPortfolioLanding(customData = null) {
 // ==========================================
 
 const INVENTORY_CATEGORIES = {
-  needles: { label: 'Agujas & Cartuchos', color: '#7C3AED' },
-  inks: { label: 'Tintas & Pigmentos', color: '#0284C7' },
-  hygiene: { label: 'Higiene & Bioseguridad', color: '#059669' },
-  aftercare: { label: 'Cuidado & Aftercare', color: '#E11D48' },
-  equipment: { label: 'Máquinas & Equipamiento', color: '#D97706' },
-  merch: { label: 'Merchandising & Arte', color: '#6366F1' },
-  other: { label: 'Otros Insumos', color: '#64748B' }
+  needles: { label: 'Agujas & Cartuchos', color: '#7C3AED', icon: icon('zap') },
+  inks: { label: 'Tintas & Pigmentos', color: '#0284C7', icon: icon('palette') },
+  hygiene: { label: 'Higiene & Bioseguridad', color: '#059669', icon: icon('shield') },
+  aftercare: { label: 'Cuidado & Aftercare', color: '#E11D48', icon: icon('check') },
+  equipment: { label: 'Máquinas & Equipamiento', color: '#D97706', icon: icon('sliders') },
+  merch: { label: 'Merchandising & Arte', color: '#6366F1', icon: icon('image') },
+  other: { label: 'Otros Insumos', color: '#64748B', icon: icon('package') }
 };
 
 const INVENTORY_UNITS = {
@@ -6741,7 +6752,8 @@ const MOVEMENT_TYPES = {
   sale_external: { label: 'Venta a Cliente', class: 'mov-sale', badge: 'Salida / Venta Cliente' },
   transfer_internal: { label: 'Facilitación a Artista', class: 'mov-transfer', badge: 'Transferencia Interna' },
   sale_internal: { label: 'Venta a Artista', class: 'mov-sale-internal', badge: 'Venta Interna' },
-  adjustment: { label: 'Ajuste de Inventario', class: 'mov-adjustment', badge: 'Ajuste / Conteo' }
+  adjustment: { label: 'Ajuste de Inventario', class: 'mov-adjustment', badge: 'Ajuste / Conteo' },
+  request: { label: 'Solicitud de Insumo', class: 'mov-request', badge: 'Solicitud Guest / Artista' }
 };
 
 let inventoryData = null;
@@ -6781,6 +6793,12 @@ async function renderInventory() {
   const { studioItems = [], personalItems = [], members = [], stats = {} } = inventoryData;
   const lowStockItems = [...studioItems, ...personalItems].filter(i => Number(i.quantity) <= Number(i.min_stock_alert));
 
+  const isStudioAccount = (activeStudio?.account_type === 'studio');
+  const userRole = currentUser?.role;
+  const isOwnerOrAdmin = (!isStudioAccount || userRole === 'owner' || userRole === 'admin');
+  const isResident = (isStudioAccount && userRole === 'resident');
+  const isGuest = (isStudioAccount && (userRole === 'guest' || userRole === 'nomad'));
+
   let itemsToDisplay = [];
   if (inventoryCurrentTab === 'studio') {
     itemsToDisplay = studioItems;
@@ -6800,25 +6818,57 @@ async function renderInventory() {
         <div>
           <p class="eyebrow">CONTROL DE INSUMOS & STOCK</p>
           <h1>Inventario & Insumos<span class="dot">.</span></h1>
-          <p class="lead">Gestión de stock del estudio, insumos personales, transferencias entre artistas y compras con boleta OCR.</p>
+          <p class="lead">${isStudioAccount 
+            ? (isGuest 
+                ? 'Catálogo de insumos del estudio. Como artista guest puedes consultar disponibilidad y solicitar los insumos necesarios para tus sesiones.' 
+                : (isResident 
+                    ? 'Insumos del estudio y stock personal. Registra tus consumos directos de insumos en sesión.' 
+                    : 'Gestión completa del stock del estudio, transferencias, ventas y consumos.'))
+            : 'Gestión completa de tu stock de insumos, costos, precios de venta y compras con boleta OCR.'}</p>
         </div>
       </div>
     </section>
 
     <!-- Top Action Bar -->
     <section class="actions inventory-top-actions">
-      <button class="primary" data-action="open-upload-screenshot" title="Importar foto de insumos o boleta desde la galería o archivos">
-        ${icon('image')} <span>Importar Foto de Insumo</span>
+      ${!isGuest ? `
+        <button class="primary" data-action="open-upload-screenshot" title="Importar foto de insumos o boleta desde la galería o archivos">
+          ${icon('image')} <span>Importar Foto de Insumo</span>
+        </button>
+        <button class="secondary" data-action="open-receipt-scanner" title="Escanear insumos o boleta en vivo usando la cámara">
+          ${icon('scan')} <span>Escanear Producto (Cámara)</span>
+        </button>
+      ` : ''}
+
+      ${isOwnerOrAdmin ? `
+        <button class="secondary" data-action="open-new-item-modal" title="Crear nuevo insumo en el catálogo">
+          ${icon('plus')} <span>Nuevo insumo</span>
+        </button>
+        <button class="secondary" data-action="open-new-movement-modal" title="Registrar compra, ajuste o consumo">
+          ${icon('sync')} <span>Registrar movimiento</span>
+        </button>
+      ` : (isResident ? `
+        <button class="secondary" data-action="open-new-personal-item-modal" title="Crear insumo en mi inventario personal">
+          ${icon('plus')} <span>Nuevo insumo personal</span>
+        </button>
+        <button class="secondary" data-action="open-new-movement-modal" title="Registrar consumo en sesión">
+          ${icon('sync')} <span>Registrar consumo</span>
+        </button>
+      ` : `
+        <button class="primary" data-action="open-guest-request-modal" title="Solicitar insumo al estudio para tu sesión">
+          ${icon('bell')} <span>Solicitar insumo al estudio</span>
+        </button>
+      `)}
+
+      <button class="secondary" data-action="export-inventory-csv" title="Exportar insumos a archivo CSV / Excel">
+        ${icon('download')} <span>Exportar CSV</span>
       </button>
-      <button class="secondary" data-action="open-receipt-scanner" title="Escanear insumos o boleta en vivo usando la cámara">
-        ${icon('scan')} <span>Escanear Producto (Cámara)</span>
-      </button>
-      <button class="secondary" data-action="open-new-item-modal">
-        ${icon('plus')} <span>Nuevo insumo</span>
-      </button>
-      <button class="secondary" data-action="open-new-movement-modal">
-        ${icon('sync')} <span>Registrar movimiento</span>
-      </button>
+
+      ${!isGuest ? `
+        <button class="secondary" data-action="open-import-csv-modal" title="Importar insumos masivamente desde archivo CSV">
+          ${icon('cloudUpload')} <span>Importar CSV</span>
+        </button>
+      ` : ''}
     </section>
 
     <!-- Metrics Cards -->
@@ -6826,10 +6876,10 @@ async function renderInventory() {
       <article class="stat-card">
         <div class="stat-card-header">
           <span class="stat-icon-bubble purple">${icon('package')}</span>
-          <p class="eyebrow">STOCK ESTUDIO</p>
+          <p class="eyebrow">${isStudioAccount ? 'STOCK ESTUDIO' : 'TOTAL INSUMOS'}</p>
         </div>
         <strong>${stats.totalStudioItems || studioItems.length}</strong>
-        <small>Insumos compartidos (${money(stats.studioValuation || 0)})</small>
+        <small>${isStudioAccount ? 'Insumos compartidos' : 'Catálogo activo'} (${money(stats.studioValuation || 0)})</small>
       </article>
 
       <article class="stat-card">
@@ -6855,13 +6905,13 @@ async function renderInventory() {
     <div class="inventory-tabs-container">
       <div class="inventory-tabs-nav">
         <button class="inv-tab-btn ${inventoryCurrentTab === 'studio' ? 'active' : ''}" data-inv-tab="studio" style="display: inline-flex; align-items: center; gap: 6px;">
-          ${icon('building')} <span>Insumos del Estudio</span> <span class="inv-tab-badge">${studioItems.length}</span>
+          ${icon('building')} <span>${isStudioAccount ? 'Insumos del Estudio' : 'Inventario Principal'}</span> <span class="inv-tab-badge">${studioItems.length}</span>
         </button>
         <button class="inv-tab-btn ${inventoryCurrentTab === 'personal' ? 'active' : ''}" data-inv-tab="personal" style="display: inline-flex; align-items: center; gap: 6px;">
           ${icon('user')} <span>Mi Inventario Personal</span> <span class="inv-tab-badge">${personalItems.length}</span>
         </button>
         <button class="inv-tab-btn ${inventoryCurrentTab === 'movements' ? 'active' : ''}" data-inv-tab="movements" style="display: inline-flex; align-items: center; gap: 6px;">
-          ${icon('sync')} <span>Movimientos & Ventas</span> <span class="inv-tab-badge">${inventoryMovements.length}</span>
+          ${icon('sync')} <span>Movimientos & Solicitudes</span> <span class="inv-tab-badge">${inventoryMovements.length}</span>
         </button>
         <button class="inv-tab-btn ${inventoryCurrentTab === 'alerts' ? 'active' : ''}" data-inv-tab="alerts" style="display: inline-flex; align-items: center; gap: 6px;">
           ${icon('alert')} <span>Alertas Reposición</span> <span class="inv-tab-badge ${lowStockItems.length > 0 ? 'badge-alert' : ''}">${lowStockItems.length}</span>
@@ -6879,7 +6929,7 @@ async function renderInventory() {
             if (count === 0 && inventoryCategoryFilter !== catKey) return '';
             return `
               <button class="cat-filter-btn ${inventoryCategoryFilter === catKey ? 'active' : ''}" data-inv-cat-filter="${catKey}">
-                ${catMeta.icon} ${catMeta.label} <span class="cat-filter-count">${count}</span>
+                ${catMeta.icon || icon('package')} ${catMeta.label} <span class="cat-filter-count">${count}</span>
               </button>
             `;
           }).join('')}
@@ -6906,10 +6956,17 @@ function renderInventoryItemsGrid(items, currentTab) {
     );
   }
 
+  const isStudioAccount = (activeStudio?.account_type === 'studio');
+  const userRole = currentUser?.role;
+  const isOwnerOrAdmin = (!isStudioAccount || userRole === 'owner' || userRole === 'admin');
+  const isResident = (isStudioAccount && userRole === 'resident');
+  const isGuest = (isStudioAccount && (userRole === 'guest' || userRole === 'nomad'));
+
   return `
     <div class="inventory-items-grid">
       ${items.map((item) => {
         const cat = INVENTORY_CATEGORIES[item.category] || INVENTORY_CATEGORIES.other;
+        const catIcon = cat.icon || icon('package');
         const unitLabel = INVENTORY_UNITS[item.unit] || item.unit;
         const qty = Number(item.quantity);
         const minAlert = Number(item.min_stock_alert || 5);
@@ -6919,19 +6976,37 @@ function renderInventoryItemsGrid(items, currentTab) {
         const stockStatusClass = isOutOfStock ? 'stock-empty' : (isLow ? 'stock-warning' : 'stock-ok');
         const stockStatusLabel = isOutOfStock ? 'AGOTADO' : (isLow ? 'STOCK BAJO' : 'STOCK ÓPTIMO');
 
+        const isStudioItem = !item.owner_user_id;
+        const isOwnPersonalItem = Boolean(item.owner_user_id && Number(item.owner_user_id) === Number(currentUser?.id));
+
         return `
           <article class="inventory-card ${stockStatusClass}" data-item-id="${item.id}">
+            <!-- Product Media Header -->
+            <div class="inv-card-media ${item.image_url ? 'has-image' : 'no-image'}">
+              ${item.image_url ? `
+                <img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.name)}" class="inv-product-img" loading="lazy" />
+                <button type="button" class="inv-img-preview-btn" data-action="preview-inventory-image" data-img-url="${escapeHtml(item.image_url)}" data-img-title="${escapeHtml(item.name)}" title="Ver foto ampliada">
+                  ${icon('eye')}
+                </button>
+              ` : `
+                <div class="inv-img-placeholder" style="--c-color: ${cat.color}">
+                  <span class="placeholder-icon">${catIcon}</span>
+                  <span class="placeholder-label">${cat.label}</span>
+                </div>
+              `}
+            </div>
+
             <div class="inv-card-header">
               <div class="inv-card-category" style="--c-color: ${cat.color}">
-                <span class="inv-cat-icon">${cat.icon}</span>
+                <span class="inv-cat-icon">${catIcon}</span>
                 <span class="inv-cat-name">${cat.label}</span>
               </div>
               <span class="inv-status-pill ${stockStatusClass}">${stockStatusLabel}</span>
             </div>
 
             <div class="inv-card-body">
-              <h3 class="inv-item-name">${item.name}</h3>
-              ${item.sku ? `<p class="inv-item-sku">SKU: <code>${item.sku}</code></p>` : ''}
+              <h3 class="inv-item-name">${escapeHtml(item.name)}</h3>
+              ${item.sku ? `<p class="inv-item-sku">SKU: <code>${escapeHtml(item.sku)}</code></p>` : ''}
 
               <div class="inv-stock-level-box">
                 <div class="inv-stock-numbers">
@@ -6955,25 +7030,49 @@ function renderInventoryItemsGrid(items, currentTab) {
               </div>
             </div>
 
+            <!-- Role-based Action Buttons -->
             <div class="inv-card-actions">
-              <button type="button" class="inv-action-btn primary" data-action="consume-item" data-id="${item.id}" data-name="${item.name}" title="Registrar consumo en sesión" style="display: inline-flex; align-items: center; gap: 4px;">
-                ${icon('check')} <span>Consumir</span>
-              </button>
-              ${currentTab === 'studio' ? `
-                <button type="button" class="inv-action-btn secondary" data-action="transfer-item" data-id="${item.id}" data-name="${item.name}" title="Facilitar o vender a un artista residente/guest" style="display: inline-flex; align-items: center; gap: 4px;">
-                  ${icon('sync')} <span>Transferir</span>
-                </button>
+              ${isStudioItem ? `
+                ${isOwnerOrAdmin ? `
+                  <button type="button" class="inv-action-btn primary" data-action="consume-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Registrar consumo en sesión">
+                    ${icon('check')} <span>Consumir</span>
+                  </button>
+                  <button type="button" class="inv-action-btn secondary" data-action="transfer-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Facilitar o vender a un artista residente/guest">
+                    ${icon('sync')} <span>Transferir</span>
+                  </button>
+                  <button type="button" class="inv-action-btn icon-only" data-action="edit-item" data-id="${item.id}" title="Editar insumo">
+                    ${icon('edit')}
+                  </button>
+                  <button type="button" class="inv-action-btn icon-only danger" data-action="delete-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Eliminar insumo">
+                    ${icon('trash')}
+                  </button>
+                ` : (isResident ? `
+                  <button type="button" class="inv-action-btn primary" data-action="consume-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Registrar consumo en mi sesión">
+                    ${icon('check')} <span>Consumir</span>
+                  </button>
+                ` : (isGuest ? `
+                  <button type="button" class="inv-action-btn primary" data-action="request-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Solicitar este insumo al estudio para mi sesión">
+                    ${icon('bell')} <span>Solicitar insumo</span>
+                  </button>
+                ` : ''))}
               ` : `
-                <button type="button" class="inv-action-btn secondary" data-action="sell-item" data-id="${item.id}" data-name="${item.name}" title="Vender a cliente final" style="display: inline-flex; align-items: center; gap: 4px;">
-                  ${icon('dollar')} <span>Venta</span>
-                </button>
+                ${isOwnPersonalItem || currentUser?.isSuperAdmin ? `
+                  <button type="button" class="inv-action-btn primary" data-action="consume-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Registrar consumo propio">
+                    ${icon('check')} <span>Consumir</span>
+                  </button>
+                  <button type="button" class="inv-action-btn secondary" data-action="sell-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Vender a cliente final">
+                    ${icon('dollar')} <span>Venta</span>
+                  </button>
+                  <button type="button" class="inv-action-btn icon-only" data-action="edit-item" data-id="${item.id}" title="Editar insumo">
+                    ${icon('edit')}
+                  </button>
+                  <button type="button" class="inv-action-btn icon-only danger" data-action="delete-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Eliminar insumo">
+                    ${icon('trash')}
+                  </button>
+                ` : `
+                  <span style="font-size: 11px; color: var(--muted); font-style: italic;">Insumo personal</span>
+                `}
               `}
-              <button type="button" class="inv-action-btn icon-only" data-action="edit-item" data-id="${item.id}" title="Editar insumo" style="display: inline-flex; align-items: center; justify-content: center;">
-                ${icon('edit')}
-              </button>
-              <button type="button" class="inv-action-btn icon-only danger" data-action="delete-item" data-id="${item.id}" data-name="${item.name}" title="Eliminar insumo" style="display: inline-flex; align-items: center; justify-content: center;">
-                ${icon('trash')}
-              </button>
             </div>
           </article>
         `;
@@ -6984,8 +7083,11 @@ function renderInventoryItemsGrid(items, currentTab) {
 
 function renderInventoryMovementsTab(movements) {
   if (!movements || !movements.length) {
-    return emptyState('Sin movimientos registrados', 'Los consumos, compras con boleta OCR y transferencias aparecerán aquí.');
+    return emptyState('Sin movimientos registrados', 'Los consumos, compras con boleta OCR, transferencias y solicitudes aparecerán aquí.');
   }
+
+  const isStudioAccount = (activeStudio?.account_type === 'studio');
+  const isOwnerOrAdmin = (!isStudioAccount || currentUser?.role === 'owner' || currentUser?.role === 'admin' || currentUser?.isSuperAdmin);
 
   return `
     <div class="inventory-movements-wrapper panel">
@@ -7000,6 +7102,7 @@ function renderInventoryMovementsTab(movements) {
               <th>Emisor / Receptor</th>
               <th>Monto ($)</th>
               <th>Notas / Cita</th>
+              ${isOwnerOrAdmin ? `<th>Acción</th>` : ''}
             </tr>
           </thead>
           <tbody>
@@ -7017,17 +7120,19 @@ function renderInventoryMovementsTab(movements) {
                 partyDesc = `Para: ${m.to_user_name}`;
               }
 
+              const isRequest = (m.movement_type === 'request');
+
               return `
-                <tr>
+                <tr class="${isRequest ? 'row-highlight-request' : ''}">
                   <td class="cell-date">${dateFormatted}</td>
                   <td>
                     <span class="movement-pill ${typeMeta.class}" style="display: inline-flex; align-items: center; gap: 5px;">
-                      ${icon('package')}
+                      ${isRequest ? icon('bell') : icon('package')}
                       <span>${typeMeta.badge}</span>
                     </span>
                   </td>
                   <td class="cell-item-name">
-                    <strong>${m.item_name}</strong>
+                    <strong>${escapeHtml(m.item_name)}</strong>
                     <small class="cat-sub">${INVENTORY_CATEGORIES[m.item_category]?.label || m.item_category}</small>
                   </td>
                   <td class="cell-qty">
@@ -7036,9 +7141,18 @@ function renderInventoryMovementsTab(movements) {
                   <td class="cell-party">${partyDesc}</td>
                   <td class="cell-amount">${Number(m.total_amount) > 0 ? money(m.total_amount) : '—'}</td>
                   <td class="cell-notes">
-                    ${m.appointment_title ? `<span class="appointment-tag" style="display: inline-flex; align-items: center; gap: 4px;">${icon('calendar')} <span>${m.appointment_title}</span></span>` : ''}
-                    ${m.notes ? `<span>${m.notes}</span>` : ''}
+                    ${m.appointment_title ? `<span class="appointment-tag" style="display: inline-flex; align-items: center; gap: 4px;">${icon('calendar')} <span>${escapeHtml(m.appointment_title)}</span></span>` : ''}
+                    ${m.notes ? `<span>${escapeHtml(m.notes)}</span>` : ''}
                   </td>
+                  ${isOwnerOrAdmin ? `
+                    <td class="cell-action">
+                      ${isRequest ? `
+                        <button type="button" class="inv-action-btn secondary small-btn" data-action="transfer-item" data-id="${m.item_id}" data-name="${escapeHtml(m.item_name)}" title="Facilitar insumo solicitado">
+                          ${icon('sync')} <span>Facilitar</span>
+                        </button>
+                      ` : '—'}
+                    </td>
+                  ` : ''}
                 </tr>
               `;
             }).join('')}
@@ -7058,7 +7172,7 @@ function openItemModal(item = null, isPersonal = false) {
 
   openModal(`
     <p class="eyebrow">${isEdit ? 'EDITAR INSUMO' : 'NUEVO INSUMO'}</p>
-    <h2 id="modal-title">${isEdit ? item.name : 'Crear Insumo de Inventario'}</h2>
+    <h2 id="modal-title">${isEdit ? escapeHtml(item.name) : 'Crear Insumo de Inventario'}</h2>
 
     <form data-form="inventory-item">
       ${isEdit ? `<input type="hidden" name="id" value="${item.id}" />` : ''}
@@ -7079,7 +7193,7 @@ function openItemModal(item = null, isPersonal = false) {
       </div>
 
       <label>Nombre del insumo / producto *
-        <input name="name" required placeholder="Ej. Cartuchos Kwadron 03RL, Crema Cicatrizante 50g..." value="${item?.name || ''}" />
+        <input name="name" required placeholder="Ej. Cartuchos Kwadron 03RL, Crema Cicatrizante 50g..." value="${escapeHtml(item?.name || '')}" />
       </label>
 
       <div class="grid two">
@@ -7121,8 +7235,25 @@ function openItemModal(item = null, isPersonal = false) {
       </div>
 
       <label>Código SKU / Referencia (opcional)
-        <input name="sku" placeholder="Ej. KW-03RL, DYN-BLK8..." value="${item?.sku || ''}" />
+        <input name="sku" placeholder="Ej. KW-03RL, DYN-BLK8..." value="${escapeHtml(item?.sku || '')}" />
       </label>
+
+      <!-- Product Photo / Image input -->
+      <div class="inv-form-image-group" style="margin-bottom: 14px;">
+        <label>Foto / Imagen del producto (opcional)
+          <div class="inv-image-input-row" style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+            <input type="text" name="imageUrl" id="inv-item-image-url" placeholder="https://... o sube una imagen" value="${escapeHtml(item?.image_url || '')}" style="flex: 1;" />
+            <label class="button secondary small-btn" style="cursor: pointer; display: inline-flex; align-items: center; gap: 4px; margin: 0; padding: 7px 12px; font-size: 12px; white-space: nowrap;">
+              ${icon('camera')} <span>Subir foto</span>
+              <input type="file" id="inv-item-file-input" accept="image/*" style="display: none;" />
+            </label>
+          </div>
+        </label>
+        <div id="inv-item-image-preview-box" class="inv-form-img-preview" style="${item?.image_url ? 'display: flex;' : 'display: none;'}">
+          <img id="inv-item-img-preview" src="${escapeHtml(item?.image_url || '')}" alt="Vista previa" />
+          <button type="button" class="inv-remove-img-btn" id="inv-remove-img-btn" title="Quitar imagen">×</button>
+        </div>
+      </div>
 
       ${!isEdit ? `
         <label class="form-checkbox-label">
@@ -7141,6 +7272,456 @@ function openItemModal(item = null, isPersonal = false) {
       </div>
     </form>
   `);
+
+  const urlInput = document.getElementById('inv-item-image-url');
+  const fileInput = document.getElementById('inv-item-file-input');
+  const previewBox = document.getElementById('inv-item-image-preview-box');
+  const previewImg = document.getElementById('inv-item-img-preview');
+  const removeBtn = document.getElementById('inv-remove-img-btn');
+
+  if (urlInput && previewBox && previewImg) {
+    urlInput.addEventListener('input', () => {
+      const val = urlInput.value.trim();
+      if (val) {
+        previewImg.src = val;
+        previewBox.style.display = 'flex';
+      } else {
+        previewBox.style.display = 'none';
+        previewImg.src = '';
+      }
+    });
+  }
+
+  if (fileInput && urlInput && previewBox && previewImg) {
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        urlInput.value = e.target.result;
+        previewImg.src = e.target.result;
+        previewBox.style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (removeBtn && urlInput && previewBox && previewImg) {
+    removeBtn.addEventListener('click', () => {
+      urlInput.value = '';
+      previewImg.src = '';
+      previewBox.style.display = 'none';
+      if (fileInput) fileInput.value = '';
+    });
+  }
+}
+
+function openGuestRequestModal(preselectedItemId = null) {
+  const studioItems = inventoryData?.studioItems || [];
+  const selectedItem = studioItems.find(i => String(i.id) === String(preselectedItemId)) || studioItems[0];
+
+  if (!studioItems.length) {
+    alert('El estudio no tiene insumos registrados actualmente.');
+    return;
+  }
+
+  openModal(`
+    <p class="eyebrow">SOLICITUD DE INSUMO</p>
+    <h2 id="modal-title">Solicitar Insumo al Estudio</h2>
+    <p class="lead" style="font-size: 13.5px; margin-bottom: 16px;">
+      Envía una solicitud al administrador del estudio para que te prepare o entregue insumos para tu sesión.
+    </p>
+
+    <form data-form="guest-supply-request">
+      <label>Insumo del estudio *
+        <select name="itemId" required id="request-item-id">
+          ${studioItems.map(i => `
+            <option value="${i.id}" ${String(i.id) === String(selectedItem?.id) ? 'selected' : ''}>
+              ${escapeHtml(i.name)} (${i.quantity} ${INVENTORY_UNITS[i.unit] || i.unit} disponibles)
+            </option>
+          `).join('')}
+        </select>
+      </label>
+
+      <div class="grid two">
+        <label>Cantidad solicitada *
+          <input type="number" name="quantity" min="0.1" step="any" required placeholder="1" value="1" />
+        </label>
+
+        <label>Box / Puesto de trabajo (opcional)
+          <input type="text" name="boxOrSpace" placeholder="Ej. Box 2, Estación Guest..." />
+        </label>
+      </div>
+
+      <label>Notas / Motivo de la solicitud (opcional)
+        <textarea name="notes" placeholder="Ej. Para cliente de las 16:00, sesión de sombreado..." rows="3"></textarea>
+      </label>
+
+      <p class="form-error"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary" data-close-modal>Cancelar</button>
+        <button type="submit" class="primary" style="display: inline-flex; align-items: center; gap: 6px;">
+          ${icon('bell')} <span>Enviar Solicitud</span>
+        </button>
+      </div>
+    </form>
+  `);
+}
+
+function openImagePreviewModal(imageUrl, title = 'Foto de Insumo') {
+  openModal(`
+    <div style="text-align: center;">
+      <h3 style="margin-bottom: 14px; font-size: 16px; color: var(--ink);">${escapeHtml(title)}</h3>
+      <div style="max-height: 75vh; overflow: hidden; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #00000030;">
+        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(title)}" style="max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px;" />
+      </div>
+      <div class="modal-actions" style="margin-top: 16px; justify-content: center;">
+        <button type="button" class="secondary" data-close-modal>Cerrar</button>
+      </div>
+    </div>
+  `);
+}
+
+function exportInventoryCSV(items, studioName = 'Tatudin') {
+  if (!items || !items.length) {
+    alert('No hay insumos para exportar.');
+    return;
+  }
+
+  let csv = '=== TATUDIN · CONTROL DE INVENTARIO & STOCK ===\r\n';
+  csv += `Estudio / Cuenta,"${(studioName || 'Tatudin').replace(/"/g, '""')}"\r\n`;
+  csv += `Fecha de exportación,${new Date().toLocaleString('es-CL')}\r\n`;
+  csv += `Total de insumos,${items.length}\r\n\r\n`;
+
+  csv += 'ID,Nombre,Categoría,Unidad,Stock Actual,Stock Mínimo Alerta,Costo Unitario,Precio Venta,SKU,Tipo Inventario,URL Imagen\r\n';
+
+  items.forEach(item => {
+    const cat = INVENTORY_CATEGORIES[item.category]?.label || item.category;
+    const unit = INVENTORY_UNITS[item.unit] || item.unit;
+    const itemType = item.owner_user_id ? 'Personal' : 'Estudio';
+    const name = `"${(item.name || '').replace(/"/g, '""')}"`;
+    const sku = `"${(item.sku || '').replace(/"/g, '""')}"`;
+    const imageUrl = `"${(item.image_url || '').replace(/"/g, '""')}"`;
+    const cost = Number(item.cost_price || 0);
+    const sale = Number(item.sale_price || 0);
+    const qty = Number(item.quantity || 0);
+    const minAlert = Number(item.min_stock_alert || 0);
+
+    csv += `${item.id},${name},"${cat}","${unit}",${qty},${minAlert},${cost},${sale},${sku},"${itemType}",${imageUrl}\r\n`;
+  });
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.download = `tatudin_inventario_${dateStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function downloadInventoryCsvTemplate() {
+  const csv = '\uFEFFNombre,Categoría,Unidad,Stock,Stock Mínimo,Costo,Precio Venta,SKU,Imagen\r\n' +
+    '"Cartuchos Kwadron 03RL",needles,boxes,10,2,25000,35000,"KW-03RL","https://images.unsplash.com/photo-1598371839696-5c5bb00bdc28?auto=format&fit=crop&w=400&q=80"\r\n' +
+    '"Tinta Dynamic Triple Black 8oz",inks,bottles,5,1,18000,24000,"DYN-BLK8",""\r\n' +
+    '"Guantes Nitrilo Negro M (Caja 100u)",hygiene,boxes,8,3,7500,0,"GLV-NIT-M",""\r\n' +
+    '"Crema Aftercare Hustle Butter 30g",aftercare,units,20,5,6000,10000,"HB-30G",""';
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'plantilla_inventario_tatudin.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function parseInventoryCsv(text) {
+  const lines = text.split(/\r\n|\n|\r/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return [];
+
+  const headerLine = lines[0];
+  const commaCount = (headerLine.match(/,/g) || []).length;
+  const semiCount = (headerLine.match(/;/g) || []).length;
+  const delimiter = semiCount > commaCount ? ';' : ',';
+
+  function parseCsvLine(line, delim) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === delim && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  }
+
+  let headerIndex = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const rawCols = parseCsvLine(lines[i], delimiter).map(c => c.toLowerCase().replace(/["'\s_]/g, ''));
+    if (rawCols.some(c => c.includes('nombre') || c.includes('name') || c.includes('producto') || c.includes('item'))) {
+      headerIndex = i;
+      break;
+    }
+  }
+
+  const rawHeaders = parseCsvLine(lines[headerIndex], delimiter).map(c => c.toLowerCase().replace(/["'\s_]/g, ''));
+
+  const nameIdx = rawHeaders.findIndex(h => h.includes('nombre') || h.includes('name') || h.includes('producto') || h.includes('item'));
+  const catIdx = rawHeaders.findIndex(h => h.includes('categoria') || h.includes('categoría') || h.includes('category'));
+  const unitIdx = rawHeaders.findIndex(h => h.includes('unidad') || h.includes('unit'));
+  const qtyIdx = rawHeaders.findIndex(h => h.includes('stock') || h.includes('cantidad') || h.includes('qty') || h.includes('quantity'));
+  const minAlertIdx = rawHeaders.findIndex(h => h.includes('mínimo') || h.includes('minimo') || h.includes('min') || h.includes('alerta'));
+  const costIdx = rawHeaders.findIndex(h => h.includes('costo') || h.includes('cost') || h.includes('compra'));
+  const saleIdx = rawHeaders.findIndex(h => h.includes('precio') || h.includes('venta') || h.includes('sale'));
+  const skuIdx = rawHeaders.findIndex(h => h.includes('sku') || h.includes('codigo') || h.includes('código') || h.includes('ref'));
+  const imgIdx = rawHeaders.findIndex(h => h.includes('imagen') || h.includes('image') || h.includes('foto') || h.includes('url'));
+
+  if (nameIdx === -1) {
+    throw new Error('No se encontró la columna "Nombre" o "Producto" en el encabezado del archivo CSV.');
+  }
+
+  const items = [];
+  for (let i = headerIndex + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('===') || !line.trim()) continue;
+    const cols = parseCsvLine(line, delimiter);
+    const name = cols[nameIdx]?.replace(/^"|"$/g, '').trim();
+    if (!name) continue;
+
+    const rawCat = catIdx !== -1 ? cols[catIdx]?.toLowerCase().replace(/^"|"$/g, '').trim() : '';
+    let category = 'other';
+    if (/aguja|cartuch|needle/i.test(rawCat)) category = 'needles';
+    else if (/tinta|pigment|ink/i.test(rawCat)) category = 'inks';
+    else if (/higien|bioseguridad|limpieza|guante|hygiene/i.test(rawCat)) category = 'hygiene';
+    else if (/cuidad|aftercare|crema|parche/i.test(rawCat)) category = 'aftercare';
+    else if (/maquin|máquina|fuente|cable|pedal|equip/i.test(rawCat)) category = 'equipment';
+    else if (/merch|polera|print|arte/i.test(rawCat)) category = 'merch';
+    else if (INVENTORY_CATEGORIES[rawCat]) category = rawCat;
+
+    const rawUnit = unitIdx !== -1 ? cols[unitIdx]?.toLowerCase().replace(/^"|"$/g, '').trim() : '';
+    let unit = 'units';
+    if (/caja|box/i.test(rawUnit)) unit = 'boxes';
+    else if (/botell|frasc|bottle/i.test(rawUnit)) unit = 'bottles';
+    else if (/paquet|pack/i.test(rawUnit)) unit = 'packs';
+    else if (/rollo|roll/i.test(rawUnit)) unit = 'rolls';
+    else if (/ml|mili/i.test(rawUnit)) unit = 'ml';
+    else if (INVENTORY_UNITS[rawUnit]) unit = rawUnit;
+
+    const quantity = qtyIdx !== -1 ? Math.max(0, parseFloat(cols[qtyIdx]?.replace(/[^0-9.-]/g, '') || '0')) : 0;
+    const minAlert = minAlertIdx !== -1 ? Math.max(0, parseFloat(cols[minAlertIdx]?.replace(/[^0-9.-]/g, '') || '5')) : 5;
+    const costPrice = costIdx !== -1 ? Math.max(0, parseFloat(cols[costIdx]?.replace(/[^0-9.-]/g, '') || '0')) : 0;
+    const salePrice = saleIdx !== -1 ? Math.max(0, parseFloat(cols[saleIdx]?.replace(/[^0-9.-]/g, '') || '0')) : 0;
+    const sku = skuIdx !== -1 ? cols[skuIdx]?.replace(/^"|"$/g, '').trim() : '';
+    const imageUrl = imgIdx !== -1 ? cols[imgIdx]?.replace(/^"|"$/g, '').trim() : '';
+
+    items.push({
+      name,
+      category,
+      unit,
+      quantity,
+      minStockAlert: minAlert,
+      costPrice,
+      salePrice,
+      sku,
+      imageUrl
+    });
+  }
+
+  return items;
+}
+
+let parsedCsvItemsCache = [];
+
+function openInventoryCsvImportModal() {
+  parsedCsvItemsCache = [];
+  const isStudioAccount = (activeStudio?.account_type === 'studio');
+  const userRole = currentUser?.role;
+  const isOwnerOrAdmin = (!isStudioAccount || userRole === 'owner' || userRole === 'admin');
+
+  openModal(`
+    <p class="eyebrow">IMPORTACIÓN MASIVA</p>
+    <h2 id="modal-title">Importar Insumos desde Archivo CSV</h2>
+    <p class="lead" style="font-size: 13.5px; margin-bottom: 16px;">
+      Sube un archivo de hoja de cálculo (.csv) con tus insumos para agregarlos rápidamente al inventario.
+    </p>
+
+    <div style="background: var(--surface-high); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; border: 1px solid var(--line-soft);">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <div>
+          <strong style="font-size: 13px; color: var(--ink);">Plantilla de ejemplo</strong>
+          <p style="font-size: 12px; color: var(--muted); margin: 2px 0 0 0;">Descarga un archivo modelo listo para rellenar en Excel o Google Sheets.</p>
+        </div>
+        <button type="button" class="secondary small-btn" data-action="download-csv-template" style="display: inline-flex; align-items: center; gap: 4px;">
+          ${icon('download')} <span>Descargar Plantilla CSV</span>
+        </button>
+      </div>
+    </div>
+
+    <form data-form="import-inventory-csv">
+      ${isStudioAccount ? `
+        <label>Destino de los insumos *
+          <select name="targetInventory" id="import-target-inventory">
+            ${isOwnerOrAdmin ? `<option value="studio">Inventario del Estudio (Compartido)</option>` : ''}
+            <option value="personal">Mi Inventario Personal</option>
+          </select>
+        </label>
+      ` : `
+        <input type="hidden" name="targetInventory" value="personal" />
+      `}
+
+      <div class="csv-dropzone" id="csv-dropzone" style="border: 2px dashed var(--accent); border-radius: 10px; padding: 22px 16px; text-align: center; cursor: pointer; background: var(--surface-subtle); margin-bottom: 14px; transition: all 0.2s ease;">
+        <div style="font-size: 26px; margin-bottom: 6px; color: var(--accent); display: flex; justify-content: center;">${icon('cloudUpload')}</div>
+        <p style="font-weight: 600; color: var(--ink); margin-bottom: 4px;" id="csv-filename-label">Haz clic para seleccionar o arrastra tu archivo .CSV aquí</p>
+        <small style="color: var(--muted);">Formatos aceptados: .csv (valores separados por coma o punto y coma)</small>
+        <input type="file" id="csv-file-input" accept=".csv,text/csv" style="display: none;" />
+      </div>
+
+      <div id="csv-preview-container" style="display: none; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong style="font-size: 13px; color: var(--ink);">Vista previa de insumos detectados:</strong>
+          <span class="inv-tab-badge" id="csv-parsed-count">0 items</span>
+        </div>
+        <div class="table-responsive" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--line-soft); border-radius: 8px;">
+          <table class="inventory-movements-table" style="font-size: 12px;">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Categoría</th>
+                <th>Stock</th>
+                <th>Costo</th>
+                <th>Venta</th>
+                <th>SKU</th>
+              </tr>
+            </thead>
+            <tbody id="csv-preview-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="form-error" id="csv-import-error"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary" data-close-modal>Cancelar</button>
+        <button type="submit" class="primary" id="csv-submit-btn" disabled style="display: inline-flex; align-items: center; gap: 6px;">
+          ${icon('check')} <span>Confirmar e Importar</span>
+        </button>
+      </div>
+    </form>
+  `);
+
+  const dropzone = document.getElementById('csv-dropzone');
+  const fileInput = document.getElementById('csv-file-input');
+  const filenameLabel = document.getElementById('csv-filename-label');
+  const previewContainer = document.getElementById('csv-preview-container');
+  const previewTbody = document.getElementById('csv-preview-tbody');
+  const parsedCountEl = document.getElementById('csv-parsed-count');
+  const submitBtn = document.getElementById('csv-submit-btn');
+  const errorEl = document.getElementById('csv-import-error');
+
+  if (dropzone && fileInput) {
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = 'var(--accent-hover)';
+      dropzone.style.background = 'var(--surface-high)';
+    });
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.style.borderColor = 'var(--accent)';
+      dropzone.style.background = 'var(--surface-subtle)';
+    });
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = 'var(--accent)';
+      dropzone.style.background = 'var(--surface-subtle)';
+      if (e.dataTransfer.files?.[0]) {
+        processCsvFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files?.[0]) {
+        processCsvFile(fileInput.files[0]);
+      }
+    });
+  }
+
+  function processCsvFile(file) {
+    if (!file.name.endsWith('.csv')) {
+      if (errorEl) errorEl.textContent = 'Por favor selecciona un archivo con extensión .csv';
+      return;
+    }
+    if (filenameLabel) filenameLabel.textContent = `Archivo: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    if (errorEl) errorEl.textContent = '';
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const items = parseInventoryCsv(text);
+        if (!items.length) {
+          if (errorEl) errorEl.textContent = 'No se encontraron insumos válidos en el archivo.';
+          if (submitBtn) submitBtn.disabled = true;
+          if (previewContainer) previewContainer.style.display = 'none';
+          return;
+        }
+
+        parsedCsvItemsCache = items;
+        if (parsedCountEl) parsedCountEl.textContent = `${items.length} insumos listos`;
+        if (previewTbody) {
+          previewTbody.innerHTML = items.slice(0, 10).map(item => `
+            <tr>
+              <td><strong>${escapeHtml(item.name)}</strong></td>
+              <td>${INVENTORY_CATEGORIES[item.category]?.label || item.category}</td>
+              <td>${item.quantity} ${INVENTORY_UNITS[item.unit] || item.unit}</td>
+              <td>${money(item.costPrice)}</td>
+              <td>${item.salePrice > 0 ? money(item.salePrice) : '—'}</td>
+              <td><code>${escapeHtml(item.sku || '—')}</code></td>
+            </tr>
+          `).join('');
+
+          if (items.length > 10) {
+            previewTbody.innerHTML += `
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--muted); font-style: italic;">
+                  ... y ${items.length - 10} insumos más incluidos en la importación.
+                </td>
+              </tr>
+            `;
+          }
+        }
+
+        if (previewContainer) previewContainer.style.display = 'block';
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = `${icon('check')} <span>Importar ${items.length} insumos</span>`;
+        }
+      } catch (err) {
+        if (errorEl) errorEl.textContent = err.message || 'Error al procesar el archivo CSV.';
+        if (submitBtn) submitBtn.disabled = true;
+        if (previewContainer) previewContainer.style.display = 'none';
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
 }
 
 function openMovementModal(preselectedItemId = null, preselectedType = 'consumption') {
@@ -7676,6 +8257,12 @@ function showReceiptConfirmationModal(data) {
       <label class="form-checkbox-label">
         <input type="checkbox" name="createExpense" value="true" checked />
         <span>Registrar automáticamente como <strong>Egreso en Billetera</strong></span>
+      </label>
+
+      <input type="hidden" name="imageSource" value="${escapeHtml(data.imageSource || '')}" />
+      <label class="form-checkbox-label">
+        <input type="checkbox" name="useAsProductImage" value="true" checked />
+        <span>Guardar esta foto como imagen del producto en Inventario</span>
       </label>
 
       <p class="form-error"></p>
@@ -9843,6 +10430,30 @@ document.addEventListener('click', async (event) => {
   if (event.target.closest('[data-action="open-new-item-modal"]')) {
     return openItemModal(null, inventoryCurrentTab === 'personal');
   }
+  if (event.target.closest('[data-action="open-new-personal-item-modal"]')) {
+    return openItemModal(null, true);
+  }
+  if (event.target.closest('[data-action="open-guest-request-modal"]')) {
+    return openGuestRequestModal();
+  }
+  const requestItemBtn = event.target.closest('[data-action="request-item"]');
+  if (requestItemBtn) {
+    return openGuestRequestModal(requestItemBtn.dataset.id);
+  }
+  if (event.target.closest('[data-action="export-inventory-csv"]')) {
+    const allItems = [...(inventoryData?.studioItems || []), ...(inventoryData?.personalItems || [])];
+    return exportInventoryCSV(allItems, activeStudio?.name || 'Tatudin');
+  }
+  if (event.target.closest('[data-action="open-import-csv-modal"]')) {
+    return openInventoryCsvImportModal();
+  }
+  if (event.target.closest('[data-action="download-csv-template"]')) {
+    return downloadInventoryCsvTemplate();
+  }
+  const previewImgBtn = event.target.closest('[data-action="preview-inventory-image"]');
+  if (previewImgBtn) {
+    return openImagePreviewModal(previewImgBtn.dataset.imgUrl, previewImgBtn.dataset.imgTitle);
+  }
   if (event.target.closest('[data-action="open-new-movement-modal"]')) {
     return openMovementModal(null, 'consumption');
   }
@@ -10193,6 +10804,7 @@ document.addEventListener('submit', async (event) => {
     }
     if (form.dataset.form === 'inventory-item') {
       const isPersonal = Boolean(form.querySelector('[name="isPersonal"]')?.checked);
+      const imageUrl = (body.imageUrl || form.querySelector('[name="imageUrl"]')?.value || '').trim();
       await api('/api/inventory/items', {
         method: 'POST',
         body: JSON.stringify({
@@ -10205,6 +10817,7 @@ document.addEventListener('submit', async (event) => {
           costPrice: Number(body.costPrice) || 0,
           salePrice: Number(body.salePrice) || 0,
           sku: body.sku,
+          imageUrl,
           isPersonal
         })
       });
@@ -10228,6 +10841,48 @@ document.addEventListener('submit', async (event) => {
       closeModal();
       return await renderInventory();
     }
+    if (form.dataset.form === 'guest-supply-request') {
+      const itemId = Number(body.itemId);
+      const qty = Number(body.quantity) || 1;
+      const box = body.boxOrSpace ? `[Puesto: ${body.boxOrSpace}] ` : '';
+      const notes = `${box}${body.notes || ''}`.trim() || 'Solicitud de insumo por artista guest';
+
+      await api('/api/inventory/movements', {
+        method: 'POST',
+        body: JSON.stringify({
+          itemId,
+          movementType: 'request',
+          quantity: qty,
+          notes
+        })
+      });
+      closeModal();
+      alert('¡Solicitud de insumo enviada al administrador del estudio exitosamente!');
+      return await renderInventory();
+    }
+    if (form.dataset.form === 'import-inventory-csv') {
+      if (!parsedCsvItemsCache.length) {
+        throw new Error('Primero selecciona un archivo CSV con insumos válidos.');
+      }
+      const isPersonal = (body.targetInventory === 'personal');
+      const submitBtn = form.querySelector('#csv-submit-btn');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Importando insumos...';
+      }
+
+      const res = await api('/api/inventory/import-csv', {
+        method: 'POST',
+        body: JSON.stringify({
+          items: parsedCsvItemsCache,
+          isPersonal
+        })
+      });
+
+      closeModal();
+      alert(`¡Se importaron ${res.importedCount || parsedCsvItemsCache.length} insumos exitosamente al inventario ${isPersonal ? 'personal' : 'del estudio'}!`);
+      return await renderInventory();
+    }
     if (form.dataset.form === 'receipt-ocr-confirm') {
       const existingItemId = body.existingItemId ? Number(body.existingItemId) : null;
       let targetItemId = existingItemId;
@@ -10235,6 +10890,8 @@ document.addEventListener('submit', async (event) => {
       const qty = Number(body.quantity) || 1;
       const totalAmount = Number(body.totalAmount) || 0;
       const unitPrice = qty > 0 ? Math.round(totalAmount / qty) : totalAmount;
+      const useAsProductImage = Boolean(form.querySelector('[name="useAsProductImage"]')?.checked);
+      const imageUrl = useAsProductImage ? (body.imageSource || '') : '';
 
       if (!targetItemId) {
         const newItemRes = await api('/api/inventory/items', {
@@ -10246,6 +10903,7 @@ document.addEventListener('submit', async (event) => {
             quantity: 0,
             costPrice: unitPrice,
             salePrice: Math.round(unitPrice * 1.3),
+            imageUrl,
             isPersonal
           })
         });
@@ -10261,6 +10919,7 @@ document.addEventListener('submit', async (event) => {
           quantity: qty,
           unitPrice: unitPrice,
           totalAmount: totalAmount,
+          receiptImageUrl: body.imageSource || '',
           notes: 'Compra procesada con OCR de Boleta',
           createFinancialRecord: createExpense
         })

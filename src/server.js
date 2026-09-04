@@ -3288,8 +3288,10 @@ app.get('/api/inventory', requireAuth, async (request, response) => {
     // 4. Low stock alerts (items where quantity <= min_stock_alert)
     const lowStockStudio = studioItemsRes.rows.filter(i => Number(i.quantity) <= Number(i.min_stock_alert));
     const lowStockPersonal = personalItemsRes.rows.filter(i => Number(i.quantity) <= Number(i.min_stock_alert));
+    const allItems = [...studioItemsRes.rows, ...personalItemsRes.rows];
 
     return response.json({
+      items: allItems,
       studioItems: studioItemsRes.rows,
       personalItems: personalItemsRes.rows,
       members: membersRes.rows,
@@ -3318,6 +3320,7 @@ app.post('/api/inventory/items', requireAuth, async (request, response) => {
     costPrice = 0,
     salePrice = 0,
     sku = '',
+    imageUrl = '',
     isPersonal = false
   } = request.body;
 
@@ -3325,11 +3328,46 @@ app.post('/api/inventory/items', requireAuth, async (request, response) => {
     return response.status(400).json({ error: 'El nombre del insumo es obligatorio' });
   }
 
+  const validCategories = ['needles', 'inks', 'hygiene', 'aftercare', 'equipment', 'merch', 'other'];
+  const cleanCategory = validCategories.includes(category) ? category : 'other';
+
+  const validUnits = ['units', 'boxes', 'bottles', 'packs', 'rolls', 'ml'];
+  const unitAliases = {
+    unit: 'units', units: 'units', u: 'units', unidad: 'units', unidades: 'units',
+    box: 'boxes', boxes: 'boxes', caja: 'boxes', cajas: 'boxes',
+    bottle: 'bottles', bottles: 'bottles', frasco: 'bottles', frascos: 'bottles',
+    pack: 'packs', packs: 'packs', paquete: 'packs', paquetes: 'packs',
+    roll: 'rolls', rolls: 'rolls', rollo: 'rolls', rollos: 'rolls',
+    ml: 'ml', mililitro: 'ml', mililitros: 'ml'
+  };
+  const cleanUnit = unitAliases[String(unit || '').toLowerCase().trim()] || (validUnits.includes(unit) ? unit : 'units');
+
   const studioId = request.studioId;
-  const ownerUserId = isPersonal ? request.user.id : null;
 
   try {
+    // Check studio account type and role permissions
+    const studioRes = await pool.query('SELECT account_type FROM studios WHERE id = $1', [studioId]);
+    const isStudioAccount = (studioRes.rows[0]?.account_type === 'studio');
+    const userRole = request.user.role;
+    const isOwnerOrAdmin = (!isStudioAccount || userRole === 'owner' || userRole === 'admin' || request.isSuperAdmin);
+
     if (id) {
+      // Check existing item
+      const itemCheck = await pool.query('SELECT * FROM inventory_items WHERE id = $1 AND studio_id = $2', [id, studioId]);
+      if (!itemCheck.rowCount) {
+        return response.status(404).json({ error: 'Insumo no encontrado' });
+      }
+      const existing = itemCheck.rows[0];
+
+      // If it's a studio item and this is a studio account, only owner/admin can edit
+      if (existing.owner_user_id === null && isStudioAccount && !isOwnerOrAdmin) {
+        return response.status(403).json({ error: 'Solo los administradores del estudio pueden modificar insumos del estudio' });
+      }
+      // If it's a personal item, only its owner can edit
+      if (existing.owner_user_id !== null && existing.owner_user_id !== request.user.id && !request.isSuperAdmin) {
+        return response.status(403).json({ error: 'No tienes permiso para modificar este insumo personal' });
+      }
+
       // Update existing item
       const updateRes = await pool.query(`
         UPDATE inventory_items SET
@@ -3341,44 +3379,51 @@ app.post('/api/inventory/items', requireAuth, async (request, response) => {
           cost_price = $6,
           sale_price = $7,
           sku = $8,
+          image_url = $9,
           updated_at = NOW()
-        WHERE id = $9 AND studio_id = $10 RETURNING *
+        WHERE id = $10 AND studio_id = $11 RETURNING *
       `, [
         name.trim(),
-        category,
-        unit,
+        cleanCategory,
+        cleanUnit,
         Math.max(0, Number(quantity) || 0),
         Math.max(0, Number(minStockAlert) || 0),
         Math.max(0, Number(costPrice) || 0),
         Math.max(0, Number(salePrice) || 0),
         (sku || '').trim(),
+        (imageUrl || '').trim(),
         id,
         studioId
       ]);
 
-      if (!updateRes.rowCount) {
-        return response.status(404).json({ error: 'Insumo no encontrado' });
-      }
-
-      return response.json({ ok: true, item: updateRes.rows[0] });
+      const updatedItem = updateRes.rows[0];
+      return response.json({ ok: true, id: updatedItem.id, item: updatedItem, ...updatedItem });
     }
+
+    // Creating new item: check permissions if creating studio stock
+    if (!isPersonal && isStudioAccount && !isOwnerOrAdmin) {
+      return response.status(403).json({ error: 'Solo los administradores del estudio pueden agregar insumos al catálogo del estudio' });
+    }
+
+    const ownerUserId = isPersonal ? request.user.id : null;
 
     // Insert new item
     const insRes = await pool.query(`
       INSERT INTO inventory_items (
-        studio_id, owner_user_id, name, category, unit, quantity, min_stock_alert, cost_price, sale_price, sku
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *
+        studio_id, owner_user_id, name, category, unit, quantity, min_stock_alert, cost_price, sale_price, sku, image_url
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *
     `, [
       studioId,
       ownerUserId,
       name.trim(),
-      category,
-      unit,
+      cleanCategory,
+      cleanUnit,
       Math.max(0, Number(quantity) || 0),
       Math.max(0, Number(minStockAlert) || 0),
       Math.max(0, Number(costPrice) || 0),
       Math.max(0, Number(salePrice) || 0),
-      (sku || '').trim()
+      (sku || '').trim(),
+      (imageUrl || '').trim()
     ]);
 
     // Register initial stock movement if quantity > 0
@@ -3397,7 +3442,8 @@ app.post('/api/inventory/items', requireAuth, async (request, response) => {
       ]);
     }
 
-    return response.status(201).json({ ok: true, item: insRes.rows[0] });
+    const newItem = insRes.rows[0];
+    return response.status(201).json({ ok: true, id: newItem.id, item: newItem, ...newItem });
   } catch (error) {
     return response.status(500).json({ error: error.message });
   }
@@ -3406,12 +3452,26 @@ app.post('/api/inventory/items', requireAuth, async (request, response) => {
 app.delete('/api/inventory/items/:id', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
+    const studioRes = await pool.query('SELECT account_type FROM studios WHERE id = $1', [request.studioId]);
+    const isStudioAccount = (studioRes.rows[0]?.account_type === 'studio');
+    const isOwnerOrAdmin = (!isStudioAccount || request.user.role === 'owner' || request.user.role === 'admin' || request.isSuperAdmin);
+
+    const itemCheck = await pool.query('SELECT * FROM inventory_items WHERE id = $1 AND studio_id = $2', [request.params.id, request.studioId]);
+    if (!itemCheck.rowCount) return response.status(404).json({ error: 'Insumo no encontrado' });
+    const item = itemCheck.rows[0];
+
+    if (item.owner_user_id === null && isStudioAccount && !isOwnerOrAdmin) {
+      return response.status(403).json({ error: 'Solo los administradores del estudio pueden eliminar insumos del estudio' });
+    }
+    if (item.owner_user_id !== null && item.owner_user_id !== request.user.id && !request.isSuperAdmin) {
+      return response.status(403).json({ error: 'No tienes permiso para eliminar este insumo personal' });
+    }
+
     const deleted = await pool.query(`
       UPDATE inventory_items SET is_active = FALSE, updated_at = NOW() 
       WHERE id = $1 AND studio_id = $2 RETURNING id
     `, [request.params.id, request.studioId]);
 
-    if (!deleted.rowCount) return response.status(404).json({ error: 'Insumo no encontrado' });
     return response.json({ ok: true, id: Number(request.params.id) });
   } catch (error) {
     return response.status(500).json({ error: error.message });
@@ -3463,7 +3523,7 @@ app.post('/api/inventory/movements', requireAuth, async (request, response) => {
     createFinancialRecord = false
   } = request.body;
 
-  const validTypes = ['purchase', 'consumption', 'sale_external', 'transfer_internal', 'sale_internal', 'adjustment'];
+  const validTypes = ['purchase', 'consumption', 'sale_external', 'transfer_internal', 'sale_internal', 'adjustment', 'request'];
   if (!validTypes.includes(movementType)) {
     return response.status(400).json({ error: 'Tipo de movimiento inválido' });
   }
@@ -3487,6 +3547,64 @@ app.post('/api/inventory/movements', requireAuth, async (request, response) => {
       return response.status(404).json({ error: 'Insumo no encontrado' });
     }
     const sourceItem = itemRes.rows[0];
+
+    // Check studio account type and role permissions
+    const studioRes = await client.query('SELECT account_type FROM studios WHERE id = $1', [studioId]);
+    const isStudioAccount = (studioRes.rows[0]?.account_type === 'studio');
+    const userRole = request.user.role;
+    const isOwnerOrAdmin = (!isStudioAccount || userRole === 'owner' || userRole === 'admin' || request.isSuperAdmin);
+    const isGuest = (userRole === 'nomad' || userRole === 'guest');
+
+    if (sourceItem.owner_user_id === null && isStudioAccount) {
+      if (movementType === 'consumption') {
+        if (isGuest && !request.isSuperAdmin) {
+          await client.query('ROLLBACK');
+          return response.status(403).json({ error: 'Los artistas guest deben solicitar insumos al estudio antes de consumirlos' });
+        }
+      } else if (movementType === 'request') {
+        // Allowed for guests & residents
+      } else {
+        if (!isOwnerOrAdmin) {
+          await client.query('ROLLBACK');
+          return response.status(403).json({ error: 'Solo los administradores del estudio pueden realizar este movimiento sobre insumos del estudio' });
+        }
+      }
+    } else if (sourceItem.owner_user_id !== null) {
+      if (sourceItem.owner_user_id !== currentUserId && !request.isSuperAdmin) {
+        await client.query('ROLLBACK');
+        return response.status(403).json({ error: 'No tienes permiso para registrar movimientos sobre este insumo personal' });
+      }
+    }
+
+    // If movement is a supply request
+    if (movementType === 'request') {
+      const movRes = await client.query(`
+        INSERT INTO inventory_movements (
+          item_id, studio_id, movement_type, quantity, unit_price, total_amount,
+          from_user_id, to_user_id, appointment_id, transaction_id, receipt_image_url, notes
+        ) VALUES ($1, $2, 'request', $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *
+      `, [
+        itemId,
+        studioId,
+        qty,
+        Number(sourceItem.cost_price || 0),
+        0,
+        currentUserId,
+        null,
+        appointmentId ? Number(appointmentId) : null,
+        null,
+        receiptImageUrl || '',
+        notes || 'Solicitud de insumo por artista'
+      ]);
+
+      await client.query('COMMIT');
+      return response.status(201).json({
+        ok: true,
+        movement: movRes.rows[0],
+        updatedItem: sourceItem,
+        isRequest: true
+      });
+    }
 
     let newSourceQty = Number(sourceItem.quantity);
     let calculatedTotal = Number(totalAmount) || (qty * (Number(unitPrice) || Number(sourceItem.cost_price || 0)));
@@ -3545,8 +3663,8 @@ app.post('/api/inventory/movements', requireAuth, async (request, response) => {
       } else {
         await client.query(`
           INSERT INTO inventory_items (
-            studio_id, owner_user_id, name, category, unit, quantity, min_stock_alert, cost_price, sale_price, sku
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            studio_id, owner_user_id, name, category, unit, quantity, min_stock_alert, cost_price, sale_price, sku, image_url
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         `, [
           studioId,
           toUserId,
@@ -3557,7 +3675,8 @@ app.post('/api/inventory/movements', requireAuth, async (request, response) => {
           sourceItem.min_stock_alert,
           Number(unitPrice) || Number(sourceItem.cost_price),
           sourceItem.sale_price,
-          sourceItem.sku
+          sourceItem.sku,
+          sourceItem.image_url || ''
         ]);
       }
 
@@ -3602,6 +3721,92 @@ app.post('/api/inventory/movements', requireAuth, async (request, response) => {
       movement: movRes.rows[0],
       updatedItem: { ...sourceItem, quantity: newSourceQty }
     });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    return response.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// CSV Import Endpoint
+app.post('/api/inventory/import-csv', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const { items = [], isPersonal = false } = request.body;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return response.status(400).json({ error: 'No se enviaron productos para importar' });
+  }
+
+  const studioId = request.studioId;
+  const studioRes = await pool.query('SELECT account_type FROM studios WHERE id = $1', [studioId]);
+  const isStudioAccount = (studioRes.rows[0]?.account_type === 'studio');
+  const userRole = request.user.role;
+  const isOwnerOrAdmin = (!isStudioAccount || userRole === 'owner' || userRole === 'admin' || request.isSuperAdmin);
+
+  if (!isPersonal && isStudioAccount && !isOwnerOrAdmin) {
+    return response.status(403).json({ error: 'Solo los administradores del estudio pueden importar insumos al catálogo del estudio' });
+  }
+
+  const ownerUserId = isPersonal ? request.user.id : null;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+    const validCategories = ['needles', 'inks', 'hygiene', 'aftercare', 'equipment', 'merch', 'other'];
+    const validUnits = ['units', 'boxes', 'bottles', 'packs', 'ml', 'rolls'];
+    const unitAliases = {
+      unit: 'units', units: 'units', u: 'units', unidad: 'units', unidades: 'units',
+      box: 'boxes', boxes: 'boxes', caja: 'boxes', cajas: 'boxes',
+      bottle: 'bottles', bottles: 'bottles', frasco: 'bottles', frascos: 'bottles',
+      pack: 'packs', packs: 'packs', paquete: 'packs', paquetes: 'packs',
+      roll: 'rolls', rolls: 'rolls', rollo: 'rolls', rollos: 'rolls',
+      ml: 'ml', mililitro: 'ml', mililitros: 'ml'
+    };
+    let importedCount = 0;
+
+    for (const item of items) {
+      const name = (item.name || item.nombre || '').trim();
+      if (!name) continue;
+
+      let category = (item.category || item.categoria || 'other').toLowerCase().trim();
+      if (!validCategories.includes(category)) category = 'other';
+
+      const rawUnit = (item.unit || item.unidad || 'units').toLowerCase().trim();
+      const unit = unitAliases[rawUnit] || (validUnits.includes(rawUnit) ? rawUnit : 'units');
+
+      const quantity = Math.max(0, Number(item.quantity ?? item.stock ?? item.cantidad) || 0);
+      const minStockAlert = Math.max(0, Number(item.minStockAlert ?? item.min_stock_alert ?? item.min_stock ?? item.stock_minimo) || 5);
+      const costPrice = Math.max(0, Number(item.costPrice ?? item.cost_price ?? item.costo) || 0);
+      const salePrice = Math.max(0, Number(item.salePrice ?? item.sale_price ?? item.precio) || 0);
+      const sku = (item.sku ?? item.codigo ?? '').trim();
+      const imageUrl = (item.imageUrl ?? item.image_url ?? item.imagen ?? item.foto ?? '').trim();
+
+      const insRes = await client.query(`
+        INSERT INTO inventory_items (
+          studio_id, owner_user_id, name, category, unit, quantity, min_stock_alert, cost_price, sale_price, sku, image_url
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id
+      `, [studioId, ownerUserId, name, category, unit, quantity, minStockAlert, costPrice, salePrice, sku, imageUrl]);
+
+      if (quantity > 0) {
+        await client.query(`
+          INSERT INTO inventory_movements (
+            item_id, studio_id, movement_type, quantity, unit_price, total_amount, from_user_id, notes
+          ) VALUES ($1, $2, 'adjustment', $3, $4, $5, $6, 'Carga masiva vía importación CSV')
+        `, [
+          insRes.rows[0].id,
+          studioId,
+          quantity,
+          costPrice,
+          quantity * costPrice,
+          request.user.id
+        ]);
+      }
+      importedCount++;
+    }
+
+    await client.query('COMMIT');
+    return response.json({ ok: true, importedCount });
   } catch (err) {
     await client.query('ROLLBACK');
     return response.status(500).json({ error: err.message });
@@ -3877,19 +4082,21 @@ async function ensureAuthSchema() {
     cost_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
     sale_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
     sku TEXT DEFAULT '',
+    image_url TEXT DEFAULT '',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
   await safeExec('ALTER TABLE inventory_items owner_user_id', `ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE`);
   await safeExec('ALTER TABLE inventory_items min_stock_alert', `ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS min_stock_alert NUMERIC(12, 2) NOT NULL DEFAULT 5`);
+  await safeExec('ALTER TABLE inventory_items image_url', `ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''`);
 
-  // 14. Inventory Movements (Purchases, Consumptions, Sales, Transfers)
+  // 14. Inventory Movements (Purchases, Consumptions, Sales, Transfers, Requests)
   await safeExec('CREATE TABLE inventory_movements', `CREATE TABLE IF NOT EXISTS inventory_movements (
     id SERIAL PRIMARY KEY,
     item_id INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
     studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
-    movement_type TEXT NOT NULL CHECK (movement_type IN ('purchase', 'consumption', 'sale_external', 'transfer_internal', 'sale_internal', 'adjustment')),
+    movement_type TEXT NOT NULL CHECK (movement_type IN ('purchase', 'consumption', 'sale_external', 'transfer_internal', 'sale_internal', 'adjustment', 'request')),
     quantity NUMERIC(12, 2) NOT NULL,
     unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
     total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
@@ -3901,6 +4108,8 @@ async function ensureAuthSchema() {
     notes TEXT DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+  await safeExec('ALTER TABLE inventory_movements drop constraint', `ALTER TABLE inventory_movements DROP CONSTRAINT IF EXISTS inventory_movements_movement_type_check`);
+  await safeExec('ALTER TABLE inventory_movements add constraint', `ALTER TABLE inventory_movements ADD CONSTRAINT inventory_movements_movement_type_check CHECK (movement_type IN ('purchase', 'consumption', 'sale_external', 'transfer_internal', 'sale_internal', 'adjustment', 'request'))`);
 
   // 15. Onboarding Profiles
   await safeExec('CREATE TABLE onboarding_profiles', `CREATE TABLE IF NOT EXISTS onboarding_profiles (

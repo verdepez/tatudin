@@ -167,6 +167,41 @@ CREATE TABLE IF NOT EXISTS session_transcripts (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS inventory_items (
+  id SERIAL PRIMARY KEY,
+  studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+  owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'needles' CHECK (category IN ('needles', 'inks', 'hygiene', 'aftercare', 'equipment', 'merch', 'other')),
+  unit TEXT NOT NULL DEFAULT 'units' CHECK (unit IN ('units', 'boxes', 'bottles', 'packs', 'ml', 'rolls')),
+  quantity NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+  min_stock_alert NUMERIC(12, 2) NOT NULL DEFAULT 5,
+  cost_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  sale_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  sku TEXT DEFAULT '',
+  image_url TEXT DEFAULT '',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS inventory_movements (
+  id SERIAL PRIMARY KEY,
+  item_id INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+  studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+  movement_type TEXT NOT NULL CHECK (movement_type IN ('purchase', 'consumption', 'sale_external', 'transfer_internal', 'sale_internal', 'adjustment', 'request')),
+  quantity NUMERIC(12, 2) NOT NULL,
+  unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  from_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  to_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  appointment_id INTEGER REFERENCES appointments(id) ON DELETE SET NULL,
+  transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+  receipt_image_url TEXT DEFAULT '',
+  notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Demo studio
 INSERT INTO studios (id, name)
 VALUES (1, 'Ink Sanctuary')

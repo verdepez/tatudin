@@ -5495,6 +5495,149 @@ textarea {
   background: color-mix(in srgb, #E11D48 4%, var(--surface));
 }
 
+/* Product Media Header */
+.inv-card-media {
+  position: relative;
+  width: calc(100% + 36px);
+  margin: -18px -18px 4px -18px;
+  height: 140px;
+  border-top-left-radius: calc(var(--radius-lg) - 1px);
+  border-top-right-radius: calc(var(--radius-lg) - 1px);
+  overflow: hidden;
+  background: var(--surface-soft, rgba(0, 0, 0, 0.04));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inv-product-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.inv-img-preview-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+  z-index: 2;
+}
+
+.inv-card-media:hover .inv-img-preview-btn,
+.inv-card-media:focus-within .inv-img-preview-btn {
+  opacity: 1;
+}
+
+.inv-img-preview-btn:hover {
+  background: rgba(0, 0, 0, 0.85);
+  transform: scale(1.08);
+}
+
+.inv-img-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--c-color, #7C3AED) 7%, var(--surface));
+  color: var(--c-color, #7C3AED);
+}
+
+.inv-img-placeholder .placeholder-icon {
+  font-size: 28px;
+  opacity: 0.85;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inv-img-placeholder .placeholder-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
+/* Form Image Preview & Controls */
+.inv-form-img-preview {
+  position: relative;
+  display: inline-flex;
+  margin-top: 8px;
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line-soft);
+  overflow: hidden;
+  background: var(--surface-soft, rgba(0, 0, 0, 0.04));
+}
+
+.inv-form-img-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.inv-remove-img-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(225, 29, 72, 0.85);
+  color: #fff;
+  border: none;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.inv-remove-img-btn:hover {
+  background: #E11D48;
+  transform: scale(1.1);
+}
+
+/* CSV Dropzone */
+.csv-dropzone {
+  border: 2px dashed var(--accent, #7C3AED);
+  border-radius: 12px;
+  padding: 24px 18px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--surface-subtle, rgba(124, 58, 237, 0.03));
+  margin-bottom: 14px;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.csv-dropzone:hover,
+.csv-dropzone.drag-over {
+  border-color: var(--accent-hover, #6D28D9);
+  background: rgba(124, 58, 237, 0.08);
+}
+
 .inv-card-header {
   display: flex;
   align-items: center;
@@ -5728,6 +5871,15 @@ textarea {
 .movement-pill.mov-adjustment {
   background: rgba(100, 116, 139, 0.14);
   color: #64748B;
+}
+
+.movement-pill.mov-request {
+  background: rgba(236, 72, 153, 0.14);
+  color: #db2777;
+}
+
+.row-highlight-request {
+  background: rgba(236, 72, 153, 0.04);
 }
 
 .cell-date {
