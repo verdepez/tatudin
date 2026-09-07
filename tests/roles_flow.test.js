@@ -198,3 +198,75 @@ test('Roles & Flujos: Settlement generation produces WhatsApp/Email formatted me
   assert.match(settleRes.data.messageText, /Transferencia liquidación semanal/);
 });
 
+test('Dashboard & Agenda: Today agenda and unmanaged past appointments', async () => {
+  // Create an appointment for today
+  const todayISO = new Date().toISOString();
+  const todayApptRes = await request('/api/appointments', {
+    method: 'POST',
+    body: JSON.stringify({
+      title: 'Compromiso Para Hoy Test',
+      startsAt: todayISO,
+      durationMinutes: 60,
+      price: 50000,
+      status: 'confirmed'
+    })
+  });
+  assert.equal(todayApptRes.status, 201);
+  const todayApptId = todayApptRes.data.id;
+
+  // Create an appointment in the past (e.g. 3 days ago)
+  const pastDate = new Date();
+  pastDate.setDate(pastDate.getDate() - 3);
+  const pastApptRes = await request('/api/appointments', {
+    method: 'POST',
+    body: JSON.stringify({
+      title: 'Compromiso Pasado No Gestionado Test',
+      startsAt: pastDate.toISOString(),
+      durationMinutes: 60,
+      price: 60000,
+      status: 'confirmed'
+    })
+  });
+  assert.equal(pastApptRes.status, 201);
+  const pastApptId = pastApptRes.data.id;
+
+  // Query GET /api/dashboard
+  const dashRes = await request('/api/dashboard');
+  assert.equal(dashRes.status, 200);
+  assert.ok(Array.isArray(dashRes.data.appointments));
+  assert.ok(Array.isArray(dashRes.data.unmanagedAppointments));
+
+  // Today's appointment must be in dashRes.data.appointments
+  const foundToday = dashRes.data.appointments.find(a => a.id === todayApptId);
+  assert.ok(foundToday, 'Today appointment must be in dashboard appointments');
+
+  // Past appointment must NOT be in appointments (today's agenda)
+  const foundPastInToday = dashRes.data.appointments.find(a => a.id === pastApptId);
+  assert.ok(!foundPastInToday, 'Past appointment must not be in today appointments');
+
+  // Past appointment must be in unmanagedAppointments
+  const foundPastInUnmanaged = dashRes.data.unmanagedAppointments.find(a => a.id === pastApptId);
+  assert.ok(foundPastInUnmanaged, 'Past appointment must be in unmanagedAppointments');
+
+  // Query GET /api/appointments?unmanaged=true
+  const unmRes = await request('/api/appointments?unmanaged=true');
+  assert.equal(unmRes.status, 200);
+  assert.ok(Array.isArray(unmRes.data));
+  const foundInUnmEndpoint = unmRes.data.find(a => a.id === pastApptId);
+  assert.ok(foundInUnmEndpoint, 'Past appointment must be returned by unmanaged=true query');
+
+  // Resolve past appointment via PATCH status: completed
+  const patchRes = await request(`/api/appointments/${pastApptId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'completed' })
+  });
+  assert.equal(patchRes.status, 200);
+  assert.equal(patchRes.data.status, 'completed');
+
+  // Verify that it is no longer in unmanagedAppointments
+  const afterUnmRes = await request('/api/appointments?unmanaged=true');
+  assert.equal(afterUnmRes.status, 200);
+  const foundAfterResolve = afterUnmRes.data.find(a => a.id === pastApptId);
+  assert.ok(!foundAfterResolve, 'Resolved appointment must not be in unmanaged appointments');
+});
+

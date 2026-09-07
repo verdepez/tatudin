@@ -1905,7 +1905,7 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
     const artistFilterSimple = isResident ? ' AND artist_id = $2' : '';
     const params = isResident ? [request.studioId, request.user.id] : [request.studioId];
 
-    const [appointments, stats, studio] = await Promise.all([
+    const [appointments, unmanagedAppointments, stats, studio] = await Promise.all([
       pool.query(`SELECT a.id, a.title, a.notes, a.starts_at, a.duration_minutes, a.status, a.price, a.deposit,
         c.name AS client_name, c.phone AS client_phone, u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
         cc.name AS category_name, cc.color AS category_color, cc.icon AS category_icon, cc.kind AS category_kind
@@ -1915,7 +1915,23 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
         LEFT JOIN users u ON u.id = a.artist_id
         LEFT JOIN studio_memberships sm ON sm.user_id = u.id AND sm.studio_id = a.studio_id
         LEFT JOIN spaces sp ON sp.id = a.space_id
-        WHERE a.studio_id = $1 ${artistFilter} AND a.status NOT IN ('cancelled', 'no_show') ORDER BY a.starts_at LIMIT 8`, params),
+        WHERE a.studio_id = $1 ${artistFilter} 
+          AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') = (NOW() AT TIME ZONE 'America/Santiago')::date
+          AND a.status NOT IN ('cancelled', 'no_show') 
+        ORDER BY a.starts_at ASC`, params),
+      pool.query(`SELECT a.id, a.title, a.notes, a.starts_at, a.duration_minutes, a.status, a.price, a.deposit,
+        c.name AS client_name, c.phone AS client_phone, u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
+        cc.name AS category_name, cc.color AS category_color, cc.icon AS category_icon, cc.kind AS category_kind
+        FROM appointments a
+        LEFT JOIN commitment_categories cc ON cc.id = a.category_id
+        LEFT JOIN clients c ON c.id = a.client_id
+        LEFT JOIN users u ON u.id = a.artist_id
+        LEFT JOIN studio_memberships sm ON sm.user_id = u.id AND sm.studio_id = a.studio_id
+        LEFT JOIN spaces sp ON sp.id = a.space_id
+        WHERE a.studio_id = $1 ${artistFilter}
+          AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') < (NOW() AT TIME ZONE 'America/Santiago')::date
+          AND a.status NOT IN ('completed', 'cancelled', 'no_show', 'rescheduled')
+        ORDER BY a.starts_at ASC LIMIT 50`, params),
       pool.query(`SELECT
         (SELECT COUNT(*) FROM appointments WHERE studio_id = $1 ${artistFilterSimple} AND status NOT IN ('cancelled', 'no_show'))::int AS scheduled_appointments,
         (SELECT COUNT(*) FROM appointments WHERE studio_id = $1 ${artistFilterSimple} AND status = 'completed')::int AS completed_appointments,
@@ -1929,14 +1945,19 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
       `, params),
       pool.query(`SELECT id, name, currency, timezone, account_type FROM studios WHERE id = $1`, [request.studioId])
     ]);
-    return response.json({ appointments: appointments.rows, stats: stats.rows[0], studio: studio.rows[0] });
+    return response.json({ 
+      appointments: appointments.rows, 
+      unmanagedAppointments: unmanagedAppointments.rows,
+      stats: stats.rows[0], 
+      studio: studio.rows[0] 
+    });
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
 app.get('/api/appointments', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
-    const { artistId, spaceId, categoryId, date, startDate, endDate, status } = request.query;
+    const { artistId, spaceId, categoryId, date, startDate, endDate, status, unmanaged } = request.query;
     let query = `SELECT a.*, c.name AS client_name, c.phone AS client_phone,
       u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
       cc.name AS category_name, cc.color AS category_color, cc.icon AS category_icon, cc.kind AS category_kind,
@@ -1950,10 +1971,17 @@ app.get('/api/appointments', requireAuth, async (request, response) => {
       WHERE a.studio_id = $1`;
     const params = [request.studioId];
 
-    if (artistId && artistId !== 'all') {
-      params.push(Number(artistId));
-      query += ` AND a.artist_id = $${params.length}`;
-    }
+    if (unmanaged === 'true') {
+      query += ` AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') < (NOW() AT TIME ZONE 'America/Santiago')::date AND a.status NOT IN ('completed', 'cancelled', 'no_show', 'rescheduled')`;
+      if (request.user.role === 'resident' || request.user.role === 'nomad') {
+        params.push(request.user.id);
+        query += ` AND a.artist_id = $${params.length}`;
+      }
+    } else {
+      if (artistId && artistId !== 'all') {
+        params.push(Number(artistId));
+        query += ` AND a.artist_id = $${params.length}`;
+      }
       if (spaceId && spaceId !== 'all') {
         params.push(Number(spaceId));
         query += ` AND a.space_id = $${params.length}`;
@@ -1973,8 +2001,12 @@ app.get('/api/appointments', requireAuth, async (request, response) => {
         params.push(startDate, endDate);
         query += ` AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') >= $${params.length - 1} AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') <= $${params.length}`;
       }
+    }
 
-    query += ` ORDER BY a.starts_at`;
+    query += ` ORDER BY a.starts_at ASC`;
+    if (unmanaged === 'true') {
+      query += ` LIMIT 50`;
+    }
     const result = await pool.query(query, params);
     return response.json(result.rows);
   } catch (error) { return response.status(500).json({ error: error.message }); }

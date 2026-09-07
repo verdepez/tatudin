@@ -622,6 +622,34 @@ export async function seedStudioData(passedPool = null) {
         price: 0,
         deposit: 0,
         notes: 'Revisión de liquidaciones a residentes, cobros de arriendos guests y métricas de la semana.'
+      },
+
+      // --- LUNES 07 DE SEPTIEMBRE (HOY) ---
+      {
+        title: 'Sesión Microrealismo Botánico y Acuarela',
+        cat: 'Cita de Tatuaje',
+        artist: 'Camila Tattoo',
+        client: 'Sebastian Herrera',
+        space: 'Box 1 · Neotrad & Color',
+        date: '2026-09-07T11:00:00-04:00',
+        dur: 180,
+        status: 'confirmed',
+        price: 160000,
+        deposit: 50000,
+        notes: 'Cita programada para hoy. Diseño botánico personalizado.'
+      },
+      {
+        title: 'Manga Oriental · Sesión 2 Sombras y Relleno',
+        cat: 'Cita de Tatuaje',
+        artist: 'Diego Blackwork',
+        client: 'Ignacio Silva',
+        space: 'Box 2 · Blackwork & Geometría',
+        date: '2026-09-07T15:30:00-04:00',
+        dur: 180,
+        status: 'confirmed',
+        price: 180000,
+        deposit: 60000,
+        notes: 'Segunda sesión de manga oriental con sombras profundas.'
       }
     ];
 

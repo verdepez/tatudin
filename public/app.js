@@ -773,6 +773,21 @@ async function startApp() {
   } else {
     await render('dashboard');
   }
+
+  // Verificar compromisos no gestionados de días anteriores al iniciar el sistema
+  if (!window._unmanagedStartupChecked && !currentUser.is_superadmin && currentUser.email !== 'soyelroot@tatudin.cl') {
+    window._unmanagedStartupChecked = true;
+    setTimeout(async () => {
+      try {
+        const unmanaged = await api('/api/appointments?unmanaged=true');
+        if (unmanaged && unmanaged.length > 0) {
+          openUnmanagedAppointmentsModal(unmanaged);
+        }
+      } catch (err) {
+        console.warn('Error checking unmanaged appointments on startup:', err);
+      }
+    }, 450);
+  }
 }
 
 function appointmentCard(item) {
@@ -1032,13 +1047,13 @@ async function render(view = 'dashboard', options = {}) {
         <section class="today panel">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">PRÓXIMOS COMPROMISOS</p>
+              <p class="eyebrow">COMPROMISOS DE HOY</p>
               <h2>Tu agenda de hoy</h2>
             </div>
             <span class="count">${(data.appointments || []).length} ${(data.appointments || []).length === 1 ? 'compromiso' : 'compromisos'}</span>
           </div>
           <div class="appointment-list">
-            ${(data.appointments || []).slice(0, 4).map(appointmentCard).join('') || emptyState('No hay compromisos próximos', 'Crea el primer compromiso de tu agenda.')}
+            ${(data.appointments || []).map(appointmentCard).join('') || emptyState('Sin compromisos para hoy', 'No tienes citas agendadas para el día de hoy.')}
           </div>
         </section>
 
@@ -2547,6 +2562,25 @@ async function renderAgenda() {
   const isMonthView = agendaFilter.viewMode === 'month';
   const rangeInfo = isMonthView ? getMonthMatrix(agendaFilter.currentDate) : getWeekRange(agendaFilter.currentDate);
 
+  // Al entrar al modo mes, gestionar compromisos pendientes solo una vez al día (omite si ya se revisó hoy)
+  if (isMonthView) {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const monthCheckKey = 'tatudin_unmanaged_month_' + todayStr;
+    if (!localStorage.getItem(monthCheckKey)) {
+      localStorage.setItem(monthCheckKey, 'true');
+      setTimeout(async () => {
+        try {
+          const unmanaged = await api('/api/appointments?unmanaged=true');
+          if (unmanaged && unmanaged.length > 0) {
+            openUnmanagedAppointmentsModal(unmanaged);
+          }
+        } catch (err) {
+          console.warn('Error checking unmanaged appointments for month view:', err);
+        }
+      }, 350);
+    }
+  }
+
   // Range parameters to get all appointments within the visible calendar period for date badges
   const rangeParams = new URLSearchParams();
   rangeParams.append('startDate', rangeInfo.startDateISO);
@@ -3096,6 +3130,259 @@ function openAgendaFilterModal(initialTab = 'filters') {
 
 function openBookingPagesModal() {
   return openAgendaFilterModal('schedules');
+}
+
+function openUnmanagedAppointmentsModal(unmanagedList) {
+  if (!unmanagedList || !unmanagedList.length) return;
+
+  const currentCount = unmanagedList.length;
+  let remainingCount = currentCount;
+  let hasMadeChanges = false;
+
+  const itemsHtml = unmanagedList.map(item => {
+    const startsAt = item.starts_at ? new Date(item.starts_at) : new Date();
+    const dateFormatted = new Intl.DateTimeFormat('es-CL', { weekday: 'short', day: 'numeric', month: 'short' }).format(startsAt);
+    const timeFormatted = formatTime(item.starts_at);
+    const price = Number(item.price) || 0;
+    const deposit = Number(item.deposit) || 0;
+    const primaryTitle = item.client_name ? item.client_name : item.title;
+    const secondaryTitle = item.client_name ? item.title : (item.notes || '');
+
+    // Default datetime for reschedule input (tomorrow at same time)
+    const nextDate = new Date(startsAt);
+    nextDate.setDate(nextDate.getDate() + 7);
+    const year = nextDate.getFullYear();
+    const month = (nextDate.getMonth() + 1).toString().padStart(2, '0');
+    const day = nextDate.getDate().toString().padStart(2, '0');
+    const hours = nextDate.getHours().toString().padStart(2, '0');
+    const minutes = nextDate.getMinutes().toString().padStart(2, '0');
+    const defaultDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+    return `
+      <div class="unmanaged-item-card" id="unm-card-${item.id}" data-id="${item.id}">
+        <div class="unmanaged-item-header">
+          <div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 2px;">
+              <span class="unmanaged-item-title">${primaryTitle}</span>
+              ${item.category_name ? `
+                <span class="category-chip" style="--cat-color: ${item.category_color || '#7C3AED'}; font-size: 11px; padding: 2px 7px;">
+                  <span class="cat-dot" style="background: ${item.category_color || '#7C3AED'}"></span>
+                  ${item.category_name}
+                </span>
+              ` : ''}
+              ${item.space_name ? `<span class="space-chip" style="font-size: 11px; padding: 2px 6px;">${icon('box')} ${item.space_name}</span>` : ''}
+              ${item.artist_name ? `<span class="artist-chip" style="font-size: 11px; padding: 2px 6px;">${item.artist_name.split(' ')[0]}</span>` : ''}
+            </div>
+            <div class="unmanaged-item-meta">
+              <span>📅 ${dateFormatted} a las ${timeFormatted} hrs</span>
+              ${secondaryTitle ? `<span>· ${secondaryTitle}</span>` : ''}
+              ${price > 0 ? `<span>· <strong>${money(price)}</strong>${deposit > 0 ? ` (Abono: ${money(deposit)})` : ''}</span>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <div class="unmanaged-actions-row" id="unm-actions-${item.id}">
+          <button type="button" class="unmanaged-btn-completed" data-unm-act="completed" data-id="${item.id}" title="Marcar como realizada con éxito">
+            ${icon('check')} <span>Efectuada</span>
+          </button>
+          <button type="button" class="unmanaged-btn-noshow" data-unm-act="no_show" data-id="${item.id}" title="El cliente no asistió">
+            <span>No asistió</span>
+          </button>
+          <button type="button" class="unmanaged-btn-cancelled" data-unm-act="cancelled" data-id="${item.id}" title="Cita cancelada">
+            <span>Cancelada</span>
+          </button>
+          <button type="button" class="unmanaged-btn-reschedule" data-unm-act="toggle-reschedule" data-id="${item.id}" title="Definir nueva fecha">
+            ${icon('calendar')} <span>Reprogramar</span>
+          </button>
+        </div>
+
+        <div class="unmanaged-reschedule-form" id="unm-resched-${item.id}">
+          <label style="font-size: 11px; font-weight: 600; color: #0369a1; display: block; margin-bottom: 4px;">Nueva fecha y horario:</label>
+          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+            <input type="datetime-local" id="unm-dt-${item.id}" value="${defaultDateTime}" style="font-size: 12px; height: 32px; flex: 1; min-width: 170px;" />
+            <button type="button" class="primary" data-unm-act="save-reschedule" data-id="${item.id}" style="background: #0284c7; border-color: #0284c7; font-size: 12px; padding: 5px 12px;">
+              Guardar
+            </button>
+            <button type="button" class="secondary" data-unm-act="cancel-reschedule" data-id="${item.id}" style="font-size: 12px; padding: 5px 10px;">
+              Volver
+            </button>
+          </div>
+        </div>
+
+        <div id="unm-badge-done-${item.id}" style="display: none; margin-top: 6px;"></div>
+      </div>
+    `;
+  }).join('');
+
+  openModal(`
+    <div class="unmanaged-modal-container">
+      <div>
+        <p class="eyebrow" style="color: #d97706; margin-bottom: 4px;">COMPROMISOS PENDIENTES DE GESTIÓN</p>
+        <h2 id="modal-title" style="margin: 0 0 6px 0;">¿Qué pasó con estas citas?</h2>
+        <p style="font-size: 13px; color: var(--muted); margin: 0;">
+          Tienes <strong id="unm-pending-counter" style="color: var(--ink);">${currentCount}</strong> ${currentCount === 1 ? 'compromiso anterior sin registrar' : 'compromisos anteriores sin registrar'}. Gestiona cada uno para mantener tus estadísticas y finanzas al día, o puedes omitir este paso para hacerlo luego.
+        </p>
+      </div>
+
+      <div class="unmanaged-list-scroll">
+        ${itemsHtml}
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line-soft);">
+        <button type="button" class="secondary" id="unm-close-skip" style="font-size: 13px;">
+          Omitir por ahora
+        </button>
+        <button type="button" class="primary" id="unm-close-done" style="font-size: 13px;">
+          Listo
+        </button>
+      </div>
+    </div>
+  `);
+
+  const updateCardStatus = (apptId, statusType, text, badgeClass) => {
+    hasMadeChanges = true;
+    const card = document.getElementById(`unm-card-${apptId}`);
+    const actionsRow = document.getElementById(`unm-actions-${apptId}`);
+    const reschedForm = document.getElementById(`unm-resched-${apptId}`);
+    const badgeDone = document.getElementById(`unm-badge-done-${apptId}`);
+
+    if (actionsRow) actionsRow.style.display = 'none';
+    if (reschedForm) reschedForm.style.display = 'none';
+    if (card) card.classList.add('is-resolved');
+    if (badgeDone) {
+      badgeDone.style.display = 'block';
+      badgeDone.innerHTML = `<span class="unmanaged-resolved-badge ${badgeClass}">${text}</span>`;
+    }
+
+    remainingCount--;
+    const counterEl = document.getElementById('unm-pending-counter');
+    if (counterEl) {
+      counterEl.textContent = Math.max(0, remainingCount);
+    }
+
+    if (remainingCount <= 0) {
+      const titleEl = document.getElementById('modal-title');
+      if (titleEl) titleEl.textContent = '¡Todos los compromisos han sido gestionados!';
+      setTimeout(async () => {
+        closeModal();
+        const activeView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'dashboard';
+        await render(activeView);
+      }, 1000);
+    }
+  };
+
+  // Event handlers
+  document.querySelectorAll('[data-unm-act="completed"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.currentTarget.dataset.id;
+      btn.disabled = true;
+      try {
+        await api(`/api/appointments/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'completed' })
+        });
+        updateCardStatus(id, 'completed', '✓ Marcada como Efectuada', 'completed');
+      } catch (err) {
+        alert(err.message || 'Error al marcar la cita como efectuada');
+        btn.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-unm-act="no_show"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.currentTarget.dataset.id;
+      btn.disabled = true;
+      try {
+        await api(`/api/appointments/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'no_show' })
+        });
+        updateCardStatus(id, 'no_show', 'Marcada como No asistió', 'noshow');
+      } catch (err) {
+        alert(err.message || 'Error al registrar no asistencia');
+        btn.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-unm-act="cancelled"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.currentTarget.dataset.id;
+      btn.disabled = true;
+      try {
+        await api(`/api/appointments/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'cancelled' })
+        });
+        updateCardStatus(id, 'cancelled', 'Marcada como Cancelada', 'cancelled');
+      } catch (err) {
+        alert(err.message || 'Error al cancelar la cita');
+        btn.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-unm-act="toggle-reschedule"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.currentTarget.dataset.id;
+      const form = document.getElementById(`unm-resched-${id}`);
+      if (form) {
+        form.style.display = form.style.display === 'none' || !form.style.display ? 'block' : 'none';
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-unm-act="cancel-reschedule"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.currentTarget.dataset.id;
+      const form = document.getElementById(`unm-resched-${id}`);
+      if (form) form.style.display = 'none';
+    });
+  });
+
+  document.querySelectorAll('[data-unm-act="save-reschedule"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.currentTarget.dataset.id;
+      const dtInput = document.getElementById(`unm-dt-${id}`);
+      const val = dtInput?.value;
+      if (!val) {
+        alert('Por favor selecciona una fecha y horario para reprogramar.');
+        return;
+      }
+      const selDate = new Date(val);
+      if (isNaN(selDate.getTime())) {
+        alert('La fecha seleccionada no es válida.');
+        return;
+      }
+      btn.disabled = true;
+      try {
+        await api(`/api/appointments/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'rescheduled',
+            startsAt: selDate.toISOString()
+          })
+        });
+        const formattedNew = formatDateISO(selDate) + ' a las ' + formatTime(selDate);
+        updateCardStatus(id, 'rescheduled', `✓ Reprogramada para ${formattedNew}`, 'rescheduled');
+      } catch (err) {
+        alert(err.message || 'Error al reprogramar la cita');
+        btn.disabled = false;
+      }
+    });
+  });
+
+  const handleClose = async () => {
+    closeModal();
+    if (hasMadeChanges) {
+      const activeView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'dashboard';
+      await render(activeView);
+    }
+  };
+
+  document.getElementById('unm-close-skip')?.addEventListener('click', handleClose);
+  document.getElementById('unm-close-done')?.addEventListener('click', handleClose);
 }
 
 function openAppointmentOutcomeModal(appt) {
