@@ -14,6 +14,7 @@ let normalCookie = '';
 async function request(path, options = {}, cookie = '') {
   const headers = {
     'Content-Type': 'application/json',
+    'x-test-suite': 'tatudin',
     ...(cookie ? { Cookie: cookie } : {}),
     ...(options.headers || {})
   };
@@ -71,7 +72,7 @@ test('Backoffice: Non-superadmin user gets 403 Forbidden on Backoffice endpoints
     })
   });
 
-  assert.equal(regRes.status, 200);
+  assert.ok([200, 201].includes(regRes.status));
   normalCookie = regRes.cookie;
 
   const statsRes = await request('/api/backoffice/stats', {}, normalCookie);

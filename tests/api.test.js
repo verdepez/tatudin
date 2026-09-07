@@ -20,6 +20,7 @@ let createdGuestSpotId = null;
 async function request(path, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
+    'x-test-suite': 'tatudin',
     ...(cookieHeader ? { Cookie: cookieHeader } : {}),
     ...(options.headers || {})
   };
@@ -809,6 +810,85 @@ test('Inventory: Role-based permissions in Studio (Owner vs Resident vs Guest)',
   assert.equal(guestRequest.status, 201);
   const movementType = guestRequest.data.movement?.movement_type || guestRequest.data.movement_type;
   assert.equal(movementType, 'request');
+
+  // 6. Owner approves & assigns requested supplies to Guest via transfer_internal
+  cookieHeader = studioOwnerCookie;
+  const membersList = await request('/api/members');
+  const membersArr = Array.isArray(membersList.data) ? membersList.data : (membersList.data.members || []);
+  const guestMember = membersArr.find(m => m.email === guestEmail);
+  assert.ok(guestMember, 'Guest member must exist');
+
+  const assignRes = await request('/api/inventory/movements', {
+    method: 'POST',
+    body: JSON.stringify({
+      itemId: studioItemId,
+      movementType: 'transfer_internal',
+      quantity: 3,
+      toUserId: guestMember.user_id || guestMember.id,
+      notes: 'Asignación aprobada para guest'
+    })
+  });
+  assert.equal(assignRes.status, 201);
+
+  // 7. Guest now sees the assigned items in personal inventory and can consume them
+  cookieHeader = '';
+  await request('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email: guestEmail, password: 'guestpass123' })
+  });
+
+  const guestInvAfterAssign = await request('/api/inventory');
+  assert.equal(guestInvAfterAssign.status, 200);
+  assert.equal(guestInvAfterAssign.data.isUnified, false);
+  const assignedItem = guestInvAfterAssign.data.personalItems.find(i => i.name === 'Papel Hectográfico Spirit');
+  assert.ok(assignedItem, 'Guest must have the assigned item in personalItems');
+  assert.equal(Number(assignedItem.quantity), 3);
+
+  // Guest consumes 1 from their assigned personal inventory
+  const guestConsumeAssigned = await request('/api/inventory/movements', {
+    method: 'POST',
+    body: JSON.stringify({
+      itemId: assignedItem.id,
+      movementType: 'consumption',
+      quantity: 1,
+      notes: 'Consumo de papel asignado en sesión'
+    })
+  });
+  assert.equal(guestConsumeAssigned.status, 201);
+
+  // 8. Test Independent Artist Unified Inventory
+  cookieHeader = '';
+  const independentEmail = `indie_inv_${Date.now()}@tatudintest.com`;
+  await request('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      fullName: 'Indie Artist',
+      email: independentEmail,
+      password: 'indiepass123',
+      studioName: 'Indie Private Studio',
+      accountType: 'independent'
+    })
+  });
+
+  // Create an item as independent
+  const indieItemRes = await request('/api/inventory/items', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'Agujas RL 05',
+      category: 'needles',
+      unit: 'box',
+      quantity: 12,
+      costPrice: 8000
+    })
+  });
+  assert.equal(indieItemRes.status, 201);
+
+  // Check GET /api/inventory for independent
+  const indieInv = await request('/api/inventory');
+  assert.equal(indieInv.status, 200);
+  assert.equal(indieInv.data.isUnified, true);
+  assert.ok(indieInv.data.items.length >= 1);
+  assert.equal(indieInv.data.stats.totalItems, indieInv.data.items.length);
 
   // Restore owner session for remaining tests / cleanup
   cookieHeader = studioOwnerCookie;

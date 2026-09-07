@@ -578,19 +578,46 @@ function updateStudioSidebarUI() {
   const container = document.querySelector('.sidebar');
   if (!container) return;
   const nameEl = container.querySelector('#studio-name');
-  if (userStudios && userStudios.length > 1) {
-    nameEl.innerHTML = `
-      <select id="studio-selector" class="studio-selector-dropdown">
-        ${userStudios.map((s) => `<option value="${s.id}" ${s.is_active ? 'selected' : ''}>${s.name}</option>`).join('')}
-      </select>
-    `;
-    document.querySelector('#studio-selector')?.addEventListener('change', async (e) => {
-      await api('/api/auth/switch-studio', { method: 'POST', body: JSON.stringify({ studioId: Number(e.target.value) }) });
-      await startApp();
-    });
-  } else if (nameEl && activeStudio?.name) {
-    nameEl.textContent = activeStudio.name;
+  if (nameEl) {
+    if (userStudios && userStudios.length > 1) {
+      nameEl.innerHTML = `
+        <select id="studio-selector" class="studio-selector-dropdown">
+          ${userStudios.map((s) => `<option value="${s.id}" ${s.is_active ? 'selected' : ''}>${s.name}</option>`).join('')}
+        </select>
+      `;
+      document.querySelector('#studio-selector')?.addEventListener('change', async (e) => {
+        await api('/api/auth/switch-studio', { method: 'POST', body: JSON.stringify({ studioId: Number(e.target.value) }) });
+        await startApp();
+      });
+    } else if (activeStudio?.name) {
+      nameEl.textContent = activeStudio.name;
+    }
   }
+  syncRoleNavigation();
+}
+
+function syncRoleNavigation() {
+  const accountType = activeStudio?.account_type || currentUser?.account_type || 'independent';
+  const role = currentUser?.role || activeStudio?.user_role || 'owner';
+  const isIndependent = (accountType === 'independent');
+  const isResident = (role === 'resident' || role === 'nomad');
+  const isStudioOwnerOrAdmin = (!isIndependent && !isResident);
+
+  // Completely hide or show studio-only sections (Artistas, Managers & Equipo)
+  // Only studio owners / managers should see these sections!
+  document.querySelectorAll('[data-nav-studio-only]').forEach((el) => {
+    el.style.display = isStudioOwnerOrAdmin ? '' : 'none';
+  });
+
+  // Dynamic labeling: "Mi Agenda" for independent vs "Agenda" for studio
+  const navAgendaText = document.querySelector('#nav-agenda-text');
+  if (navAgendaText) navAgendaText.textContent = isIndependent ? 'Mi Agenda' : 'Agenda';
+
+  const drawerAgendaText = document.querySelector('#drawer-agenda-text');
+  if (drawerAgendaText) drawerAgendaText.textContent = isIndependent ? 'Mi Agenda' : 'Agenda';
+
+  const mobileNavAgenda = document.querySelector('#mobile-nav-agenda-text');
+  if (mobileNavAgenda) mobileNavAgenda.textContent = isIndependent ? 'Mi Agenda' : 'Agenda';
 }
 
 function updateUserMenuUI() {
@@ -937,6 +964,17 @@ let currentAppView = 'dashboard';
 async function render(view = 'dashboard', options = {}) {
   closeMobileDrawer();
   const prevView = currentAppView;
+
+  syncRoleNavigation();
+
+  // Protect restricted studio views for independent accounts and resident artists
+  const accountType = activeStudio?.account_type || currentUser?.account_type || 'independent';
+  const role = currentUser?.role || activeStudio?.user_role || 'owner';
+  const isStudioOwnerOrAdmin = (accountType === 'studio' && role !== 'resident' && role !== 'nomad');
+  if (!isStudioOwnerOrAdmin && (view === 'artistas' || view === 'artists' || view === 'managers')) {
+    view = 'dashboard';
+  }
+
   currentAppView = view;
 
   // Immediate 0ms visual feedback on navigation links
@@ -2618,12 +2656,16 @@ async function renderAgenda() {
     }
   }
 
+  const isStudio = (activeStudio?.account_type === 'studio');
+
   app.innerHTML = `
     <section class="page-heading">
       <div>
-        <p class="eyebrow">AGENDA & DISPONIBILIDAD</p>
-        <h1>Tu calendario<span class="dot">.</span></h1>
-        <p class="lead">Gestiona tus compromisos, disponibilidad semanal y páginas de reserva con clientes.</p>
+        <p class="eyebrow">${isStudio ? 'AGENDA & DISPONIBILIDAD' : 'MI AGENDA PERSONAL'}</p>
+        <h1>${isStudio ? 'Tu calendario' : 'Mi Agenda'}<span class="dot">.</span></h1>
+        <p class="lead">${isStudio 
+          ? 'Gestiona tus compromisos, disponibilidad semanal y páginas de reserva con clientes.' 
+          : 'Tu espacio individual de compromisos, sesiones y disponibilidad.'}</p>
       </div>
 
       <!-- Actions: Configuración de Agenda + Google Calendar Style Crear Dropdown Menu -->
@@ -2820,9 +2862,10 @@ async function renderAgenda() {
 }
 
 function openAgendaFilterModal(initialTab = 'filters') {
+  const isStudio = (activeStudio?.account_type === 'studio');
   const validHiddenCount = (agendaFilter.hiddenCategories || []).filter(hid => (categories || []).some(c => String(c.id) === String(hid))).length;
   let activeFiltersCount = 0;
-  if (agendaFilter.artistId !== 'all') activeFiltersCount++;
+  if (isStudio && agendaFilter.artistId !== 'all') activeFiltersCount++;
   if (agendaFilter.spaceId !== 'all') activeFiltersCount++;
   if (agendaFilter.status !== 'all') activeFiltersCount++;
   if (agendaFilter.date) activeFiltersCount++;
@@ -2883,6 +2926,7 @@ function openAgendaFilterModal(initialTab = 'filters') {
           </small>
         </div>
 
+        ${isStudio ? `
         <div class="field">
           <label for="modal-agenda-artist" style="font-weight: 700; font-size: 12px;">Artista / Responsable:</label>
           <select id="modal-agenda-artist" name="artistId">
@@ -2894,6 +2938,7 @@ function openAgendaFilterModal(initialTab = 'filters') {
             `).join('')}
           </select>
         </div>
+        ` : ''}
 
         <div class="field">
           <label for="modal-agenda-space" style="font-weight: 700; font-size: 12px;">Box / Espacio:</label>
@@ -3022,7 +3067,7 @@ function openAgendaFilterModal(initialTab = 'filters') {
   form?.addEventListener('submit', (e) => {
     e.preventDefault();
     const formData = new FormData(form);
-    agendaFilter.artistId = formData.get('artistId') || 'all';
+    agendaFilter.artistId = isStudio ? (formData.get('artistId') || 'all') : 'all';
     agendaFilter.spaceId = formData.get('spaceId') || 'all';
     agendaFilter.status = formData.get('status') || 'all';
     agendaFilter.categoryId = 'all';
@@ -3561,82 +3606,97 @@ async function renderFinances() {
   // 6. Pérdidas Estimadas (Ingresos no percibidos por citas canceladas)
   const estimatedLosses = Number(overview.estimated_losses || 0);
 
+  const isResident = (currentUser?.role === 'resident' || currentUser?.role === 'nomad');
+
   app.innerHTML = `
     <section class="page-heading">
       <div>
-        <p class="eyebrow">BILLETERA & LIQUIDACIONES</p>
-        <h1>Billetera<span class="dot">.</span></h1>
-        <p class="lead">Control consolidado de saldo disponible en billetera, ingresos esperados, abonos, comisiones y margen neto del estudio.</p>
+        <p class="eyebrow">${isResident ? 'MIS FINANZAS & LIQUIDACIONES' : 'BILLETERA & LIQUIDACIONES'}</p>
+        <h1>${isResident ? 'Mis Finanzas' : 'Billetera'}<span class="dot">.</span></h1>
+        <p class="lead">${isResident 
+          ? 'Resumen de tus trabajos facturados, abonos recaudados, comisiones acordadas y transferencias recibidas del estudio.' 
+          : 'Control consolidado de saldo disponible en billetera, ingresos esperados, abonos, comisiones y margen neto del estudio.'}
+        </p>
       </div>
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button class="secondary" data-action="open-upload-screenshot">${icon('image')} <span>Leer Boleta / Captura</span></button>
+        ${!isResident ? `
+          <button class="secondary" data-action="open-upload-screenshot">${icon('image')} <span>Leer Boleta / Captura</span></button>
+        ` : ''}
         <button class="secondary" data-action="export-finances-csv">${icon('download')} <span>Exportar CSV</span></button>
-        <button class="primary" data-action="new-transaction">${icon('plus')} <span>Registrar movimiento</span></button>
+        ${!isResident ? `
+          <button class="primary" data-action="new-transaction">${icon('plus')} <span>Registrar movimiento</span></button>
+        ` : ''}
       </div>
     </section>
 
     <!-- 6 Unified Financial Stat Cards -->
     <section class="stats" style="margin-bottom: 24px;">
-      <!-- 1. Saldo Neto Disponible -->
+      <!-- 1. Saldo Neto o Tu Comisión Acumulada -->
       <article class="stat-card">
         <div class="stat-card-header">
-          <span class="stat-label">Saldo Neto Billetera</span>
+          <span class="stat-label">${isResident ? 'Tu Comisión Acumulada' : 'Saldo Neto Billetera'}</span>
           <div class="stat-icon-bubble green">${icon('finances')}</div>
         </div>
-        <strong class="stat-value" title="${fullMoney(netBalance)}" style="color: ${netBalance >= 0 ? 'var(--green-text)' : 'var(--red)'};">${money(netBalance)}</strong>
-        <p class="stat-trend">Margen real retenido tras comisiones y gastos</p>
+        <strong class="stat-value" title="${fullMoney(isResident ? totalCommissions : netBalance)}" style="color: ${(isResident ? totalCommissions : netBalance) >= 0 ? 'var(--green-text)' : 'var(--red)'};">
+          ${money(isResident ? totalCommissions : netBalance)}
+        </strong>
+        <p class="stat-trend">${isResident ? 'Monto a tu favor por trabajos realizados' : 'Margen real retenido tras comisiones y gastos'}</p>
       </article>
 
-      <!-- 2. Ingresos Esperados (NUEVA CASILLA) -->
+      <!-- 2. Ingresos Esperados -->
       <article class="stat-card">
         <div class="stat-card-header">
-          <span class="stat-label">Ingresos Esperados</span>
+          <span class="stat-label">${isResident ? 'Tus Trabajos Agendados' : 'Ingresos Esperados'}</span>
           <div class="stat-icon-bubble purple">${icon('calendar')}</div>
         </div>
         <strong class="stat-value" title="${fullMoney(expectedIncome)}">${money(expectedIncome)}</strong>
-        <p class="stat-trend">Valor proyectado de citas agendadas</p>
+        <p class="stat-trend">${isResident ? 'Valor proyectado de tus citas agendadas' : 'Valor proyectado de citas agendadas'}</p>
       </article>
 
-      <!-- 3. Abonos Recaudados (NUEVA CASILLA) -->
+      <!-- 3. Abonos Recaudados -->
       <article class="stat-card">
         <div class="stat-card-header">
           <span class="stat-label">Abonos Cobrados</span>
           <div class="stat-icon-bubble teal">${icon('income')}</div>
         </div>
         <strong class="stat-value" title="${fullMoney(totalDeposits)}">${money(totalDeposits)}</strong>
-        <p class="stat-trend">Señas cobradas para asegurar citas</p>
+        <p class="stat-trend">${isResident ? 'Señas cobradas para asegurar tus citas' : 'Señas cobradas para asegurar citas'}</p>
       </article>
 
-      <!-- 4. Total Recaudado en Caja -->
+      <!-- 4. Total Facturado -->
       <article class="stat-card">
         <div class="stat-card-header">
-          <span class="stat-label">Total Recaudado</span>
+          <span class="stat-label">${isResident ? 'Total Facturado' : 'Total Recaudado'}</span>
           <div class="stat-icon-bubble blue">${icon('income')}</div>
         </div>
-        <strong class="stat-value" title="${fullMoney(totalGrossIncome)}">${money(totalGrossIncome)}</strong>
-        <p class="stat-trend">Abonos + citas completadas + otros ingresos</p>
+        <strong class="stat-value" title="${fullMoney(isResident ? appointmentsRevenue : totalGrossIncome)}">${money(isResident ? appointmentsRevenue : totalGrossIncome)}</strong>
+        <p class="stat-trend">${isResident ? 'Abonos + citas completadas por ti' : 'Abonos + citas completadas + otros ingresos'}</p>
       </article>
 
-      <!-- 5. Comisiones Artistas -->
+      <!-- 5. Pendiente de Pago o Comisiones Artistas -->
       <article class="stat-card">
         <div class="stat-card-header">
-          <span class="stat-label">Comisiones Artistas</span>
+          <span class="stat-label">${isResident ? 'Pendiente por Cobrar' : 'Comisiones Artistas'}</span>
           <div class="stat-icon-bubble orange">${icon('percent')}</div>
         </div>
-        <strong class="stat-value" title="${fullMoney(totalCommissions)}">${money(totalCommissions)}</strong>
+        <strong class="stat-value" title="${fullMoney(isResident ? totalPending : totalCommissions)}">${money(isResident ? totalPending : totalCommissions)}</strong>
         <p class="stat-trend" style="color: ${totalPending > 0 ? 'var(--red)' : 'var(--green-text)'}; font-weight: 600;">
-          ${totalPending > 0 ? `<span title="${fullMoney(totalPending)}">${money(totalPending)} por liquidar</span>` : 'Todas liquidadas'}
+          ${isResident 
+            ? (totalPending > 0 ? `<span title="${fullMoney(totalPending)}">${money(totalPending)} por recibir</span>` : 'Al día con el estudio')
+            : (totalPending > 0 ? `<span title="${fullMoney(totalPending)}">${money(totalPending)} por liquidar</span>` : 'Todas liquidadas')}
         </p>
       </article>
 
-      <!-- 6. Pérdidas Estimadas (NUEVA CASILLA) -->
+      <!-- 6. Total Pagado / Liquidado -->
       <article class="stat-card">
         <div class="stat-card-header">
-          <span class="stat-label">Pérdidas Estimadas</span>
-          <div class="stat-icon-bubble red">${icon('trash')}</div>
+          <span class="stat-label">${isResident ? 'Total Transferido' : 'Pérdidas Estimadas'}</span>
+          <div class="stat-icon-bubble ${isResident ? 'green' : 'red'}">${isResident ? icon('check') : icon('trash')}</div>
         </div>
-        <strong class="stat-value" title="${fullMoney(estimatedLosses)}" style="color: ${estimatedLosses > 0 ? 'var(--red)' : 'var(--muted)'};">${money(estimatedLosses)}</strong>
-        <p class="stat-trend">Ingresos no percibidos por citas canceladas</p>
+        <strong class="stat-value" title="${fullMoney(isResident ? settledCommissions : estimatedLosses)}" style="color: ${isResident ? 'var(--green-text)' : (estimatedLosses > 0 ? 'var(--red)' : 'var(--muted)')};">
+          ${money(isResident ? settledCommissions : estimatedLosses)}
+        </strong>
+        <p class="stat-trend">${isResident ? 'Liquidaciones ya pagadas por el estudio' : 'Ingresos no percibidos por citas canceladas'}</p>
       </article>
     </section>
 
@@ -3644,8 +3704,8 @@ async function renderFinances() {
     <section class="panel" style="margin-bottom: 20px;">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">EQUIPO Y COMISIONES</p>
-          <h2>Liquidaciones por artista</h2>
+          <p class="eyebrow">${isResident ? 'ESTADO DE CUENTA' : 'EQUIPO Y COMISIONES'}</p>
+          <h2>${isResident ? 'Tu acuerdo y liquidaciones con el estudio' : 'Liquidaciones por artista'}</h2>
         </div>
       </div>
       <div class="artist-performance-list">
@@ -3680,29 +3740,35 @@ async function renderFinances() {
                 </div>
               </div>
               <div class="perf-actions">
-                ${pending > 0 ? `
-                  <button class="primary small settle-btn" data-action="settle-artist"
-                    data-artist-id="${a.artist_id}"
-                    data-artist-name="${a.artist_name}"
-                    data-pending="${pending}">
-                    ${icon('check')} Liquidar
-                  </button>
-                ` : '<span class="settle-badge paid">Al día</span>'}
+                ${isResident ? (
+                  pending > 0
+                    ? '<span class="badge warning" style="padding: 6px 12px; font-weight: 700; border-radius: 6px; background: rgba(245, 158, 11, 0.15); color: #d97706;">Pendiente de transferencia</span>'
+                    : '<span class="settle-badge paid">Al día con el estudio</span>'
+                ) : (
+                  pending > 0 ? `
+                    <button class="primary small settle-btn" data-action="settle-artist"
+                      data-artist-id="${a.artist_id}"
+                      data-artist-name="${a.artist_name}"
+                      data-pending="${pending}">
+                      ${icon('check')} Liquidar
+                    </button>
+                  ` : '<span class="settle-badge paid">Al día</span>'
+                )}
               </div>
             </article>
           `;
-        }).join('') || '<p class="empty-note">Sin actividad de artistas registrada en este período.</p>'}
+        }).join('') || '<p class="empty-note">Sin actividad registrada en este período.</p>'}
       </div>
     </section>
 
     <section class="transaction-list panel">
       <div class="section-heading" style="flex-wrap: wrap; gap: 12px; align-items: flex-start;">
         <div>
-          <h2>Historial de movimientos</h2>
+          <h2>${isResident ? 'Tus pagos y transferencias recibidas' : 'Historial de movimientos'}</h2>
           <p style="margin: 2px 0 0; font-size: 12px; color: var(--muted); font-weight: 600;">
             ${transactions.length > 0 
               ? `Mostrando <strong>${Math.min(walletTransactionsLimit, transactions.length)}</strong> de <strong>${transactions.length}</strong> movimientos ${walletFilter.startDate || walletFilter.endDate ? '(rango filtrado)' : ''}` 
-              : 'Sin movimientos registrados para el filtro seleccionado'}
+              : isResident ? 'Sin pagos o transferencias registradas aún.' : 'Sin movimientos registrados para el filtro seleccionado'}
           </p>
         </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
@@ -6795,36 +6861,66 @@ async function renderInventory() {
 
   const isStudioAccount = (activeStudio?.account_type === 'studio');
   const userRole = currentUser?.role;
-  const isOwnerOrAdmin = (!isStudioAccount || userRole === 'owner' || userRole === 'admin');
+  const isIndependent = (!isStudioAccount || activeStudio?.account_type === 'independent');
+  const isOwnerOrAdmin = (!isStudioAccount || userRole === 'owner' || userRole === 'admin' || currentUser?.isSuperAdmin);
   const isResident = (isStudioAccount && userRole === 'resident');
   const isGuest = (isStudioAccount && (userRole === 'guest' || userRole === 'nomad'));
 
+  // Ensure default tab makes sense for the role
+  if (isIndependent) {
+    if (inventoryCurrentTab === 'studio') {
+      inventoryCurrentTab = 'personal';
+    }
+  } else if (isResident) {
+    if (!window._residentInvTabInit) {
+      inventoryCurrentTab = 'personal';
+      window._residentInvTabInit = true;
+    }
+  } else if (isGuest) {
+    if (!window._guestInvTabInit) {
+      inventoryCurrentTab = 'studio';
+      window._guestInvTabInit = true;
+    }
+  }
+
   let itemsToDisplay = [];
-  if (inventoryCurrentTab === 'studio') {
-    itemsToDisplay = studioItems;
-  } else if (inventoryCurrentTab === 'personal') {
-    itemsToDisplay = personalItems;
-  } else if (inventoryCurrentTab === 'alerts') {
-    itemsToDisplay = lowStockItems;
+  if (isIndependent) {
+    if (inventoryCurrentTab === 'alerts') {
+      itemsToDisplay = lowStockItems;
+    } else {
+      itemsToDisplay = inventoryData.items || personalItems;
+    }
+  } else {
+    if (inventoryCurrentTab === 'studio') {
+      itemsToDisplay = studioItems;
+    } else if (inventoryCurrentTab === 'personal') {
+      itemsToDisplay = personalItems;
+    } else if (inventoryCurrentTab === 'alerts') {
+      itemsToDisplay = lowStockItems;
+    }
   }
 
   if (inventoryCategoryFilter !== 'all') {
     itemsToDisplay = itemsToDisplay.filter(i => i.category === inventoryCategoryFilter);
   }
 
+  const allCount = isIndependent 
+    ? (inventoryData.items || personalItems).length 
+    : (inventoryCurrentTab === 'personal' ? personalItems.length : (inventoryCurrentTab === 'alerts' ? lowStockItems.length : studioItems.length));
+
   app.innerHTML = `
     <section class="intro">
       <div class="intro-header-row">
         <div>
-          <p class="eyebrow">CONTROL DE INSUMOS & STOCK</p>
+          <p class="eyebrow">${isIndependent ? 'GESTIÓN DE STOCK INDEPENDIENTE' : (isGuest ? 'CONTROL DE INSUMOS · GUEST SPOT' : (isResident ? 'CONTROL DE INSUMOS & SESIONES' : 'CONTROL DE INSUMOS & STOCK'))}</p>
           <h1>Inventario & Insumos<span class="dot">.</span></h1>
-          <p class="lead">${isStudioAccount 
-            ? (isGuest 
-                ? 'Catálogo de insumos del estudio. Como artista guest puedes consultar disponibilidad y solicitar los insumos necesarios para tus sesiones.' 
+          <p class="lead">${isIndependent 
+            ? 'Gestión completa y unificada de tus insumos, costos unitarios, precios de venta y compras con boleta OCR.' 
+            : (isGuest 
+                ? 'Consulta los insumos del estudio y solicita los insumos necesarios para que te sean asignados a tu estación/box.' 
                 : (isResident 
-                    ? 'Insumos del estudio y stock personal. Registra tus consumos directos de insumos en sesión.' 
-                    : 'Gestión completa del stock del estudio, transferencias, ventas y consumos.'))
-            : 'Gestión completa de tu stock de insumos, costos, precios de venta y compras con boleta OCR.'}</p>
+                    ? 'Insumos del estudio y stock personal. Registra tus consumos directos de insumos en sesión o solicita insumos al estudio.' 
+                    : 'Gestión completa del stock del estudio, asignaciones a artistas residentes/guests, compras y consumos.'))}</p>
         </div>
       </div>
     </section>
@@ -6840,25 +6936,41 @@ async function renderInventory() {
         </button>
       ` : ''}
 
-      ${isOwnerOrAdmin ? `
-        <button class="secondary" data-action="open-new-item-modal" title="Crear nuevo insumo en el catálogo">
+      ${isIndependent ? `
+        <button class="secondary" data-action="open-new-item-modal" title="Crear nuevo insumo en tu catálogo">
+          ${icon('plus')} <span>Nuevo insumo</span>
+        </button>
+        <button class="secondary" data-action="open-new-movement-modal" title="Registrar consumo, compra o venta">
+          ${icon('sync')} <span>Registrar movimiento</span>
+        </button>
+      ` : (isOwnerOrAdmin ? `
+        <button class="secondary" data-action="open-new-item-modal" title="Crear nuevo insumo en el catálogo del estudio">
           ${icon('plus')} <span>Nuevo insumo</span>
         </button>
         <button class="secondary" data-action="open-new-movement-modal" title="Registrar compra, ajuste o consumo">
           ${icon('sync')} <span>Registrar movimiento</span>
         </button>
       ` : (isResident ? `
+        <button class="primary" data-action="open-new-movement-modal" title="Registrar consumo de insumos en sesión">
+          ${icon('sync')} <span>Registrar consumo</span>
+        </button>
         <button class="secondary" data-action="open-new-personal-item-modal" title="Crear insumo en mi inventario personal">
           ${icon('plus')} <span>Nuevo insumo personal</span>
         </button>
-        <button class="secondary" data-action="open-new-movement-modal" title="Registrar consumo en sesión">
-          ${icon('sync')} <span>Registrar consumo</span>
+        <button class="secondary" data-action="open-guest-request-modal" title="Solicitar insumo al estudio para asignación">
+          ${icon('bell')} <span>Solicitar al estudio</span>
         </button>
       ` : `
         <button class="primary" data-action="open-guest-request-modal" title="Solicitar insumo al estudio para tu sesión">
           ${icon('bell')} <span>Solicitar insumo al estudio</span>
         </button>
-      `)}
+        <button class="secondary" data-action="open-new-movement-modal" title="Registrar consumo de insumos asignados en sesión">
+          ${icon('sync')} <span>Consumir asignado</span>
+        </button>
+        <button class="secondary" data-action="open-new-personal-item-modal" title="Registrar insumo personal que traje conmigo">
+          ${icon('plus')} <span>Insumo que traje</span>
+        </button>
+      `))}
 
       <button class="secondary" data-action="export-inventory-csv" title="Exportar insumos a archivo CSV / Excel">
         ${icon('download')} <span>Exportar CSV</span>
@@ -6873,45 +6985,122 @@ async function renderInventory() {
 
     <!-- Metrics Cards -->
     <section class="stats inventory-stats-grid">
-      <article class="stat-card">
-        <div class="stat-card-header">
-          <span class="stat-icon-bubble purple">${icon('package')}</span>
-          <p class="eyebrow">${isStudioAccount ? 'STOCK ESTUDIO' : 'TOTAL INSUMOS'}</p>
-        </div>
-        <strong>${stats.totalStudioItems || studioItems.length}</strong>
-        <small>${isStudioAccount ? 'Insumos compartidos' : 'Catálogo activo'} (${money(stats.studioValuation || 0)})</small>
-      </article>
+      ${isIndependent ? `
+        <article class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-icon-bubble purple">${icon('package')}</span>
+            <p class="eyebrow">TOTAL INSUMOS</p>
+          </div>
+          <strong>${stats.totalItems || (inventoryData.items || personalItems).length}</strong>
+          <small>Catálogo activo (${money(stats.totalValuation || stats.personalValuation || 0)})</small>
+        </article>
 
-      <article class="stat-card">
-        <div class="stat-card-header">
-          <span class="stat-icon-bubble green">${icon('user')}</span>
-          <p class="eyebrow">MI STOCK PERSONAL</p>
-        </div>
-        <strong>${stats.totalPersonalItems || personalItems.length}</strong>
-        <small>Tus insumos propios (${money(stats.personalValuation || 0)})</small>
-      </article>
+        <article class="stat-card ${lowStockItems.length > 0 ? 'alert-card' : ''}">
+          <div class="stat-card-header">
+            <span class="stat-icon-bubble ${lowStockItems.length > 0 ? 'red' : 'green'}">${icon('alert')}</span>
+            <p class="eyebrow">STOCK BAJO</p>
+          </div>
+          <strong>${lowStockItems.length}</strong>
+          <small>${lowStockItems.length > 0 ? 'Insumos requieren reposición' : 'Todos con stock óptimo'}</small>
+        </article>
 
-      <article class="stat-card ${lowStockItems.length > 0 ? 'alert-card' : ''}">
-        <div class="stat-card-header">
-          <span class="stat-icon-bubble ${lowStockItems.length > 0 ? 'red' : 'green'}">${icon('alert')}</span>
-          <p class="eyebrow">STOCK BAJO</p>
-        </div>
-        <strong>${lowStockItems.length}</strong>
-        <small>${lowStockItems.length > 0 ? 'Insumos requieren reposición' : 'Todos los insumos con buen stock'}</small>
-      </article>
+        <article class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-icon-bubble green">${icon('sync')}</span>
+            <p class="eyebrow">MOVIMIENTOS & COMPRAS</p>
+          </div>
+          <strong>${inventoryMovements.length}</strong>
+          <small>Consumos, compras y ventas registradas</small>
+        </article>
+      ` : (isGuest ? `
+        <article class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-icon-bubble green">${icon('user')}</span>
+            <p class="eyebrow">MI STOCK ASIGNADO</p>
+          </div>
+          <strong>${personalItems.length}</strong>
+          <small>Insumos asignados a tu puesto (${money(stats.personalValuation || 0)})</small>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-icon-bubble purple">${icon('building')}</span>
+            <p class="eyebrow">INSUMOS DEL ESTUDIO</p>
+          </div>
+          <strong>${studioItems.length}</strong>
+          <small>Disponibles para solicitar al estudio</small>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-icon-bubble blue">${icon('bell')}</span>
+            <p class="eyebrow">MIS SOLICITUDES</p>
+          </div>
+          <strong>${inventoryMovements.filter(m => m.movement_type === 'request').length}</strong>
+          <small>Peticiones enviadas al estudio</small>
+        </article>
+      ` : `
+        <article class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-icon-bubble purple">${icon('package')}</span>
+            <p class="eyebrow">${isResident ? 'MI STOCK PERSONAL' : 'STOCK ESTUDIO'}</p>
+          </div>
+          <strong>${isResident ? personalItems.length : (stats.totalStudioItems || studioItems.length)}</strong>
+          <small>${isResident ? 'Tus insumos propios' : 'Insumos compartidos'} (${money(isResident ? (stats.personalValuation || 0) : (stats.studioValuation || 0))})</small>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-icon-bubble green">${icon('building')}</span>
+            <p class="eyebrow">${isResident ? 'INSUMOS DEL ESTUDIO' : 'MI STOCK PERSONAL'}</p>
+          </div>
+          <strong>${isResident ? studioItems.length : (stats.totalPersonalItems || personalItems.length)}</strong>
+          <small>${isResident ? 'Insumos compartidos disponibles' : `Tus insumos propios (${money(stats.personalValuation || 0)})`}</small>
+        </article>
+
+        <article class="stat-card ${lowStockItems.length > 0 ? 'alert-card' : ''}">
+          <div class="stat-card-header">
+            <span class="stat-icon-bubble ${lowStockItems.length > 0 ? 'red' : 'green'}">${icon('alert')}</span>
+            <p class="eyebrow">STOCK BAJO</p>
+          </div>
+          <strong>${lowStockItems.length}</strong>
+          <small>${lowStockItems.length > 0 ? 'Insumos requieren reposición' : 'Todos los insumos con buen stock'}</small>
+        </article>
+      `)}
     </section>
 
     <!-- Inventory Context Tabs -->
     <div class="inventory-tabs-container">
       <div class="inventory-tabs-nav">
-        <button class="inv-tab-btn ${inventoryCurrentTab === 'studio' ? 'active' : ''}" data-inv-tab="studio" style="display: inline-flex; align-items: center; gap: 6px;">
-          ${icon('building')} <span>${isStudioAccount ? 'Insumos del Estudio' : 'Inventario Principal'}</span> <span class="inv-tab-badge">${studioItems.length}</span>
-        </button>
-        <button class="inv-tab-btn ${inventoryCurrentTab === 'personal' ? 'active' : ''}" data-inv-tab="personal" style="display: inline-flex; align-items: center; gap: 6px;">
-          ${icon('user')} <span>Mi Inventario Personal</span> <span class="inv-tab-badge">${personalItems.length}</span>
-        </button>
+        ${isIndependent ? `
+          <button class="inv-tab-btn ${inventoryCurrentTab === 'personal' || inventoryCurrentTab === 'studio' ? 'active' : ''}" data-inv-tab="personal" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('package')} <span>Mis Insumos</span> <span class="inv-tab-badge">${(inventoryData.items || personalItems).length}</span>
+          </button>
+        ` : (isGuest ? `
+          <button class="inv-tab-btn ${inventoryCurrentTab === 'studio' ? 'active' : ''}" data-inv-tab="studio" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('building')} <span>Insumos del Estudio</span> <span class="inv-tab-badge">${studioItems.length}</span>
+          </button>
+          <button class="inv-tab-btn ${inventoryCurrentTab === 'personal' ? 'active' : ''}" data-inv-tab="personal" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('user')} <span>Mi Stock Asignado</span> <span class="inv-tab-badge">${personalItems.length}</span>
+          </button>
+        ` : (isResident ? `
+          <button class="inv-tab-btn ${inventoryCurrentTab === 'personal' ? 'active' : ''}" data-inv-tab="personal" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('user')} <span>Mi Inventario Personal</span> <span class="inv-tab-badge">${personalItems.length}</span>
+          </button>
+          <button class="inv-tab-btn ${inventoryCurrentTab === 'studio' ? 'active' : ''}" data-inv-tab="studio" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('building')} <span>Insumos del Estudio</span> <span class="inv-tab-badge">${studioItems.length}</span>
+          </button>
+        ` : `
+          <button class="inv-tab-btn ${inventoryCurrentTab === 'studio' ? 'active' : ''}" data-inv-tab="studio" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('building')} <span>Insumos del Estudio</span> <span class="inv-tab-badge">${studioItems.length}</span>
+          </button>
+          <button class="inv-tab-btn ${inventoryCurrentTab === 'personal' ? 'active' : ''}" data-inv-tab="personal" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('user')} <span>Mi Inventario Personal</span> <span class="inv-tab-badge">${personalItems.length}</span>
+          </button>
+        `))}
+
         <button class="inv-tab-btn ${inventoryCurrentTab === 'movements' ? 'active' : ''}" data-inv-tab="movements" style="display: inline-flex; align-items: center; gap: 6px;">
-          ${icon('sync')} <span>Movimientos & Solicitudes</span> <span class="inv-tab-badge">${inventoryMovements.length}</span>
+          ${icon('sync')} <span>${isIndependent ? 'Movimientos & Compras' : (isGuest ? 'Mis Solicitudes & Movimientos' : 'Movimientos & Solicitudes')}</span> <span class="inv-tab-badge">${inventoryMovements.length}</span>
         </button>
         <button class="inv-tab-btn ${inventoryCurrentTab === 'alerts' ? 'active' : ''}" data-inv-tab="alerts" style="display: inline-flex; align-items: center; gap: 6px;">
           ${icon('alert')} <span>Alertas Reposición</span> <span class="inv-tab-badge ${lowStockItems.length > 0 ? 'badge-alert' : ''}">${lowStockItems.length}</span>
@@ -6922,10 +7111,13 @@ async function renderInventory() {
       ${inventoryCurrentTab !== 'movements' ? `
         <div class="inventory-category-filters">
           <button class="cat-filter-btn ${inventoryCategoryFilter === 'all' ? 'active' : ''}" data-inv-cat-filter="all">
-            Todos (${inventoryCurrentTab === 'studio' ? studioItems.length : (inventoryCurrentTab === 'personal' ? personalItems.length : lowStockItems.length)})
+            Todos (${allCount})
           </button>
           ${Object.entries(INVENTORY_CATEGORIES).map(([catKey, catMeta]) => {
-            const count = (inventoryCurrentTab === 'studio' ? studioItems : (inventoryCurrentTab === 'personal' ? personalItems : lowStockItems)).filter(i => i.category === catKey).length;
+            const poolForCounts = isIndependent 
+              ? (inventoryData.items || personalItems) 
+              : (inventoryCurrentTab === 'personal' ? personalItems : (inventoryCurrentTab === 'alerts' ? lowStockItems : studioItems));
+            const count = poolForCounts.filter(i => i.category === catKey).length;
             if (count === 0 && inventoryCategoryFilter !== catKey) return '';
             return `
               <button class="cat-filter-btn ${inventoryCategoryFilter === catKey ? 'active' : ''}" data-inv-cat-filter="${catKey}">
@@ -6958,7 +7150,8 @@ function renderInventoryItemsGrid(items, currentTab) {
 
   const isStudioAccount = (activeStudio?.account_type === 'studio');
   const userRole = currentUser?.role;
-  const isOwnerOrAdmin = (!isStudioAccount || userRole === 'owner' || userRole === 'admin');
+  const isIndependent = (!isStudioAccount || activeStudio?.account_type === 'independent');
+  const isOwnerOrAdmin = (!isStudioAccount || userRole === 'owner' || userRole === 'admin' || currentUser?.isSuperAdmin);
   const isResident = (isStudioAccount && userRole === 'resident');
   const isGuest = (isStudioAccount && (userRole === 'guest' || userRole === 'nomad'));
 
@@ -7032,13 +7225,26 @@ function renderInventoryItemsGrid(items, currentTab) {
 
             <!-- Role-based Action Buttons -->
             <div class="inv-card-actions">
-              ${isStudioItem ? `
+              ${isIndependent ? `
+                <button type="button" class="inv-action-btn primary" data-action="consume-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Registrar consumo en sesión">
+                  ${icon('check')} <span>Consumir</span>
+                </button>
+                <button type="button" class="inv-action-btn secondary" data-action="sell-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Vender a cliente final">
+                  ${icon('dollar')} <span>Venta</span>
+                </button>
+                <button type="button" class="inv-action-btn icon-only" data-action="edit-item" data-id="${item.id}" title="Editar insumo">
+                  ${icon('edit')}
+                </button>
+                <button type="button" class="inv-action-btn icon-only danger" data-action="delete-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Eliminar insumo">
+                  ${icon('trash')}
+                </button>
+              ` : (isStudioItem ? `
                 ${isOwnerOrAdmin ? `
                   <button type="button" class="inv-action-btn primary" data-action="consume-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Registrar consumo en sesión">
                     ${icon('check')} <span>Consumir</span>
                   </button>
-                  <button type="button" class="inv-action-btn secondary" data-action="transfer-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Facilitar o vender a un artista residente/guest">
-                    ${icon('sync')} <span>Transferir</span>
+                  <button type="button" class="inv-action-btn secondary" data-action="transfer-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Facilitar o asignar a un artista residente/guest">
+                    ${icon('sync')} <span>Asignar</span>
                   </button>
                   <button type="button" class="inv-action-btn icon-only" data-action="edit-item" data-id="${item.id}" title="Editar insumo">
                     ${icon('edit')}
@@ -7050,19 +7256,24 @@ function renderInventoryItemsGrid(items, currentTab) {
                   <button type="button" class="inv-action-btn primary" data-action="consume-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Registrar consumo en mi sesión">
                     ${icon('check')} <span>Consumir</span>
                   </button>
+                  <button type="button" class="inv-action-btn secondary" data-action="request-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Solicitar insumo al estudio para asignación">
+                    ${icon('bell')} <span>Solicitar</span>
+                  </button>
                 ` : (isGuest ? `
                   <button type="button" class="inv-action-btn primary" data-action="request-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Solicitar este insumo al estudio para mi sesión">
                     ${icon('bell')} <span>Solicitar insumo</span>
                   </button>
                 ` : ''))}
               ` : `
-                ${isOwnPersonalItem || currentUser?.isSuperAdmin ? `
+                ${isOwnPersonalItem || currentUser?.isSuperAdmin || isOwnerOrAdmin ? `
                   <button type="button" class="inv-action-btn primary" data-action="consume-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Registrar consumo propio">
                     ${icon('check')} <span>Consumir</span>
                   </button>
-                  <button type="button" class="inv-action-btn secondary" data-action="sell-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Vender a cliente final">
-                    ${icon('dollar')} <span>Venta</span>
-                  </button>
+                  ${!isGuest ? `
+                    <button type="button" class="inv-action-btn secondary" data-action="sell-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" title="Vender a cliente final">
+                      ${icon('dollar')} <span>Venta</span>
+                    </button>
+                  ` : ''}
                   <button type="button" class="inv-action-btn icon-only" data-action="edit-item" data-id="${item.id}" title="Editar insumo">
                     ${icon('edit')}
                   </button>
@@ -7072,7 +7283,7 @@ function renderInventoryItemsGrid(items, currentTab) {
                 ` : `
                   <span style="font-size: 11px; color: var(--muted); font-style: italic;">Insumo personal</span>
                 `}
-              `}
+              `)}
             </div>
           </article>
         `;
@@ -7147,8 +7358,8 @@ function renderInventoryMovementsTab(movements) {
                   ${isOwnerOrAdmin ? `
                     <td class="cell-action">
                       ${isRequest ? `
-                        <button type="button" class="inv-action-btn secondary small-btn" data-action="transfer-item" data-id="${m.item_id}" data-name="${escapeHtml(m.item_name)}" title="Facilitar insumo solicitado">
-                          ${icon('sync')} <span>Facilitar</span>
+                        <button type="button" class="inv-action-btn secondary small-btn" data-action="assign-request" data-item-id="${m.item_id}" data-to-user-id="${m.from_user_id}" data-qty="${m.quantity}" data-item-name="${escapeHtml(m.item_name)}" data-user-name="${escapeHtml(m.from_user_name || 'Artista')}" title="Aprobar y asignar insumos solicitados al inventario personal del artista">
+                          ${icon('sync')} <span>Asignar</span>
                         </button>
                       ` : '—'}
                     </td>
@@ -7255,12 +7466,12 @@ function openItemModal(item = null, isPersonal = false) {
         </div>
       </div>
 
-      ${!isEdit ? `
+      ${!isEdit && (activeStudio?.account_type === 'studio') && (currentUser?.role === 'owner' || currentUser?.role === 'admin' || currentUser?.isSuperAdmin) ? `
         <label class="form-checkbox-label">
           <input type="checkbox" name="isPersonal" ${isPersonal ? 'checked' : ''} />
           <span>Guardar en mi <strong>Inventario Personal</strong> (en lugar del inventario compartido del estudio)</span>
         </label>
-      ` : ''}
+      ` : (!isEdit && isPersonal ? `<input type="hidden" name="isPersonal" value="true" />` : '')}
 
       <p class="form-error"></p>
 
@@ -7724,21 +7935,35 @@ function openInventoryCsvImportModal() {
   }
 }
 
-function openMovementModal(preselectedItemId = null, preselectedType = 'consumption') {
-  const allItems = [...(inventoryData?.studioItems || []), ...(inventoryData?.personalItems || [])];
+function openMovementModal(preselectedItemId = null, preselectedType = 'consumption', preselectedQty = 1, preselectedToUserId = null, preselectedNotes = '') {
+  const isIndependent = (activeStudio?.account_type === 'independent');
+  const isGuest = (activeStudio?.account_type === 'studio' && (currentUser?.role === 'guest' || currentUser?.role === 'nomad'));
+  const isResident = (activeStudio?.account_type === 'studio' && currentUser?.role === 'resident');
+  const isOwnerOrAdmin = (!activeStudio || activeStudio?.account_type !== 'studio' || currentUser?.role === 'owner' || currentUser?.role === 'admin' || currentUser?.isSuperAdmin);
+
+  // Available items to select
+  let selectableItems = [];
+  if (isIndependent) {
+    selectableItems = inventoryData?.items || inventoryData?.personalItems || [];
+  } else if (isGuest && preselectedType === 'consumption') {
+    selectableItems = inventoryData?.personalItems || [];
+  } else {
+    selectableItems = [...(inventoryData?.studioItems || []), ...(inventoryData?.personalItems || [])];
+  }
+
   const members = inventoryData?.members || [];
 
   openModal(`
     <p class="eyebrow">MOVIMIENTO DE INVENTARIO</p>
-    <h2 id="modal-title">Registrar Consumo, Venta o Transferencia</h2>
+    <h2 id="modal-title">${preselectedType === 'transfer_internal' ? 'Asignar / Facilitar Insumo a Artista' : 'Registrar Consumo, Venta o Movimiento'}</h2>
 
     <form data-form="inventory-movement">
       <label>Insumo *
         <select name="itemId" id="mov-item-select" required>
           <option value="">Selecciona un insumo...</option>
-          ${allItems.map((i) => `
+          ${selectableItems.map((i) => `
             <option value="${i.id}" data-qty="${i.quantity}" data-unit="${i.unit}" data-cost="${i.cost_price}" data-sale="${i.sale_price}" ${Number(preselectedItemId) === Number(i.id) ? 'selected' : ''}>
-              ${i.owner_user_id ? '[Personal] ' : '[Estudio] '} ${i.name} (Stock: ${i.quantity} ${INVENTORY_UNITS[i.unit] || i.unit})
+              ${!isIndependent ? (i.owner_user_id ? '[Personal] ' : '[Estudio] ') : ''}${escapeHtml(i.name)} (Stock: ${i.quantity} ${INVENTORY_UNITS[i.unit] || i.unit})
             </option>
           `).join('')}
         </select>
@@ -7747,17 +7972,19 @@ function openMovementModal(preselectedItemId = null, preselectedType = 'consumpt
       <label>Tipo de movimiento *
         <select name="movementType" id="mov-type-select" required>
           <option value="consumption" ${preselectedType === 'consumption' ? 'selected' : ''}>Consumo en sesión / cita de tatuaje</option>
-          <option value="purchase" ${preselectedType === 'purchase' ? 'selected' : ''}>Compra externa (Ingreso de stock)</option>
-          <option value="sale_external" ${preselectedType === 'sale_external' ? 'selected' : ''}>Venta a cliente final (Aftercare / Merch)</option>
-          <option value="transfer_internal" ${preselectedType === 'transfer_internal' ? 'selected' : ''}>Facilitación / Préstamo de estudio a artista</option>
-          <option value="sale_internal" ${preselectedType === 'sale_internal' ? 'selected' : ''}>Venta interna a artista residente o guest</option>
+          ${!isGuest ? `<option value="purchase" ${preselectedType === 'purchase' ? 'selected' : ''}>Compra externa (Ingreso de stock)</option>` : ''}
+          ${!isGuest ? `<option value="sale_external" ${preselectedType === 'sale_external' ? 'selected' : ''}>Venta a cliente final (Aftercare / Merch)</option>` : ''}
+          ${isOwnerOrAdmin && !isIndependent ? `
+            <option value="transfer_internal" ${preselectedType === 'transfer_internal' ? 'selected' : ''}>Facilitación / Asignación de estudio a artista</option>
+            <option value="sale_internal" ${preselectedType === 'sale_internal' ? 'selected' : ''}>Venta interna a artista residente o guest</option>
+          ` : ''}
           <option value="adjustment" ${preselectedType === 'adjustment' ? 'selected' : ''}>Ajuste manual de stock / Conteo físico</option>
         </select>
       </label>
 
       <div class="grid two">
         <label>Cantidad *
-          <input type="number" name="quantity" min="0.01" step="any" required placeholder="1" value="1" />
+          <input type="number" name="quantity" min="0.01" step="any" required placeholder="1" value="${preselectedQty || 1}" />
         </label>
 
         <label id="mov-price-field">Precio / Monto total ($)
@@ -7766,31 +7993,33 @@ function openMovementModal(preselectedItemId = null, preselectedType = 'consumpt
       </div>
 
       <!-- Target Artist Selector (For transfer or internal sale) -->
-      <div id="mov-target-user-field" class="form-section ${['transfer_internal', 'sale_internal'].includes(preselectedType) ? '' : 'hidden'}">
-        <label>Artista receptor (Residente o Guest) *
-          <select name="toUserId">
-            <option value="">Selecciona al artista...</option>
-            ${members.map((m) => `
-              <option value="${m.id}">${m.full_name} (${ROLE_MAP[m.role]?.label || m.role})</option>
-            `).join('')}
-          </select>
-        </label>
-      </div>
+      ${!isIndependent ? `
+        <div id="mov-target-user-field" class="form-section ${['transfer_internal', 'sale_internal'].includes(preselectedType) ? '' : 'hidden'}">
+          <label>Artista receptor (Residente o Guest) *
+            <select name="toUserId">
+              <option value="">Selecciona al artista...</option>
+              ${members.map((m) => `
+                <option value="${m.id}" ${Number(preselectedToUserId) === Number(m.id) ? 'selected' : ''}>${escapeHtml(m.full_name)} (${ROLE_MAP[m.role]?.label || m.role})</option>
+              `).join('')}
+            </select>
+          </label>
+        </div>
+      ` : ''}
 
       <label class="form-checkbox-label" id="mov-financial-record-wrap">
-        <input type="checkbox" name="createFinancialRecord" value="true" checked />
+        <input type="checkbox" name="createFinancialRecord" value="true" ${['consumption', 'transfer_internal'].includes(preselectedType) ? '' : 'checked'} />
         <span>Registrar automáticamente en <strong>Billetera</strong> (como Ingreso o Egreso)</span>
       </label>
 
       <label>Notas u observación
-        <input name="notes" placeholder="Ej. Sesión brazo completo, compra proveedor ChileTattoo..." />
+        <input name="notes" placeholder="Ej. Sesión brazo completo, compra proveedor..." value="${escapeHtml(preselectedNotes || '')}" />
       </label>
 
       <p class="form-error"></p>
 
       <div class="modal-actions">
         <button type="button" class="secondary" data-close-modal>Cancelar</button>
-        <button type="submit" class="primary">Registrar Movimiento</button>
+        <button type="submit" class="primary">${preselectedType === 'transfer_internal' ? 'Confirmar Asignación' : 'Registrar Movimiento'}</button>
       </div>
     </form>
   `);
@@ -10485,6 +10714,15 @@ document.addEventListener('click', async (event) => {
   if (transferBtn) {
     return openMovementModal(transferBtn.dataset.id, 'transfer_internal');
   }
+  const assignRequestBtn = event.target.closest('[data-action="assign-request"]');
+  if (assignRequestBtn) {
+    const itemId = assignRequestBtn.dataset.itemId;
+    const toUserId = assignRequestBtn.dataset.toUserId;
+    const qty = Number(assignRequestBtn.dataset.qty) || 1;
+    const userName = assignRequestBtn.dataset.userName || 'Artista';
+    const notes = `Asignación aprobada para solicitud de ${userName}`;
+    return openMovementModal(itemId, 'transfer_internal', qty, toUserId, notes);
+  }
   const editItemBtn = event.target.closest('[data-action="edit-item"]');
   if (editItemBtn) {
     const allItems = [...(inventoryData?.studioItems || []), ...(inventoryData?.personalItems || [])];
@@ -10676,11 +10914,38 @@ document.addEventListener('submit', async (event) => {
         submitBtn.textContent = 'Liquidando...';
       }
       try {
-        await api('/api/finances/settle', {
+        const settleRes = await api('/api/finances/settle', {
           method: 'POST',
           body: JSON.stringify({ artistId: Number(body.artistId), amount: Number(body.amount), notes: body.notes })
         });
-        closeModal();
+        const msg = settleRes.messageText || '';
+        const phone = (settleRes.artistPhone || '').replace(/[^0-9]/g, '');
+        const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+        
+        openModal(`
+          <div style="text-align: center; margin-bottom: 16px;">
+            <div style="width: 48px; height: 48px; margin: 0 auto 12px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; color: #10B981;">
+              ${icon('check')}
+            </div>
+            <p class="eyebrow" style="color: var(--green-text, #10B981);">LIQUIDACIÓN EMITIDA</p>
+            <h2 id="modal-title">Liquidación Confirmada</h2>
+            <p class="lead" style="margin-bottom: 0;">Se registró el pago de $${Number(body.amount).toLocaleString('es-CL')} para ${settleRes.artistName || 'el artista'}.</p>
+          </div>
+
+          <div style="background: var(--surface-low); border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; margin-bottom: 16px; border: 1px solid var(--line-soft);">${escapeHtml(msg)}</div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="primary" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; padding: 10px 16px;">
+              ${icon('chat')} <span>Enviar por WhatsApp</span>
+            </a>
+            ${settleRes.artistEmail ? `
+              <a href="mailto:${settleRes.artistEmail}?subject=${encodeURIComponent('Liquidación de comisiones Tatudin')}&body=${encodeURIComponent(msg)}" class="secondary" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; padding: 10px 16px;">
+                ${icon('mail')} <span>Enviar por Email</span>
+              </a>
+            ` : ''}
+            <button type="button" class="secondary" data-close-modal style="padding: 10px 16px;">Cerrar</button>
+          </div>
+        `);
         return await render('finanzas');
       } finally {
         if (submitBtn) {
@@ -10714,6 +10979,7 @@ document.addEventListener('submit', async (event) => {
       });
       activeStudio = updated;
       updateStudioSidebarUI();
+      syncRoleNavigation(updated.account_type);
       const successMsg = form.querySelector('.form-error');
       if (successMsg) {
         successMsg.style.color = 'var(--green-text)';

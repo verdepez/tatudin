@@ -747,12 +747,85 @@ export async function seedStudioData(passedPool = null) {
       }
     }
 
+    // 12. Crear Usuario Demo Tatuador Independiente
+    const indepEmail = 'independiente@tatudin.com';
+    let indepRes = await client.query('SELECT id FROM users WHERE email = $1', [indepEmail]);
+    let indepId;
+    if (!indepRes.rowCount) {
+      const insIndep = await client.query(
+        'INSERT INTO users (email, password_hash, full_name) VALUES ($1, $2, $3) RETURNING id',
+        [indepEmail, passwordHash, 'Nicolás Tatuador Independiente']
+      );
+      indepId = insIndep.rows[0].id;
+    } else {
+      indepId = indepRes.rows[0].id;
+      await client.query('UPDATE users SET password_hash = $1, full_name = $2 WHERE id = $3', [passwordHash, 'Nicolás Tatuador Independiente', indepId]);
+    }
+
+    let indepStudioRes = await client.query(`
+      SELECT s.id FROM studios s
+      JOIN studio_memberships sm ON sm.studio_id = s.id
+      WHERE sm.user_id = $1 AND sm.role = 'owner' LIMIT 1
+    `, [indepId]);
+
+    let indepStudioId;
+    if (!indepStudioRes.rowCount) {
+      const insIndepStudio = await client.query(
+        'INSERT INTO studios (name, account_type, currency, timezone) VALUES ($1, $2, $3, $4) RETURNING id',
+        ['Nico Tattoo Privado', 'independent', 'CLP', 'America/Santiago']
+      );
+      indepStudioId = insIndepStudio.rows[0].id;
+      await client.query('INSERT INTO studio_memberships (user_id, studio_id, role, status, commission_percent, has_app_access) VALUES ($1, $2, $3, $4, $5, $6)', [indepId, indepStudioId, 'owner', 'active', 100.00, true]);
+    } else {
+      indepStudioId = indepStudioRes.rows[0].id;
+      await client.query("UPDATE studios SET name = $1, account_type = 'independent', currency = 'CLP', timezone = 'America/Santiago' WHERE id = $2", ['Nico Tattoo Privado', indepStudioId]);
+    }
+
+    // Cliente demo para independiente
+    let indepClientRes = await client.query('SELECT id FROM clients WHERE studio_id = $1 LIMIT 1', [indepStudioId]);
+    let indepClientId;
+    if (!indepClientRes.rowCount) {
+      const insCl = await client.query(
+        'INSERT INTO clients (studio_id, name, email, phone) VALUES ($1, $2, $3, $4) RETURNING id',
+        [indepStudioId, 'Valeria Morales', 'valeria.cliente@gmail.com', '+56987654321']
+      );
+      indepClientId = insCl.rows[0].id;
+    } else {
+      indepClientId = indepClientRes.rows[0].id;
+    }
+
+    // Cita demo para independiente
+    let indepApptRes = await client.query('SELECT id FROM appointments WHERE studio_id = $1 LIMIT 1', [indepStudioId]);
+    if (!indepApptRes.rowCount) {
+      await client.query(`
+        INSERT INTO appointments (
+          studio_id, client_id, artist_id, title, starts_at, duration_minutes, status, price, deposit, notes
+        ) VALUES ($1, $2, $3, 'Sesión Fineline Floral', NOW() + interval '2 hours', 180, 'confirmed', 120000, 30000, 'Diseño botánico antebrazo')
+      `, [indepStudioId, indepClientId, indepId]);
+    }
+
+    // Insumos de inventario para independiente
+    let indepInvRes = await client.query('SELECT id FROM inventory_items WHERE studio_id = $1 LIMIT 1', [indepStudioId]);
+    if (!indepInvRes.rowCount) {
+      await client.query(`
+        INSERT INTO inventory_items (
+          studio_id, owner_user_id, name, category, unit, quantity, min_stock_alert, cost_price, sale_price, sku
+        ) VALUES 
+        ($1, $2, 'Cartuchos Kwadron 03RL', 'needles', 'boxes', 8, 3, 24990, 0, 'KWA-03RL-INDEP'),
+        ($1, $2, 'Tinta Dynamic Triple Black 8oz', 'inks', 'bottles', 2, 1, 35000, 0, 'DYN-BLK-INDEP'),
+        ($1, $2, 'Espuma Limpiadora Witch Hazel', 'hygiene', 'bottles', 5, 2, 9990, 0, 'WITCH-FOAM-INDEP')
+      `, [indepStudioId, indepId]);
+    }
+
     await client.query('COMMIT');
     console.log('✅ Seeding completado exitosamente con todas las entidades y agenda poblada.');
     console.log(`🔑 Credenciales de Acceso Estudio:`);
     console.log(`   Email: ${ownerEmail}`);
     console.log(`   Password: ${defaultPassword}`);
-    return { ok: true, ownerEmail, defaultPassword };
+    console.log(`🔑 Credenciales Tatuador Independiente:`);
+    console.log(`   Email: ${indepEmail}`);
+    console.log(`   Password: ${defaultPassword}`);
+    return { ok: true, ownerEmail, indepEmail, defaultPassword };
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Error en el seeding:', err);

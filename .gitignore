@@ -31,3 +31,7 @@ knowledge-card.md
 playwright-report/
 test-results/
 .playwright/
+
+# Binary documents & specifications
+*.pdf
+

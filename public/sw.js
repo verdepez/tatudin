@@ -1,8 +1,9 @@
-const CACHE_NAME = 'tatudin-shell-v36';
+const CACHE_NAME = 'tatudin-shell-v61';
+const PRECACHE_ASSETS = [
   '/',
   '/index.html',
-  '/styles.css?v=56',
-  '/app.js?v=56',
+  '/styles.css?v=61',
+  '/app.js?v=61',
   '/offline-store.js',
   '/favicon-32.png',
   '/icon-192.png',
@@ -52,7 +53,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static Assets (JS, CSS, Images, Fonts): Stale-While-Revalidate for 0ms instant load
+  // Network-First for JS and CSS to guarantee fresh code updates, falling back to cache
+  if (event.request.url.includes('/app.js') || event.request.url.includes('/styles.css')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse.ok) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Static Assets (Images, Fonts, etc.): Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)

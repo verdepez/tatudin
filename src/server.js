@@ -106,9 +106,11 @@ app.get(['/app.js', '/styles.css', '/offline-store.js', '/speech-recognition.js'
 });
 
 app.use(express.static(path.join(__dirname, '..', 'public'), {
-  maxAge: '1h',
+  maxAge: 0,
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.svg') || filePath.endsWith('.png') || filePath.endsWith('.jpg')) {
+    if (filePath.endsWith('sw.js') || filePath.endsWith('app.js') || filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    } else if (filePath.endsWith('.svg') || filePath.endsWith('.png') || filePath.endsWith('.jpg')) {
       res.setHeader('Cache-Control', 'public, max-age=86400');
     }
   }
@@ -179,6 +181,7 @@ async function requireAuth(request, response, next) {
     request.studioId = cached.studioId;
     request.sessionId = sessionId;
     request.isSuperAdmin = cached.isSuperAdmin;
+    request.accountType = cached.accountType || cached.user?.account_type || 'independent';
     return next();
   }
 
@@ -186,7 +189,9 @@ async function requireAuth(request, response, next) {
     const result = await pool.query(`
       SELECT u.id, u.email, u.full_name, u.is_superadmin, s_t.id AS session_id,
              COALESCE(s_t.active_studio_id, sm.studio_id) AS studio_id,
-             sm.role, s.name AS studio_name
+             sm.role, s.name AS studio_name,
+             COALESCE(s.account_type, 'independent') AS account_type,
+             COALESCE(sm.has_app_access, TRUE) AS has_app_access
       FROM sessions s_t
       JOIN users u ON u.id = s_t.user_id
       LEFT JOIN studio_memberships sm ON sm.user_id = u.id AND sm.studio_id = COALESCE(s_t.active_studio_id, (
@@ -202,22 +207,34 @@ async function requireAuth(request, response, next) {
     }
 
     let userRow = result.rows[0];
+
+    // Restrict access if profile is configured without direct app access (guests / account-less artists)
+    if (userRow.has_app_access === false && !userRow.is_superadmin && userRow.role !== 'owner' && userRow.role !== 'admin') {
+      authSessionCache.delete(sessionId);
+      return response.status(403).json({ error: 'Este perfil no cuenta con acceso interactivo a la plataforma.' });
+    }
+
     if (!userRow.studio_id) {
       const defStudio = await pool.query("INSERT INTO studios (name, account_type, currency, timezone) VALUES ($1, 'independent', 'CLP', 'America/Santiago') RETURNING id, name", [`Estudio de ${userRow.full_name || 'Artista'}`]);
       const newStudioId = defStudio.rows[0].id;
-      await pool.query("INSERT INTO studio_memberships (user_id, studio_id, role) VALUES ($1, $2, 'owner')", [userRow.id, newStudioId]);
+      await pool.query("INSERT INTO studio_memberships (user_id, studio_id, role, has_app_access) VALUES ($1, $2, 'owner', TRUE)", [userRow.id, newStudioId]);
       await pool.query('UPDATE sessions SET active_studio_id = $1 WHERE id = $2', [newStudioId, sessionId]);
       await seedDefaultCategories(pool, newStudioId, 'independent');
       userRow.studio_id = newStudioId;
       userRow.role = 'owner';
       userRow.studio_name = defStudio.rows[0].name;
+      userRow.account_type = 'independent';
+      userRow.has_app_access = true;
     }
 
     const isSuper = Boolean(userRow.is_superadmin || userRow.email === 'soyelroot@tatudin.cl');
     userRow.is_superadmin = isSuper;
+    userRow.isSuperAdmin = isSuper;
+    userRow.account_type = userRow.account_type || 'independent';
 
     request.user = userRow;
     request.studioId = userRow.studio_id;
+    request.accountType = userRow.account_type;
     request.sessionId = sessionId;
     request.isSuperAdmin = isSuper;
 
@@ -225,6 +242,7 @@ async function requireAuth(request, response, next) {
       time: Date.now(),
       user: userRow,
       studioId: userRow.studio_id,
+      accountType: userRow.account_type,
       isSuperAdmin: isSuper
     });
 
@@ -785,6 +803,14 @@ app.post('/api/auth/login', loginRateLimiter, async (request, response) => {
     }
 
     const user = userResult.rows[0];
+
+    // Explicitly reject login for profiles created without interactive app access
+    if (user.password_hash === '!NO_LOGIN!') {
+      return response.status(403).json({
+        error: 'Este perfil no cuenta con acceso interactivo a la plataforma. Consulta con la administración de tu estudio.'
+      });
+    }
+
     const valid = await verifyPassword(password, user.password_hash);
     if (!valid) {
       // Special recovery if root password was out of sync
@@ -815,13 +841,14 @@ app.post('/api/auth/login', loginRateLimiter, async (request, response) => {
       studioId = allowedMemRes.rows[0]?.studio_id || null;
 
       if (!studioId) {
-        const disabledGuestMem = await pool.query(
-          "SELECT sm.id, s.name AS studio_name FROM studio_memberships sm JOIN studios s ON s.id = sm.studio_id WHERE sm.user_id = $1 AND sm.status = 'active' AND sm.has_app_access = FALSE LIMIT 1",
+        const disabledMem = await pool.query(
+          "SELECT sm.id, sm.role, s.name AS studio_name FROM studio_memberships sm JOIN studios s ON s.id = sm.studio_id WHERE sm.user_id = $1 AND sm.status = 'active' AND sm.has_app_access = FALSE LIMIT 1",
           [user.id]
         );
-        if (disabledGuestMem.rowCount && !user.is_superadmin) {
+        if (disabledMem.rowCount && !user.is_superadmin) {
+          const roleLabel = disabledMem.rows[0].role === 'nomad' ? 'Guest (Invitado)' : 'Artista';
           return response.status(403).json({
-            error: `Tu registro como Guest en "${disabledGuestMem.rows[0].studio_name}" no tiene habilitado el acceso directo a la plataforma. Contacta al administrador del estudio para activar tu acceso.`
+            error: `Tu registro como ${roleLabel} en "${disabledMem.rows[0].studio_name}" no tiene habilitado el acceso directo a la plataforma. Consulta con la administración de tu estudio.`
           });
         }
       }
@@ -837,7 +864,7 @@ app.post('/api/auth/login', loginRateLimiter, async (request, response) => {
         );
         studioId = defStudio.rows[0].id;
         await pool.query(
-          "INSERT INTO studio_memberships (user_id, studio_id, role, commission_percent, status) VALUES ($1, $2, 'owner', 100.00, 'active') ON CONFLICT (user_id, studio_id) DO UPDATE SET status = 'active'",
+          "INSERT INTO studio_memberships (user_id, studio_id, role, commission_percent, status, has_app_access) VALUES ($1, $2, 'owner', 100.00, 'active', TRUE) ON CONFLICT (user_id, studio_id) DO UPDATE SET status = 'active', has_app_access = TRUE",
           [user.id, studioId]
         );
         await seedDefaultCategories(pool, studioId, 'independent');
@@ -879,7 +906,8 @@ app.post('/api/auth/login', loginRateLimiter, async (request, response) => {
         id: user.id,
         email: user.email,
         fullName: user.full_name,
-        isSuperAdmin: isSuper
+        isSuperAdmin: isSuper,
+        is_superadmin: isSuper
       }
     });
   } catch (error) {
@@ -1450,13 +1478,13 @@ app.patch('/api/guest-spots/:id', requireAuth, async (request, response) => {
       if (userCheck.rowCount) {
         userId = userCheck.rows[0].id;
       } else {
-        const newUser = await client.query('INSERT INTO users (email, password_hash, full_name) VALUES (LOWER($1), $2, $3) RETURNING id', [item.artist_email, await hashPassword('tatudin123'), item.artist_name]);
+        const newUser = await client.query("INSERT INTO users (email, password_hash, full_name) VALUES (LOWER($1), '!NO_LOGIN!', $2) RETURNING id", [item.artist_email, item.artist_name]);
         userId = newUser.rows[0].id;
       }
       await client.query(`
-        INSERT INTO studio_memberships (user_id, studio_id, role, status, commission_percent)
-        VALUES ($1, $2, 'nomad', 'active', 70.00)
-        ON CONFLICT (user_id, studio_id) DO UPDATE SET role = 'nomad', status = 'active'
+        INSERT INTO studio_memberships (user_id, studio_id, role, status, commission_percent, has_app_access)
+        VALUES ($1, $2, 'nomad', 'active', 70.00, FALSE)
+        ON CONFLICT (user_id, studio_id) DO UPDATE SET role = 'nomad', status = 'active', has_app_access = FALSE
       `, [userId, request.studioId]);
     }
     await client.query('COMMIT');
@@ -1616,8 +1644,11 @@ app.post('/api/members', requireAuth, async (request, response) => {
 
   const validAgreementTypes = ['commission', 'fixed_daily', 'fixed_monthly'];
   const cleanAgreementType = validAgreementTypes.includes(agreementType) ? agreementType : 'commission';
-  // If role is nomad/guest and hasAppAccess is not explicitly passed as true, default to false (safe Guest mode)
-  const cleanHasAppAccess = hasAppAccess !== undefined ? Boolean(hasAppAccess) : (normalizedRole !== 'nomad');
+  // For artists without account, hasAppAccess defaults to false unless explicitly set to true or role is admin
+  const cleanHasAppAccess = hasAppAccess !== undefined 
+    ? Boolean(hasAppAccess) 
+    : (normalizedRole === 'admin');
+  const userPasswordHash = cleanHasAppAccess ? await hashPassword(password || 'tatudin123') : '!NO_LOGIN!';
 
   const client = await pool.connect();
   try {
@@ -1627,7 +1658,7 @@ app.post('/api/members', requireAuth, async (request, response) => {
     if (existing.rowCount) {
       userId = existing.rows[0].id;
     } else {
-      const newUser = await client.query('INSERT INTO users (email, password_hash, full_name) VALUES (LOWER($1), $2, $3) RETURNING id', [email.trim(), await hashPassword(password), fullName.trim()]);
+      const newUser = await client.query('INSERT INTO users (email, password_hash, full_name) VALUES (LOWER($1), $2, $3) RETURNING id', [email.trim(), userPasswordHash, fullName.trim()]);
       userId = newUser.rows[0].id;
     }
     const membership = await client.query(`INSERT INTO studio_memberships (
@@ -1869,6 +1900,11 @@ app.patch('/api/spaces/:id', requireAuth, async (request, response) => {
 app.get('/api/dashboard', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
+    const isResident = (request.user.role === 'resident' || request.user.role === 'nomad');
+    const artistFilter = isResident ? ' AND a.artist_id = $2' : '';
+    const artistFilterSimple = isResident ? ' AND artist_id = $2' : '';
+    const params = isResident ? [request.studioId, request.user.id] : [request.studioId];
+
     const [appointments, stats, studio] = await Promise.all([
       pool.query(`SELECT a.id, a.title, a.notes, a.starts_at, a.duration_minutes, a.status, a.price, a.deposit,
         c.name AS client_name, c.phone AS client_phone, u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
@@ -1879,18 +1915,18 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
         LEFT JOIN users u ON u.id = a.artist_id
         LEFT JOIN studio_memberships sm ON sm.user_id = u.id AND sm.studio_id = a.studio_id
         LEFT JOIN spaces sp ON sp.id = a.space_id
-        WHERE a.studio_id = $1 AND a.status NOT IN ('cancelled', 'no_show') ORDER BY a.starts_at LIMIT 8`, [request.studioId]),
+        WHERE a.studio_id = $1 ${artistFilter} AND a.status NOT IN ('cancelled', 'no_show') ORDER BY a.starts_at LIMIT 8`, params),
       pool.query(`SELECT
-        (SELECT COUNT(*) FROM appointments WHERE studio_id = $1 AND status NOT IN ('cancelled', 'no_show'))::int AS scheduled_appointments,
-        (SELECT COUNT(*) FROM appointments WHERE studio_id = $1 AND status = 'completed')::int AS completed_appointments,
-        (SELECT COUNT(*) FROM clients WHERE studio_id = $1)::int AS clients,
-        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 AND status NOT IN ('cancelled', 'no_show')), 0)::numeric AS expected_income,
-        COALESCE((SELECT SUM(deposit) FROM appointments WHERE studio_id = $1 AND status NOT IN ('cancelled', 'no_show')), 0)::numeric AS total_deposits,
-        (COALESCE((SELECT SUM(CASE WHEN status = 'completed' THEN price ELSE deposit END) FROM appointments WHERE studio_id = $1 AND status NOT IN ('cancelled', 'no_show')), 0)
-          + COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'income'), 0))::numeric AS income,
-        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense'), 0)::numeric AS expenses,
-        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 AND status IN ('cancelled', 'no_show')), 0)::numeric AS estimated_losses
-      `, [request.studioId]),
+        (SELECT COUNT(*) FROM appointments WHERE studio_id = $1 ${artistFilterSimple} AND status NOT IN ('cancelled', 'no_show'))::int AS scheduled_appointments,
+        (SELECT COUNT(*) FROM appointments WHERE studio_id = $1 ${artistFilterSimple} AND status = 'completed')::int AS completed_appointments,
+        (SELECT COUNT(DISTINCT client_id) FROM appointments WHERE studio_id = $1 ${artistFilterSimple})::int AS clients,
+        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 ${artistFilterSimple} AND status NOT IN ('cancelled', 'no_show')), 0)::numeric AS expected_income,
+        COALESCE((SELECT SUM(deposit) FROM appointments WHERE studio_id = $1 ${artistFilterSimple} AND status NOT IN ('cancelled', 'no_show')), 0)::numeric AS total_deposits,
+        (COALESCE((SELECT SUM(CASE WHEN status = 'completed' THEN price ELSE deposit END) FROM appointments WHERE studio_id = $1 ${artistFilterSimple} AND status NOT IN ('cancelled', 'no_show')), 0)
+          + ${isResident ? '0' : `COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'income'), 0)`})::numeric AS income,
+        ${isResident ? '0::numeric' : `COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense'), 0)::numeric`} AS expenses,
+        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 ${artistFilterSimple} AND status IN ('cancelled', 'no_show')), 0)::numeric AS estimated_losses
+      `, params),
       pool.query(`SELECT id, name, currency, timezone, account_type FROM studios WHERE id = $1`, [request.studioId])
     ]);
     return response.json({ appointments: appointments.rows, stats: stats.rows[0], studio: studio.rows[0] });
@@ -1918,25 +1954,25 @@ app.get('/api/appointments', requireAuth, async (request, response) => {
       params.push(Number(artistId));
       query += ` AND a.artist_id = $${params.length}`;
     }
-    if (spaceId && spaceId !== 'all') {
-      params.push(Number(spaceId));
-      query += ` AND a.space_id = $${params.length}`;
-    }
-    if (categoryId && categoryId !== 'all') {
-      params.push(Number(categoryId));
-      query += ` AND a.category_id = $${params.length}`;
-    }
-    if (status && status !== 'all') {
-      params.push(status);
-      query += ` AND a.status = $${params.length}`;
-    }
-    if (date) {
-      params.push(date);
-      query += ` AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') = $${params.length}`;
-    } else if (startDate && endDate) {
-      params.push(startDate, endDate);
-      query += ` AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') >= $${params.length - 1} AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') <= $${params.length}`;
-    }
+      if (spaceId && spaceId !== 'all') {
+        params.push(Number(spaceId));
+        query += ` AND a.space_id = $${params.length}`;
+      }
+      if (categoryId && categoryId !== 'all') {
+        params.push(Number(categoryId));
+        query += ` AND a.category_id = $${params.length}`;
+      }
+      if (status && status !== 'all') {
+        params.push(status);
+        query += ` AND a.status = $${params.length}`;
+      }
+      if (date) {
+        params.push(date);
+        query += ` AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') = $${params.length}`;
+      } else if (startDate && endDate) {
+        params.push(startDate, endDate);
+        query += ` AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') >= $${params.length - 1} AND DATE(a.starts_at AT TIME ZONE 'America/Santiago') <= $${params.length}`;
+      }
 
     query += ` ORDER BY a.starts_at`;
     const result = await pool.query(query, params);
@@ -1998,7 +2034,31 @@ app.post('/api/appointments', requireAuth, async (request, response) => {
       RETURNING *
     `, [request.studioId, catId, validClientId, artistId ? Number(artistId) : null, spaceId ? Number(spaceId) : null, title.trim(), notes.trim(), startsAt, Math.max(15, Number(durationMinutes || 60)), status, Number(price || 0), Number(deposit || 0)]);
     
-    return response.status(201).json(result.rows[0]);
+    const appt = result.rows[0];
+    let notification = null;
+    if (artistId) {
+      try {
+        const artRes = await pool.query('SELECT full_name, email FROM users WHERE id = $1', [artistId]);
+        if (artRes.rowCount) {
+          const art = artRes.rows[0];
+          const dateStr = new Date(startsAt).toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+          const msg = `Hola ${art.full_name}, tienes una nueva cita agendada:\n` +
+            `📌 ${title.trim()}\n` +
+            `📅 Fecha y hora: ${dateStr}\n` +
+            `⏱ Duración: ${durationMinutes} min\n` +
+            (Number(price) ? `💵 Valor: $${Number(price).toLocaleString('es-CL')}\n` : '') +
+            (Number(deposit) ? `💳 Seña/Abono: $${Number(deposit).toLocaleString('es-CL')}\n` : '') +
+            (notes?.trim() ? `📝 Notas: ${notes.trim()}\n` : '');
+          notification = {
+            artistName: art.full_name,
+            artistEmail: art.email,
+            text: msg
+          };
+        }
+      } catch {}
+    }
+
+    return response.status(201).json({ ...appt, notification });
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
@@ -2920,11 +2980,17 @@ app.get('/api/transactions', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
     const { startDate, endDate, sort } = request.query;
+    const isResident = (request.user.role === 'resident' || request.user.role === 'nomad');
     let query = `SELECT t.*, u.full_name AS artist_name
       FROM transactions t
       LEFT JOIN users u ON u.id = t.artist_id
       WHERE t.studio_id = $1`;
     const params = [request.studioId];
+
+    if (isResident) {
+      params.push(request.user.id);
+      query += ` AND (t.artist_id = $${params.length} OR t.user_id = $${params.length})`;
+    }
 
     if (startDate) {
       params.push(startDate);
@@ -2946,19 +3012,23 @@ app.get('/api/transactions', requireAuth, async (request, response) => {
 app.get('/api/finances/overview', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
+    const isResident = (request.user.role === 'resident' || request.user.role === 'nomad');
+    const artistFilter = isResident ? ' AND artist_id = $2' : '';
+    const params = isResident ? [request.studioId, request.user.id] : [request.studioId];
+
     const result = await pool.query(`
       SELECT
-        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 AND status NOT IN ('cancelled', 'no_show')), 0)::numeric AS expected_income,
-        COALESCE((SELECT SUM(deposit) FROM appointments WHERE studio_id = $1 AND status NOT IN ('cancelled', 'no_show')), 0)::numeric AS total_deposits,
-        COALESCE((SELECT SUM(CASE WHEN status = 'completed' THEN price ELSE deposit END) FROM appointments WHERE studio_id = $1 AND status NOT IN ('cancelled', 'no_show')), 0)::numeric AS appointments_collected,
-        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'income'), 0)::numeric AS manual_income,
-        (COALESCE((SELECT SUM(CASE WHEN status = 'completed' THEN price ELSE deposit END) FROM appointments WHERE studio_id = $1 AND status NOT IN ('cancelled', 'no_show')), 0)
-          + COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'income'), 0))::numeric AS total_gross_income,
-        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense' AND description ILIKE '%Liquidación%'), 0)::numeric AS settled_commissions,
-        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense' AND description NOT ILIKE '%Liquidación%'), 0)::numeric AS operational_expenses,
-        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense'), 0)::numeric AS total_expenses,
-        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 AND status IN ('cancelled', 'no_show')), 0)::numeric AS estimated_losses
-    `, [request.studioId]);
+        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 ${artistFilter} AND status NOT IN ('cancelled', 'no_show')), 0)::numeric AS expected_income,
+        COALESCE((SELECT SUM(deposit) FROM appointments WHERE studio_id = $1 ${artistFilter} AND status NOT IN ('cancelled', 'no_show')), 0)::numeric AS total_deposits,
+        COALESCE((SELECT SUM(CASE WHEN status = 'completed' THEN price ELSE deposit END) FROM appointments WHERE studio_id = $1 ${artistFilter} AND status NOT IN ('cancelled', 'no_show')), 0)::numeric AS appointments_collected,
+        ${isResident ? '0::numeric' : `COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'income'), 0)::numeric`} AS manual_income,
+        (COALESCE((SELECT SUM(CASE WHEN status = 'completed' THEN price ELSE deposit END) FROM appointments WHERE studio_id = $1 ${artistFilter} AND status NOT IN ('cancelled', 'no_show')), 0)
+          + ${isResident ? '0' : `COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'income'), 0)`})::numeric AS total_gross_income,
+        COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 ${isResident ? 'AND artist_id = $2' : ''} AND kind = 'expense' AND description ILIKE '%Liquidación%'), 0)::numeric AS settled_commissions,
+        ${isResident ? '0::numeric' : `COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense' AND description NOT ILIKE '%Liquidación%'), 0)::numeric`} AS operational_expenses,
+        ${isResident ? `COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND artist_id = $2 AND kind = 'expense' AND description ILIKE '%Liquidación%'), 0)::numeric` : `COALESCE((SELECT SUM(amount) FROM transactions WHERE studio_id = $1 AND kind = 'expense'), 0)::numeric`} AS total_expenses,
+        COALESCE((SELECT SUM(price) FROM appointments WHERE studio_id = $1 ${artistFilter} AND status IN ('cancelled', 'no_show')), 0)::numeric AS estimated_losses
+    `, params);
     return response.json(result.rows[0]);
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
@@ -2966,6 +3036,10 @@ app.get('/api/finances/overview', requireAuth, async (request, response) => {
 app.get('/api/finances/summary', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
+    const isResident = (request.user.role === 'resident' || request.user.role === 'nomad');
+    const userFilter = isResident ? ' AND sm.user_id = $2' : '';
+    const params = isResident ? [request.studioId, request.user.id] : [request.studioId];
+
     const result = await pool.query(`
       SELECT u.id AS artist_id, u.full_name AS artist_name, sm.role AS artist_role,
              COALESCE(sm.agreement_type, 'commission') AS agreement_type,
@@ -2981,10 +3055,10 @@ app.get('/api/finances/summary', requireAuth, async (request, response) => {
       FROM studio_memberships sm
       JOIN users u ON u.id = sm.user_id
       LEFT JOIN appointments a ON a.artist_id = u.id AND a.studio_id = sm.studio_id AND a.status NOT IN ('cancelled', 'no_show')
-      WHERE sm.studio_id = $1 AND sm.status = 'active'
+      WHERE sm.studio_id = $1 AND sm.status = 'active' ${userFilter}
       GROUP BY u.id, sm.role, sm.agreement_type, sm.fixed_amount, sm.commission_percent
       ORDER BY total_generated DESC
-    `, [request.studioId]);
+    `, params);
 
     const mapped = result.rows.map((row) => ({
       ...row,
@@ -2996,19 +3070,42 @@ app.get('/api/finances/summary', requireAuth, async (request, response) => {
 
 app.post('/api/finances/settle', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  if (request.user.role !== 'owner' && request.user.role !== 'admin' && !request.isSuperAdmin) {
+    return response.status(403).json({ error: 'Solo los administradores o dueños del estudio pueden emitir liquidaciones' });
+  }
   const { artistId, amount, notes = '' } = request.body;
   if (!artistId || !amount || Number(amount) <= 0) {
     return response.status(400).json({ error: 'Artista y un monto válido son requeridos' });
   }
   try {
-    const artist = await pool.query('SELECT full_name FROM users WHERE id = $1', [artistId]);
+    const artist = await pool.query('SELECT u.full_name, u.email, c.phone FROM users u LEFT JOIN clients c ON LOWER(c.email) = LOWER(u.email) AND c.studio_id = $1 WHERE u.id = $2 LIMIT 1', [request.studioId, artistId]);
     const artistName = artist.rows[0]?.full_name || 'Artista';
+    const artistEmail = artist.rows[0]?.email || '';
+    const artistPhone = artist.rows[0]?.phone || '';
+    const stRes = await pool.query('SELECT name FROM studios WHERE id = $1', [request.studioId]);
+    const studioName = stRes.rows[0]?.name || 'Tatudin Studio';
+
     const description = `Liquidación comisiones · ${artistName}${notes ? ` (${notes})` : ''}`;
     const result = await pool.query(`
       INSERT INTO transactions (studio_id, kind, description, amount, occurred_on, artist_id)
       VALUES ($1, 'expense', $2, $3, NOW()::date, $4) RETURNING *
     `, [request.studioId, description, Number(amount), Number(artistId)]);
-    return response.status(201).json({ ok: true, transaction: result.rows[0] });
+
+    const formattedAmount = `$${Number(amount).toLocaleString('es-CL')}`;
+    const messageText = `Hola ${artistName}, se ha emitido tu liquidación de comisiones en ${studioName}:\n` +
+      `💰 Monto liquidado: ${formattedAmount}\n` +
+      `📅 Fecha: ${new Date().toLocaleDateString('es-CL')}\n` +
+      (notes ? `📝 Detalle: ${notes}\n` : '') +
+      `¡Gracias por tu trabajo!`;
+
+    return response.status(201).json({ 
+      ok: true, 
+      transaction: result.rows[0], 
+      messageText, 
+      artistName, 
+      artistPhone, 
+      artistEmail 
+    });
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
@@ -3262,21 +3359,50 @@ app.get('/api/inventory', requireAuth, async (request, response) => {
   const userId = request.user.id;
 
   try {
-    // 1. Studio Items (Shared stock owned by studio)
+    const isIndependent = (request.accountType === 'independent' || request.user?.account_type === 'independent');
+
+    if (isIndependent) {
+      // Independent artists have a single unified inventory of all items
+      const itemsRes = await pool.query(`
+        SELECT * FROM inventory_items 
+        WHERE (studio_id = $1 OR owner_user_id = $2) AND is_active = TRUE 
+        ORDER BY category ASC, name ASC
+      `, [studioId, userId]);
+
+      const lowStock = itemsRes.rows.filter(i => Number(i.quantity) <= Number(i.min_stock_alert));
+      const totalValuation = itemsRes.rows.reduce((acc, i) => acc + (Number(i.quantity) * Number(i.cost_price || 0)), 0);
+
+      return response.json({
+        items: itemsRes.rows,
+        studioItems: itemsRes.rows,
+        personalItems: itemsRes.rows,
+        members: [],
+        isUnified: true,
+        stats: {
+          totalItems: itemsRes.rowCount,
+          totalStudioItems: itemsRes.rowCount,
+          totalPersonalItems: itemsRes.rowCount,
+          lowStockCount: lowStock.length,
+          studioValuation: totalValuation,
+          personalValuation: totalValuation,
+          totalValuation
+        }
+      });
+    }
+
+    // Studio Account: Studio shared items + Current user's personal items
     const studioItemsRes = await pool.query(`
       SELECT * FROM inventory_items 
       WHERE studio_id = $1 AND owner_user_id IS NULL AND is_active = TRUE 
       ORDER BY category ASC, name ASC
     `, [studioId]);
 
-    // 2. Personal Items (Stock owned by the current user/artist)
     const personalItemsRes = await pool.query(`
       SELECT * FROM inventory_items 
       WHERE (studio_id = $1 OR studio_id IS NULL) AND owner_user_id = $2 AND is_active = TRUE 
       ORDER BY category ASC, name ASC
     `, [studioId, userId]);
 
-    // 3. Studio Members (for transferring or selling items internally)
     const membersRes = await pool.query(`
       SELECT u.id, u.full_name, u.email, sm.role, sm.status 
       FROM studio_memberships sm 
@@ -3285,7 +3411,6 @@ app.get('/api/inventory', requireAuth, async (request, response) => {
       ORDER BY u.full_name ASC
     `, [studioId]);
 
-    // 4. Low stock alerts (items where quantity <= min_stock_alert)
     const lowStockStudio = studioItemsRes.rows.filter(i => Number(i.quantity) <= Number(i.min_stock_alert));
     const lowStockPersonal = personalItemsRes.rows.filter(i => Number(i.quantity) <= Number(i.min_stock_alert));
     const allItems = [...studioItemsRes.rows, ...personalItemsRes.rows];
@@ -3295,6 +3420,7 @@ app.get('/api/inventory', requireAuth, async (request, response) => {
       studioItems: studioItemsRes.rows,
       personalItems: personalItemsRes.rows,
       members: membersRes.rows,
+      isUnified: false,
       stats: {
         totalStudioItems: studioItemsRes.rowCount,
         totalPersonalItems: personalItemsRes.rowCount,
@@ -3405,7 +3531,7 @@ app.post('/api/inventory/items', requireAuth, async (request, response) => {
       return response.status(403).json({ error: 'Solo los administradores del estudio pueden agregar insumos al catálogo del estudio' });
     }
 
-    const ownerUserId = isPersonal ? request.user.id : null;
+    const ownerUserId = (!isStudioAccount || isPersonal) ? request.user.id : null;
 
     // Insert new item
     const insRes = await pool.query(`
@@ -3464,7 +3590,9 @@ app.delete('/api/inventory/items/:id', requireAuth, async (request, response) =>
       return response.status(403).json({ error: 'Solo los administradores del estudio pueden eliminar insumos del estudio' });
     }
     if (item.owner_user_id !== null && item.owner_user_id !== request.user.id && !request.isSuperAdmin) {
-      return response.status(403).json({ error: 'No tienes permiso para eliminar este insumo personal' });
+      if (isStudioAccount || !isOwnerOrAdmin) {
+        return response.status(403).json({ error: 'No tienes permiso para eliminar este insumo personal' });
+      }
     }
 
     const deleted = await pool.query(`
@@ -3481,9 +3609,13 @@ app.delete('/api/inventory/items/:id', requireAuth, async (request, response) =>
 app.get('/api/inventory/movements', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   const studioId = request.studioId;
+  const userId = request.user.id;
+  const isStudioAccount = (request.accountType === 'studio');
+  const userRole = request.user.role;
+  const isOwnerOrAdmin = (!isStudioAccount || userRole === 'owner' || userRole === 'admin' || request.isSuperAdmin);
 
   try {
-    const res = await pool.query(`
+    let query = `
       SELECT 
         m.*,
         i.name AS item_name,
@@ -3498,10 +3630,17 @@ app.get('/api/inventory/movements', requireAuth, async (request, response) => {
       LEFT JOIN users u_to ON u_to.id = m.to_user_id
       LEFT JOIN appointments a ON a.id = m.appointment_id
       WHERE m.studio_id = $1
-      ORDER BY m.created_at DESC
-      LIMIT 100
-    `, [studioId]);
+    `;
+    const params = [studioId];
 
+    if (isStudioAccount && !isOwnerOrAdmin) {
+      query += ` AND (m.from_user_id = $2 OR m.to_user_id = $2)`;
+      params.push(userId);
+    }
+
+    query += ` ORDER BY m.created_at DESC LIMIT 100`;
+
+    const res = await pool.query(query, params);
     return response.json({ movements: res.rows });
   } catch (error) {
     return response.status(500).json({ error: error.message });
@@ -3748,7 +3887,7 @@ app.post('/api/inventory/import-csv', requireAuth, async (request, response) => 
     return response.status(403).json({ error: 'Solo los administradores del estudio pueden importar insumos al catálogo del estudio' });
   }
 
-  const ownerUserId = isPersonal ? request.user.id : null;
+  const ownerUserId = (!isStudioAccount || isPersonal) ? request.user.id : null;
   const client = await pool.connect();
 
   try {
