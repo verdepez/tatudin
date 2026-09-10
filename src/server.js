@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { seedStudioData } from './seed_studio.js';
 import { loginRateLimiter, passwordResetRateLimiter, publicApiRateLimiter } from './middlewares/rateLimiter.js';
 import { csrfProtection, generateCsrfToken } from './middlewares/csrf.js';
-import { sendPasswordResetEmail } from './services/mailer.js';
+import { sendPasswordResetEmail, sendAppointmentConfirmationEmail, sendLoyaltyAndAftercareEmail } from './services/mailer.js';
 import { logAuditEvent } from './services/auditLogger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -555,6 +555,7 @@ app.get('/api/backoffice/studios', requireSuperAdmin, async (_request, response)
   try {
     const result = await pool.query(`
       SELECT s.id, s.name, s.account_type, s.currency, s.timezone, s.created_at,
+             COALESCE(s.is_active, TRUE) AS is_active,
              COUNT(DISTINCT sm.user_id)::int AS member_count,
              COUNT(DISTINCT sp.id)::int AS space_count,
              COUNT(DISTINCT a.id)::int AS appointment_count,
@@ -570,6 +571,27 @@ app.get('/api/backoffice/studios', requireSuperAdmin, async (_request, response)
       ORDER BY s.created_at DESC
     `);
     return response.json(result.rows);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/backoffice/studios/:id/toggle-active', requireSuperAdmin, async (request, response) => {
+  try {
+    const studioId = Number(request.params.id);
+    const result = await pool.query(
+      `UPDATE studios SET is_active = NOT COALESCE(is_active, TRUE) WHERE id = $1 RETURNING id, name, is_active`,
+      [studioId]
+    );
+    if (result.rows.length === 0) {
+      return response.status(404).json({ error: 'Estudio no encontrado' });
+    }
+    const studio = result.rows[0];
+    await pool.query(
+      `INSERT INTO audit_logs (studio_id, user_id, action, entity_type, entity_id, details) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [studioId, request.user.id, studio.is_active ? 'studio_activated' : 'studio_deactivated', 'studio', studioId, JSON.stringify({ studio_name: studio.name, is_active: studio.is_active })]
+    );
+    return response.json(studio);
   } catch (error) {
     return response.status(500).json({ error: error.message });
   }
@@ -1390,6 +1412,7 @@ async function checkAppointmentConflict(studioId, startsAt, durationMinutes, art
     LEFT JOIN spaces sp ON sp.id = a.space_id
     WHERE a.studio_id = $1
       AND a.status <> 'cancelled'
+      AND NOT (a.status = 'pending_client' AND a.token_expires_at IS NOT NULL AND a.token_expires_at < NOW())
       AND a.starts_at < ((CASE WHEN $2::text ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $2::timestamptz ELSE ($2::timestamp AT TIME ZONE 'America/Santiago') END) + $3::interval)
       AND (a.starts_at + (a.duration_minutes || ' minutes')::interval) > (CASE WHEN $2::text ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $2::timestamptz ELSE ($2::timestamp AT TIME ZONE 'America/Santiago') END)
   `;
@@ -2035,24 +2058,42 @@ app.get('/api/appointments/:id', requireAuth, async (request, response) => {
 
 app.post('/api/appointments', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
-  const { categoryId = null, clientId = null, artistId = null, spaceId = null, title, notes = '', startsAt, durationMinutes = 60, status = 'confirmed', price = 0, deposit = 0 } = request.body;
+  const { categoryId = null, clientId = null, artistId = null, spaceId = null, title, notes = '', startsAt, durationMinutes = 60, status = 'confirmed', price = 0, deposit = 0, newClientName = null, newClientPhone = '', newClientEmail = '', studioId = null } = request.body;
   if (!title?.trim() || !startsAt) return response.status(400).json({ error: 'Título y fecha/hora son obligatorios' });
   
   try {
+    let effectiveStudioId = request.studioId;
+    if (studioId && Number(studioId) !== request.studioId) {
+      const memberCheck = await pool.query(
+        "SELECT studio_id FROM studio_memberships WHERE user_id = $1 AND studio_id = $2 AND status = 'active'",
+        [request.userId, Number(studioId)]
+      );
+      if (memberCheck.rowCount) effectiveStudioId = Number(studioId);
+    }
+
     let catId = categoryId ? Number(categoryId) : null;
     if (!catId) {
-      const defaultCat = await pool.query('SELECT id FROM commitment_categories WHERE studio_id = $1 ORDER BY is_system DESC, id ASC LIMIT 1', [request.studioId]);
+      const defaultCat = await pool.query('SELECT id FROM commitment_categories WHERE studio_id = $1 ORDER BY is_system DESC, id ASC LIMIT 1', [effectiveStudioId]);
       catId = defaultCat.rows[0]?.id || null;
     }
 
     let validClientId = null;
     if (clientId) {
-      const clientCheck = await pool.query('SELECT id FROM clients WHERE id = $1 AND studio_id = $2', [Number(clientId), request.studioId]);
+      const clientCheck = await pool.query('SELECT id FROM clients WHERE id = $1 AND studio_id = $2', [Number(clientId), effectiveStudioId]);
       if (clientCheck.rowCount) validClientId = clientCheck.rows[0].id;
+    } else if (newClientName && newClientName.trim()) {
+      const newCl = await pool.query(
+        'INSERT INTO clients (studio_id, name, phone, email) VALUES ($1, $2, $3, $4) RETURNING id',
+        [effectiveStudioId, newClientName.trim(), (newClientPhone || '').trim(), (newClientEmail || '').trim()]
+      );
+      validClientId = newCl.rows[0].id;
     }
 
-    // Schedule Conflict Prevention
-    const conflict = await checkAppointmentConflict(request.studioId, startsAt, durationMinutes, artistId, spaceId);
+    const targetArtistId = artistId ? Number(artistId) : request.userId;
+    const targetSpaceId = spaceId ? Number(spaceId) : null;
+
+    // Schedule Conflict Prevention for both Artist and Box
+    const conflict = await checkAppointmentConflict(effectiveStudioId, startsAt, durationMinutes, targetArtistId, targetSpaceId);
     if (conflict) {
       return response.status(409).json({ error: conflict });
     }
@@ -2064,7 +2105,7 @@ app.post('/api/appointments', requireAuth, async (request, response) => {
         CASE WHEN $8::text ~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN $8::timestamptz ELSE ($8::timestamp AT TIME ZONE 'America/Santiago') END,
         $9, $10, $11, $12)
       RETURNING *
-    `, [request.studioId, catId, validClientId, artistId ? Number(artistId) : null, spaceId ? Number(spaceId) : null, title.trim(), notes.trim(), startsAt, Math.max(15, Number(durationMinutes || 60)), status, Number(price || 0), Number(deposit || 0)]);
+    `, [effectiveStudioId, catId, validClientId, targetArtistId, targetSpaceId, title.trim(), notes.trim(), startsAt, Math.max(15, Number(durationMinutes || 60)), status, Number(price || 0), Number(deposit || 0)]);
     
     const appt = result.rows[0];
     let notification = null;
@@ -2143,7 +2184,16 @@ app.patch('/api/appointments/:id', requireAuth, async (request, response) => {
         request.studioId
       ]);
     if (!result.rowCount) return response.status(404).json({ error: 'Cita no encontrada' });
-    return response.json(result.rows[0]);
+    const updatedAppt = result.rows[0];
+
+    if (status && ['cancelled', 'rescheduled', 'no_show'].includes(status)) {
+      await pool.query(
+        "UPDATE scheduled_automations SET status = 'cancelled', execution_log = $1, sent_at = NOW() WHERE appointment_id = $2 AND status = 'pending'",
+        [`Cita actualizada a estado "${status}". Automatización descartada.`, updatedAppt.id]
+      ).catch(() => {});
+    }
+
+    return response.json(updatedAppt);
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
@@ -2616,6 +2666,210 @@ function escapeIcsText(str) {
     .replace(/\r?\n/g, '\\n');
 }
 
+export function calculateBusinessDays(startDate, numDays) {
+  const d = new Date(startDate);
+  let added = 0;
+  while (added < numDays) {
+    d.setDate(d.getDate() + 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) {
+      added++;
+    }
+  }
+  return d;
+}
+
+export function validateRut(rutStr) {
+  if (!rutStr || typeof rutStr !== 'string') return false;
+  const clean = rutStr.replace(/[^0-9kK]/g, '').toUpperCase();
+  if (clean.length < 2) return false;
+  const body = clean.slice(0, -1);
+  const dv = clean.slice(-1);
+  let sum = 0;
+  let multiplier = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    sum += Number(body[i]) * multiplier;
+    multiplier = multiplier === 7 ? 2 : multiplier + 1;
+  }
+  const expectedDvNum = 11 - (sum % 11);
+  const expectedDv = expectedDvNum === 11 ? '0' : expectedDvNum === 10 ? 'K' : String(expectedDvNum);
+  return dv === expectedDv;
+}
+
+export function formatRut(rutStr) {
+  if (!rutStr) return '';
+  const clean = rutStr.replace(/[^0-9kK]/g, '').toUpperCase();
+  if (clean.length < 2) return clean;
+  const body = clean.slice(0, -1);
+  const dv = clean.slice(-1);
+  let formatted = '';
+  let count = 0;
+  for (let i = body.length - 1; i >= 0; i--) {
+    formatted = body[i] + formatted;
+    count++;
+    if (count % 3 === 0 && i !== 0) {
+      formatted = '.' + formatted;
+    }
+  }
+  return `${formatted}-${dv}`;
+}
+
+async function syncExternalCalendar(calendarId, poolInstance) {
+  const p = poolInstance || pool;
+  if (!p) throw new Error('Database not configured');
+
+  const calRes = await p.query('SELECT * FROM external_calendars WHERE id = $1', [calendarId]);
+  if (!calRes.rowCount) throw new Error('Calendario externo no encontrado');
+  const cal = calRes.rows[0];
+
+  let fetchUrl = cal.feed_url.trim();
+  if (fetchUrl.startsWith('webcal://')) {
+    fetchUrl = 'https://' + fetchUrl.slice('webcal://'.length);
+  }
+
+  const icsResponse = await fetch(fetchUrl, {
+    headers: { 'User-Agent': 'TatudinCalendarSync/1.0' },
+    signal: AbortSignal.timeout(15000)
+  });
+
+  if (!icsResponse.ok) {
+    throw new Error(`No se pudo obtener el calendario externo (HTTP ${icsResponse.status})`);
+  }
+
+  const icsText = await icsResponse.text();
+  const events = parseIcsEvents(icsText);
+
+  let catRes = await p.query(
+    "SELECT id FROM commitment_categories WHERE studio_id = $1 AND name = 'Calendario Externo' LIMIT 1",
+    [cal.studio_id]
+  );
+  let catId = catRes.rowCount ? catRes.rows[0].id : null;
+  if (!catId) {
+    const newCat = await p.query(
+      "INSERT INTO commitment_categories (studio_id, name, kind, color, icon, is_system) VALUES ($1, 'Calendario Externo', 'personal', '#3B82F6', 'calendar', TRUE) RETURNING id",
+      [cal.studio_id]
+    );
+    catId = newCat.rows[0].id;
+  }
+
+  let importedCount = 0;
+  let updatedCount = 0;
+
+  for (const ev of events) {
+    const existing = await p.query(
+      'SELECT id FROM appointments WHERE studio_id = $1 AND external_uid = $2 LIMIT 1',
+      [cal.studio_id, ev.uid]
+    );
+
+    if (existing.rowCount) {
+      await p.query(`
+        UPDATE appointments SET
+          title = $1,
+          notes = $2,
+          starts_at = $3,
+          duration_minutes = $4,
+          external_source = $5,
+          external_calendar_name = $6,
+          synced_at = NOW()
+        WHERE id = $7
+      `, [ev.title, ev.notes, ev.startsAt, ev.durationMinutes, cal.provider, cal.calendar_name, existing.rows[0].id]);
+      updatedCount++;
+    } else {
+      await p.query(`
+        INSERT INTO appointments (
+          studio_id, category_id, artist_id, title, notes, starts_at, duration_minutes,
+          status, external_source, external_uid, external_calendar_name, synced_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed', $8, $9, $10, NOW())
+      `, [
+        cal.studio_id,
+        catId,
+        cal.user_id,
+        ev.title,
+        ev.notes,
+        ev.startsAt,
+        ev.durationMinutes,
+        cal.provider,
+        ev.uid,
+        cal.calendar_name
+      ]);
+      importedCount++;
+    }
+  }
+
+  await p.query('UPDATE external_calendars SET last_synced_at = NOW() WHERE id = $1', [cal.id]);
+
+  return { ok: true, importedCount, updatedCount, totalEvents: events.length };
+}
+
+async function processDueAutomations(poolInstance) {
+  const p = poolInstance || pool;
+  if (!p) return { processed: 0 };
+
+  try {
+    const dueRes = await p.query(`
+      SELECT sa.*, a.status as appointment_status, a.title as appointment_title,
+             c.name as client_name, c.last_name as client_last_name, c.email as client_email,
+             u.full_name as artist_name, s.name as studio_name
+      FROM scheduled_automations sa
+      JOIN appointments a ON a.id = sa.appointment_id
+      JOIN clients c ON c.id = sa.client_id
+      LEFT JOIN users u ON u.id = a.artist_id
+      JOIN studios s ON s.id = sa.studio_id
+      WHERE sa.status = 'pending' AND sa.scheduled_for <= NOW()
+      ORDER BY sa.scheduled_for ASC
+      LIMIT 25
+    `);
+
+    let sentCount = 0;
+    let cancelledCount = 0;
+
+    for (const item of dueRes.rows) {
+      // RULE: Strictly validate that appointment was successful ('completed').
+      // If cancelled, rescheduled, no_show, or still pending, cancel and do NOT send.
+      if (item.appointment_status !== 'completed') {
+        await p.query(`
+          UPDATE scheduled_automations
+          SET status = 'cancelled', execution_log = $1, sent_at = NOW()
+          WHERE id = $2
+        `, [`Cita no completada (estado actual: ${item.appointment_status}). Automatización descartada según reglas.`, item.id]);
+        cancelledCount++;
+        continue;
+      }
+
+      if (item.type === 'post_care_loyalty') {
+        const clientFullName = `${item.client_name} ${item.client_last_name || ''}`.trim();
+        try {
+          await sendLoyaltyAndAftercareEmail({
+            to: item.client_email,
+            clientName: clientFullName,
+            artistName: item.artist_name || 'Tu Artista',
+            studioName: item.studio_name,
+            title: item.appointment_title || 'Tatuaje'
+          });
+
+          await p.query(`
+            UPDATE scheduled_automations
+            SET status = 'sent', execution_log = 'Enviado exitosamente a ' || $1, sent_at = NOW()
+            WHERE id = $2
+          `, [item.client_email, item.id]);
+          sentCount++;
+        } catch (mailErr) {
+          await p.query(`
+            UPDATE scheduled_automations
+            SET status = 'failed', execution_log = 'Error al enviar: ' || $1
+            WHERE id = $2
+          `, [mailErr.message, item.id]);
+        }
+      }
+    }
+
+    return { processed: dueRes.rowCount, sentCount, cancelledCount };
+  } catch (err) {
+    console.warn('[AUTOMATIONS WORKER] Error processing due automations:', err.message);
+    return { error: err.message };
+  }
+}
+
 // 1. Import ICS file content
 app.post('/api/calendar/import-ics', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
@@ -2833,6 +3087,515 @@ app.get('/api/calendar/feed/:token.ics', publicApiRateLimiter, async (request, r
   } catch (error) {
     return response.status(500).send('Error generando feed de calendario');
   }
+});
+
+// ---------------- EXTERNAL CALENDARS (Google & Apple Calendar) ----------------
+
+app.get('/api/calendar/external', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const result = await pool.query(
+      'SELECT * FROM external_calendars WHERE studio_id = $1 ORDER BY created_at DESC',
+      [request.studioId]
+    );
+    return response.json(result.rows);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/calendar/external', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const { provider, feedUrl, calendarName } = request.body;
+  if (!provider || !feedUrl || !calendarName) {
+    return response.status(400).json({ error: 'Proveedor, URL de feed y nombre de calendario son requeridos' });
+  }
+
+  if (!['google', 'apple', 'custom_ics'].includes(provider)) {
+    return response.status(400).json({ error: 'Proveedor no soportado' });
+  }
+
+  try {
+    const insertRes = await pool.query(
+      `INSERT INTO external_calendars (studio_id, user_id, provider, feed_url, calendar_name)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [request.studioId, request.userId, provider, feedUrl.trim(), calendarName.trim()]
+    );
+    const newCal = insertRes.rows[0];
+
+    // Initial sync upon integration as requested:
+    // "al integrar por primera vez las agendas debe importar las citas desde google y calendar de apple"
+    let syncResult = null;
+    let syncError = null;
+    try {
+      syncResult = await syncExternalCalendar(newCal.id, pool);
+    } catch (sErr) {
+      console.warn('[CALENDAR SYNC] Initial sync warning:', sErr.message);
+      syncError = sErr.message;
+    }
+
+    return response.status(201).json({
+      ok: true,
+      calendar: newCal,
+      syncResult,
+      syncError
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/calendar/external/:id/sync', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const result = await syncExternalCalendar(Number(request.params.id), pool);
+    return response.json(result);
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/calendar/external/:id', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  try {
+    const calId = Number(request.params.id);
+    const calRes = await pool.query(
+      'SELECT * FROM external_calendars WHERE id = $1 AND studio_id = $2',
+      [calId, request.studioId]
+    );
+    if (!calRes.rowCount) return response.status(404).json({ error: 'Calendario no encontrado' });
+    const cal = calRes.rows[0];
+
+    // Delete associated imported appointments
+    await pool.query(
+      'DELETE FROM appointments WHERE studio_id = $1 AND external_source = $2 AND external_calendar_name = $3',
+      [request.studioId, cal.provider, cal.calendar_name]
+    );
+
+    await pool.query('DELETE FROM external_calendars WHERE id = $1', [calId]);
+    return response.json({ ok: true, message: 'Calendario desvinculado exitosamente' });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/appointments/check-conflict', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const { startsAt, durationMinutes = 60, artistId = null, spaceId = null, excludeAppointmentId = null, studioId = null } = request.query;
+  if (!startsAt) return response.json({ hasConflict: false });
+  try {
+    let effectiveStudioId = request.studioId;
+    if (studioId && Number(studioId) !== request.studioId) {
+      const memberCheck = await pool.query(
+        "SELECT studio_id FROM studio_memberships WHERE user_id = $1 AND studio_id = $2 AND status = 'active'",
+        [request.userId, Number(studioId)]
+      );
+      if (memberCheck.rowCount) effectiveStudioId = Number(studioId);
+    }
+    const conflict = await checkAppointmentConflict(
+      effectiveStudioId,
+      startsAt,
+      Number(durationMinutes) || 60,
+      artistId ? Number(artistId) : null,
+      spaceId ? Number(spaceId) : null,
+      excludeAppointmentId
+    );
+    return response.json({ hasConflict: Boolean(conflict), message: conflict || null });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------- APPOINTMENT PUBLIC LINK GENERATION & CONFIRMATION ----------------
+
+app.post('/api/appointments/generate-link', requireAuth, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+    const {
+      title,
+      startsAt,
+      durationMinutes = 120,
+      artistId,
+      spaceId,
+      price = 0,
+      deposit = 0,
+      notes = '',
+      tokenDurationHours = 24,
+      studioId = null,
+      proposedSlots = [],
+      isMultiSession = false
+    } = request.body;
+
+    if (!startsAt && (!proposedSlots || !proposedSlots.length)) {
+      return response.status(400).json({ error: 'La fecha y hora de la cita son obligatorias' });
+    }
+
+    try {
+      let effectiveStudioId = request.studioId;
+      if (studioId && Number(studioId) !== request.studioId) {
+        const memberCheck = await pool.query(
+          "SELECT studio_id FROM studio_memberships WHERE user_id = $1 AND studio_id = $2 AND status = 'active'",
+          [request.userId, Number(studioId)]
+        );
+        if (memberCheck.rowCount) effectiveStudioId = Number(studioId);
+      }
+
+      const parsedDurationHours = Number(tokenDurationHours) > 0 ? Number(tokenDurationHours) : 24;
+      const expiresAt = new Date(Date.now() + parsedDurationHours * 3600 * 1000);
+      const bookingToken = crypto.randomBytes(24).toString('hex');
+
+      const catRes = await pool.query(
+        'SELECT id FROM commitment_categories WHERE studio_id = $1 ORDER BY is_system DESC, id ASC LIMIT 1',
+        [effectiveStudioId]
+      );
+      const categoryId = catRes.rowCount ? catRes.rows[0].id : null;
+
+      const targetArtistId = artistId ? Number(artistId) : request.userId;
+      const targetSpaceId = spaceId ? Number(spaceId) : null;
+
+      // Prepare list of slots
+      const rawSlots = Array.isArray(proposedSlots) && proposedSlots.length ? proposedSlots : [{ startsAt, durationMinutes }];
+      const validSlots = rawSlots.map((s, idx) => {
+        const st = (s.startsAt || startsAt);
+        const iso = st.includes('Z') || st.match(/[+-]\d{2}(:\d{2})?$/) ? new Date(st).toISOString() : st;
+        return {
+          index: idx,
+          startsAt: iso,
+          durationMinutes: Number(s.durationMinutes) || Number(durationMinutes) || 120
+        };
+      });
+
+      const primarySlot = validSlots[0];
+
+      // Validate conflicts for all proposed slots
+      for (const slot of validSlots) {
+        const conflict = await checkAppointmentConflict(effectiveStudioId, slot.startsAt, slot.durationMinutes, targetArtistId, targetSpaceId);
+        if (conflict) {
+          return response.status(409).json({ error: conflict });
+        }
+      }
+
+      const result = await pool.query(`
+        INSERT INTO appointments (
+          studio_id, category_id, artist_id, space_id, title, notes,
+          starts_at, duration_minutes, price, deposit, status,
+          booking_token, token_expires_at, token_views_count, token_duration_hours,
+          proposed_slots, is_multi_session, selected_slot_index
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending_client', $11, $12, 0, $13, $14, $15, 0)
+        RETURNING *
+      `, [
+        effectiveStudioId,
+        categoryId,
+        targetArtistId,
+        targetSpaceId,
+        (title || 'Sesión de Tatuaje').trim(),
+        notes ? notes.trim() : '',
+        primarySlot.startsAt,
+        primarySlot.durationMinutes,
+        Number(price) || 0,
+        Number(deposit) || 0,
+        bookingToken,
+        expiresAt.toISOString(),
+        parsedDurationHours,
+        JSON.stringify(validSlots),
+        Boolean(isMultiSession)
+      ]);
+
+    const appt = result.rows[0];
+
+    const host = request.get('host') || 'localhost:3000';
+    const proto = request.headers['x-forwarded-proto'] || request.protocol || 'http';
+    const shareUrl = `${proto}://${host}/#completar-cita/${bookingToken}`;
+
+    const dateStr = new Date(appt.starts_at).toLocaleDateString('es-CL', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long'
+    });
+    const timeStr = new Date(appt.starts_at).toLocaleTimeString('es-CL', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const studioRes = await pool.query('SELECT name FROM studios WHERE id = $1', [request.studioId]);
+    const studioName = studioRes.rowCount ? studioRes.rows[0].name : 'Tatudin Studio';
+
+    const whatsappShareText = `¡Hola! Aquí tienes el enlace para confirmar tu cita de tatuaje ("${appt.title}") para el ${dateStr} a las ${timeStr} hrs en ${studioName}.\n\n` +
+      `Por favor ingresa para registrar tus datos y confirmar:\n${shareUrl}\n\n` +
+      `Nota: Este enlace tiene una vigencia de ${parsedDurationHours} horas y permite un máximo de 2 accesos por seguridad.`;
+
+    return response.status(201).json({
+      ok: true,
+      appointment: appt,
+      token: bookingToken,
+      shareUrl,
+      expiresAt: appt.token_expires_at,
+      tokenViewsCount: 0,
+      maxViews: 2,
+      whatsappShareText
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+// Public GET appointment details by booking token
+app.get('/api/public/booking-token/:token', publicApiRateLimiter, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const { token } = request.params;
+  if (!token) return response.status(400).json({ error: 'Token no provisto' });
+
+  try {
+    const apptRes = await pool.query(`
+      SELECT a.*, s.name as studio_name, s.currency as studio_currency,
+             u.full_name as artist_name, sp.name as space_name
+      FROM appointments a
+      JOIN studios s ON s.id = a.studio_id
+      LEFT JOIN users u ON u.id = a.artist_id
+      LEFT JOIN spaces sp ON sp.id = a.space_id
+      WHERE a.booking_token = $1
+      LIMIT 1
+    `, [token]);
+
+    if (!apptRes.rowCount) {
+      return response.status(404).json({ error: 'Enlace de cita no encontrado o inválido', code: 'NOT_FOUND' });
+    }
+
+    const appt = apptRes.rows[0];
+
+    // Check expiration
+    if (appt.token_expires_at && new Date() > new Date(appt.token_expires_at)) {
+      return response.status(410).json({
+        error: 'Este enlace ha expirado. Por favor solicita un nuevo enlace a tu artista.',
+        code: 'EXPIRED'
+      });
+    }
+
+    // Check maximum 2 openings if still pending_client
+    if (appt.status === 'pending_client') {
+      if (appt.token_views_count >= 2) {
+        return response.status(403).json({
+          error: 'Este enlace ha alcanzado el límite máximo de 2 aperturas por seguridad. Por favor solicita uno nuevo a tu artista.',
+          code: 'MAX_VIEWS_REACHED'
+        });
+      }
+
+      // Increment view count atomically
+      await pool.query(
+        'UPDATE appointments SET token_views_count = token_views_count + 1 WHERE id = $1',
+        [appt.id]
+      );
+      appt.token_views_count += 1;
+    }
+
+    return response.json({
+      id: appt.id,
+      token: appt.booking_token,
+      title: appt.title,
+      notes: appt.notes,
+      startsAt: appt.starts_at,
+      durationMinutes: appt.duration_minutes,
+      price: appt.price,
+      deposit: appt.deposit,
+      status: appt.status,
+      studioName: appt.studio_name,
+      currency: appt.studio_currency,
+      artistName: appt.artist_name || 'Artista',
+      spaceName: appt.space_name,
+      tokenViewsCount: appt.token_views_count,
+      maxViews: 2,
+      expiresAt: appt.token_expires_at,
+      proposedSlots: appt.proposed_slots || [],
+      isMultiSession: Boolean(appt.is_multi_session),
+      selectedSlotIndex: appt.selected_slot_index || 0
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+// Public POST confirm appointment by booking token
+app.post('/api/public/booking-token/:token/confirm', publicApiRateLimiter, async (request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const { token } = request.params;
+  const {
+    name,
+    lastName = '',
+    rut = '',
+    hasNoRut = false,
+    phone,
+    email,
+    clientNotes = '',
+    acceptTerms = false,
+    selectedSlotIndex = 0
+  } = request.body;
+
+  if (!name || !phone || !email) {
+    return response.status(400).json({ error: 'Nombre, teléfono y correo electrónico son obligatorios' });
+  }
+
+  if (!acceptTerms) {
+    return response.status(400).json({ error: 'Debes aceptar los Términos de Servicio para confirmar la cita' });
+  }
+
+  if (!hasNoRut) {
+    if (!rut || !validateRut(rut)) {
+      return response.status(400).json({
+        error: 'El RUT ingresado no es válido. Verifica el formato y dígito verificador, o marca la casilla "No tengo RUT" si eres extranjero.'
+      });
+    }
+  }
+
+  try {
+    const apptRes = await pool.query(`
+      SELECT a.*, s.name as studio_name, u.full_name as artist_name, u.email as artist_email
+      FROM appointments a
+      JOIN studios s ON s.id = a.studio_id
+      LEFT JOIN users u ON u.id = a.artist_id
+      WHERE a.booking_token = $1
+      LIMIT 1
+    `, [token]);
+
+    if (!apptRes.rowCount) {
+      return response.status(404).json({ error: 'Enlace no válido' });
+    }
+
+    const appt = apptRes.rows[0];
+
+    if (appt.token_expires_at && new Date() > new Date(appt.token_expires_at)) {
+      return response.status(410).json({ error: 'Este enlace ha expirado' });
+    }
+
+    if (appt.status !== 'pending_client') {
+      return response.status(400).json({ error: 'Esta cita ya fue confirmada anteriormente' });
+    }
+
+    // Determine target slot
+    let finalStartsAt = appt.starts_at;
+    let finalDuration = appt.duration_minutes;
+    const slots = appt.proposed_slots;
+    const chosenIndex = Number(selectedSlotIndex) >= 0 ? Number(selectedSlotIndex) : 0;
+
+    if (Array.isArray(slots) && slots.length > chosenIndex && slots[chosenIndex]?.startsAt) {
+      finalStartsAt = slots[chosenIndex].startsAt;
+      finalDuration = Number(slots[chosenIndex].durationMinutes) || finalDuration;
+    }
+
+    // Prevent double-booking or box collision on the selected slot prior to confirmation
+    const conflict = await checkAppointmentConflict(appt.studio_id, finalStartsAt, finalDuration, appt.artist_id, appt.space_id, appt.id);
+    if (conflict) {
+      return response.status(409).json({ error: conflict });
+    }
+
+    const cleanRut = hasNoRut ? null : formatRut(rut);
+    const clientFullName = `${name.trim()} ${lastName.trim()}`.trim();
+
+    let clientId = null;
+    let existingClient = null;
+
+    if (cleanRut) {
+      const byRut = await pool.query(
+        'SELECT id FROM clients WHERE studio_id = $1 AND rut = $2 LIMIT 1',
+        [appt.studio_id, cleanRut]
+      );
+      if (byRut.rowCount) existingClient = byRut.rows[0];
+    }
+
+    if (!existingClient && email) {
+      const byEmail = await pool.query(
+        'SELECT id FROM clients WHERE studio_id = $1 AND LOWER(email) = LOWER($2) LIMIT 1',
+        [appt.studio_id, email.trim()]
+      );
+      if (byEmail.rowCount) existingClient = byEmail.rows[0];
+    }
+
+    if (existingClient) {
+      clientId = existingClient.id;
+      await pool.query(`
+        UPDATE clients SET
+          name = $1,
+          last_name = $2,
+          rut = COALESCE($3, rut),
+          has_no_rut = $4,
+          phone = $5,
+          email = $6
+        WHERE id = $7
+      `, [name.trim(), lastName.trim(), cleanRut, Boolean(hasNoRut), phone.trim(), email.trim(), clientId]);
+    } else {
+      const newClientRes = await pool.query(`
+        INSERT INTO clients (studio_id, name, last_name, rut, has_no_rut, phone, email, notes)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id
+      `, [
+        appt.studio_id,
+        name.trim(),
+        lastName.trim(),
+        cleanRut,
+        Boolean(hasNoRut),
+        phone.trim(),
+        email.trim(),
+        clientNotes ? `Nota de reserva: ${clientNotes.trim()}` : ''
+      ]);
+      clientId = newClientRes.rows[0].id;
+    }
+
+    const finalNotes = clientNotes
+      ? (appt.notes ? `${appt.notes}\nNota cliente: ${clientNotes}` : `Nota cliente: ${clientNotes}`)
+      : appt.notes;
+
+    const updatedApptRes = await pool.query(`
+      UPDATE appointments SET
+        client_id = $1,
+        starts_at = $2,
+        duration_minutes = $3,
+        selected_slot_index = $4,
+        status = 'confirmed',
+        notes = $5,
+        terms_accepted_at = NOW()
+      WHERE id = $6
+      RETURNING *
+    `, [clientId, finalStartsAt, finalDuration, chosenIndex, finalNotes, appt.id]);
+
+    const confirmedAppt = updatedApptRes.rows[0];
+
+    // 1. Immediate confirmation email with pre-session considerations
+    sendAppointmentConfirmationEmail({
+      to: email.trim(),
+      clientName: clientFullName,
+      artistName: appt.artist_name || 'Tu Artista',
+      studioName: appt.studio_name,
+      startsAt: confirmedAppt.starts_at,
+      durationMinutes: confirmedAppt.duration_minutes,
+      title: confirmedAppt.title,
+      notes: confirmedAppt.notes,
+      deposit: confirmedAppt.deposit
+    }).catch((e) => console.warn('[CONFIRMATION EMAIL ERROR]', e.message));
+
+    // 2. Schedule 3-business-days loyalty & aftercare automation
+    const endTime = new Date(new Date(confirmedAppt.starts_at).getTime() + (confirmedAppt.duration_minutes || 120) * 60000);
+    const scheduledFor = calculateBusinessDays(endTime, 3);
+
+    await pool.query(`
+      INSERT INTO scheduled_automations (
+        studio_id, appointment_id, client_id, type, scheduled_for, status
+      ) VALUES ($1, $2, $3, 'post_care_loyalty', $4, 'pending')
+    `, [appt.studio_id, appt.id, clientId, scheduledFor.toISOString()]);
+
+    return response.json({
+      ok: true,
+      message: 'Cita confirmada exitosamente',
+      appointment: confirmedAppt,
+      client: { id: clientId, name: clientFullName, email, phone, rut: cleanRut }
+    });
+  } catch (error) {
+    return response.status(500).json({ error: error.message });
+  }
+});
+
+// Trigger due automations manually (or via cron)
+app.post('/api/automations/process-due', requireAuth, async (_request, response) => {
+  if (!pool) return response.status(503).json({ error: 'Database not configured' });
+  const result = await processDueAutomations(pool);
+  return response.json(result);
 });
 
 // ---------------- SESSION TRANSCRIPTS & MEETING NOTES ----------------
@@ -4051,6 +4814,7 @@ async function ensureAuthSchema() {
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
   await safeExec('ALTER TABLE studios account_type', `ALTER TABLE studios ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'independent' CHECK (account_type IN ('independent', 'studio'))`);
+  await safeExec('ALTER TABLE studios is_active', `ALTER TABLE studios ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE`);
 
   // 2. Users
   await safeExec('CREATE TABLE users', `CREATE TABLE IF NOT EXISTS users (
@@ -4161,6 +4925,9 @@ async function ensureAuthSchema() {
     notes TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+  await safeExec('ALTER TABLE clients last_name', `ALTER TABLE clients ADD COLUMN IF NOT EXISTS last_name TEXT DEFAULT ''`);
+  await safeExec('ALTER TABLE clients rut', `ALTER TABLE clients ADD COLUMN IF NOT EXISTS rut TEXT DEFAULT NULL`);
+  await safeExec('ALTER TABLE clients has_no_rut', `ALTER TABLE clients ADD COLUMN IF NOT EXISTS has_no_rut BOOLEAN NOT NULL DEFAULT FALSE`);
 
   // 9. Appointments
   await safeExec('CREATE TABLE appointments', `CREATE TABLE IF NOT EXISTS appointments (
@@ -4174,7 +4941,7 @@ async function ensureAuthSchema() {
     notes TEXT NOT NULL DEFAULT '',
     starts_at TIMESTAMPTZ NOT NULL,
     duration_minutes INTEGER NOT NULL DEFAULT 180 CHECK (duration_minutes > 0),
-    status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled', 'rescheduled', 'no_show')),
+    status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled', 'rescheduled', 'no_show', 'pending_client')),
     price NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (price >= 0),
     deposit NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (deposit >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -4188,10 +4955,46 @@ async function ensureAuthSchema() {
   await safeExec('ALTER TABLE appointments external_uid', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS external_uid TEXT DEFAULT NULL`);
   await safeExec('ALTER TABLE appointments external_calendar_name', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS external_calendar_name TEXT DEFAULT NULL`);
   await safeExec('ALTER TABLE appointments synced_at', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ DEFAULT NULL`);
+  await safeExec('ALTER TABLE appointments booking_token', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS booking_token TEXT UNIQUE DEFAULT NULL`);
+  await safeExec('ALTER TABLE appointments token_expires_at', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS token_expires_at TIMESTAMPTZ DEFAULT NULL`);
+  await safeExec('ALTER TABLE appointments token_views_count', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS token_views_count INTEGER NOT NULL DEFAULT 0`);
+  await safeExec('ALTER TABLE appointments token_duration_hours', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS token_duration_hours NUMERIC(4, 1) DEFAULT 24`);
+  await safeExec('ALTER TABLE appointments work_details', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS work_details TEXT DEFAULT ''`);
+  await safeExec('ALTER TABLE appointments terms_accepted_at', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ DEFAULT NULL`);
+  await safeExec('ALTER TABLE appointments proposed_slots', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS proposed_slots JSONB DEFAULT '[]'::jsonb`);
+  await safeExec('ALTER TABLE appointments is_multi_session', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS is_multi_session BOOLEAN DEFAULT FALSE`);
+  await safeExec('ALTER TABLE appointments selected_slot_index', `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS selected_slot_index INTEGER DEFAULT 0`);
   await safeExec('ALTER TABLE appointments status constraint', `
     ALTER TABLE appointments DROP CONSTRAINT IF EXISTS appointments_status_check;
-    ALTER TABLE appointments ADD CONSTRAINT appointments_status_check CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled', 'rescheduled', 'no_show'));
+    ALTER TABLE appointments ADD CONSTRAINT appointments_status_check CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled', 'rescheduled', 'no_show', 'pending_client'));
   `);
+
+  // External Calendars & Scheduled Automations
+  await safeExec('CREATE TABLE external_calendars', `CREATE TABLE IF NOT EXISTS external_calendars (
+    id SERIAL PRIMARY KEY,
+    studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL CHECK (provider IN ('google', 'apple', 'custom_ics')),
+    feed_url TEXT NOT NULL,
+    calendar_name TEXT NOT NULL,
+    last_synced_at TIMESTAMPTZ,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+
+  await safeExec('CREATE TABLE scheduled_automations', `CREATE TABLE IF NOT EXISTS scheduled_automations (
+    id SERIAL PRIMARY KEY,
+    studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+    appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+    client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK (type IN ('post_care_loyalty', 'confirmation_followup')),
+    scheduled_for TIMESTAMPTZ NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'cancelled', 'failed')),
+    execution_log TEXT DEFAULT '',
+    payload JSONB DEFAULT '{}'::jsonb,
+    sent_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
 
   // 10. Transactions
   await safeExec('CREATE TABLE transactions', `CREATE TABLE IF NOT EXISTS transactions (
@@ -4512,6 +5315,10 @@ server.on('error', (err) => {
 ensureAuthSchema()
   .then(() => {
     console.log('[DB] Database schema successfully initialized and ready.');
+    // Start background processor for due automations (every 5 minutes)
+    setInterval(() => {
+      processDueAutomations().catch((err) => console.warn('[AUTOMATIONS INTERVAL ERROR]', err.message));
+    }, 5 * 60 * 1000).unref();
   })
   .catch((error) => {
     console.warn('[DB] Database initialization notice (server is online):', error.message || error);

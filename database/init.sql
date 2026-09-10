@@ -76,6 +76,9 @@ CREATE TABLE IF NOT EXISTS clients (
   id SERIAL PRIMARY KEY,
   studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  last_name TEXT DEFAULT '',
+  rut TEXT,
+  has_no_rut BOOLEAN NOT NULL DEFAULT FALSE,
   email TEXT,
   phone TEXT,
   notes TEXT NOT NULL DEFAULT '',
@@ -91,11 +94,24 @@ CREATE TABLE IF NOT EXISTS appointments (
   space_id INTEGER REFERENCES spaces(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
   notes TEXT NOT NULL DEFAULT '',
+  work_details TEXT DEFAULT '',
   starts_at TIMESTAMPTZ NOT NULL,
   duration_minutes INTEGER NOT NULL DEFAULT 180 CHECK (duration_minutes > 0),
-  status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled', 'rescheduled', 'no_show')),
+  status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('inquiry', 'confirmed', 'deposit_paid', 'in_session', 'completed', 'cancelled', 'rescheduled', 'no_show', 'pending_client')),
   price NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (price >= 0),
   deposit NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (deposit >= 0),
+  booking_token TEXT UNIQUE,
+  token_expires_at TIMESTAMPTZ,
+  token_views_count INTEGER NOT NULL DEFAULT 0,
+  token_duration_hours NUMERIC(4, 1) DEFAULT 24,
+  terms_accepted_at TIMESTAMPTZ,
+  proposed_slots JSONB DEFAULT '[]'::jsonb,
+  is_multi_session BOOLEAN DEFAULT FALSE,
+  selected_slot_index INTEGER DEFAULT 0,
+  external_source TEXT,
+  external_uid TEXT,
+  external_calendar_name TEXT,
+  synced_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -199,6 +215,32 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
   transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
   receipt_image_url TEXT DEFAULT '',
   notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS external_calendars (
+  id SERIAL PRIMARY KEY,
+  studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL CHECK (provider IN ('google', 'apple', 'custom_ics')),
+  feed_url TEXT NOT NULL,
+  calendar_name TEXT NOT NULL,
+  last_synced_at TIMESTAMPTZ,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_automations (
+  id SERIAL PRIMARY KEY,
+  studio_id INTEGER NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+  appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+  client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('post_care_loyalty', 'confirmation_followup')),
+  scheduled_for TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'cancelled', 'failed')),
+  execution_log TEXT DEFAULT '',
+  payload JSONB DEFAULT '{}'::jsonb,
+  sent_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
