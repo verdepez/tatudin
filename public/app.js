@@ -409,6 +409,11 @@ function onboardingFooter(back = true) {
 
 function renderOnboarding(step = 0, authMode = 'register') {
   closeModal();
+  const portal = document.querySelector('#public-portal');
+  if (portal) {
+    portal.style.display = 'none';
+    portal.innerHTML = '';
+  }
   document.body.classList.add('onboarding-mode');
   const ws = document.querySelector('#workspace');
   if (ws) ws.style.display = 'flex';
@@ -712,6 +717,12 @@ function toggleMobileDrawer() {
 
 async function startApp() {
   const ws = document.querySelector('#workspace');
+  if (ws) ws.style.display = 'flex';
+  const portal = document.querySelector('#public-portal');
+  if (portal) {
+    portal.style.display = 'none';
+    portal.innerHTML = '';
+  }
   document.body.classList.remove('onboarding-mode');
   const healthEl = document.querySelector('#health');
   if (healthEl) healthEl.textContent = 'conectada';
@@ -772,21 +783,6 @@ async function startApp() {
     await render('backoffice');
   } else {
     await render('dashboard');
-  }
-
-  // Verificar compromisos no gestionados de días anteriores al iniciar el sistema
-  if (!window._unmanagedStartupChecked && !currentUser.is_superadmin && currentUser.email !== 'soyelroot@tatudin.cl') {
-    window._unmanagedStartupChecked = true;
-    setTimeout(async () => {
-      try {
-        const unmanaged = await api('/api/appointments?unmanaged=true');
-        if (unmanaged && unmanaged.length > 0) {
-          openUnmanagedAppointmentsModal(unmanaged);
-        }
-      } catch (err) {
-        console.warn('Error checking unmanaged appointments on startup:', err);
-      }
-    }, 450);
   }
 }
 
@@ -1047,13 +1043,13 @@ async function render(view = 'dashboard', options = {}) {
         <section class="today panel">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">COMPROMISOS DE HOY</p>
+              <p class="eyebrow">PRÓXIMOS COMPROMISOS</p>
               <h2>Tu agenda de hoy</h2>
             </div>
             <span class="count">${(data.appointments || []).length} ${(data.appointments || []).length === 1 ? 'compromiso' : 'compromisos'}</span>
           </div>
           <div class="appointment-list">
-            ${(data.appointments || []).map(appointmentCard).join('') || emptyState('Sin compromisos para hoy', 'No tienes citas agendadas para el día de hoy.')}
+            ${(data.appointments || []).slice(0, 4).map(appointmentCard).join('') || emptyState('No hay compromisos próximos', 'Crea el primer compromiso de tu agenda.')}
           </div>
         </section>
 
@@ -2562,25 +2558,6 @@ async function renderAgenda() {
   const isMonthView = agendaFilter.viewMode === 'month';
   const rangeInfo = isMonthView ? getMonthMatrix(agendaFilter.currentDate) : getWeekRange(agendaFilter.currentDate);
 
-  // Al entrar al modo mes, gestionar compromisos pendientes solo una vez al día (omite si ya se revisó hoy)
-  if (isMonthView) {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const monthCheckKey = 'tatudin_unmanaged_month_' + todayStr;
-    if (!localStorage.getItem(monthCheckKey)) {
-      localStorage.setItem(monthCheckKey, 'true');
-      setTimeout(async () => {
-        try {
-          const unmanaged = await api('/api/appointments?unmanaged=true');
-          if (unmanaged && unmanaged.length > 0) {
-            openUnmanagedAppointmentsModal(unmanaged);
-          }
-        } catch (err) {
-          console.warn('Error checking unmanaged appointments for month view:', err);
-        }
-      }, 350);
-    }
-  }
-
   // Range parameters to get all appointments within the visible calendar period for date badges
   const rangeParams = new URLSearchParams();
   rangeParams.append('startDate', rangeInfo.startDateISO);
@@ -3130,259 +3107,6 @@ function openAgendaFilterModal(initialTab = 'filters') {
 
 function openBookingPagesModal() {
   return openAgendaFilterModal('schedules');
-}
-
-function openUnmanagedAppointmentsModal(unmanagedList) {
-  if (!unmanagedList || !unmanagedList.length) return;
-
-  const currentCount = unmanagedList.length;
-  let remainingCount = currentCount;
-  let hasMadeChanges = false;
-
-  const itemsHtml = unmanagedList.map(item => {
-    const startsAt = item.starts_at ? new Date(item.starts_at) : new Date();
-    const dateFormatted = new Intl.DateTimeFormat('es-CL', { weekday: 'short', day: 'numeric', month: 'short' }).format(startsAt);
-    const timeFormatted = formatTime(item.starts_at);
-    const price = Number(item.price) || 0;
-    const deposit = Number(item.deposit) || 0;
-    const primaryTitle = item.client_name ? item.client_name : item.title;
-    const secondaryTitle = item.client_name ? item.title : (item.notes || '');
-
-    // Default datetime for reschedule input (tomorrow at same time)
-    const nextDate = new Date(startsAt);
-    nextDate.setDate(nextDate.getDate() + 7);
-    const year = nextDate.getFullYear();
-    const month = (nextDate.getMonth() + 1).toString().padStart(2, '0');
-    const day = nextDate.getDate().toString().padStart(2, '0');
-    const hours = nextDate.getHours().toString().padStart(2, '0');
-    const minutes = nextDate.getMinutes().toString().padStart(2, '0');
-    const defaultDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
-
-    return `
-      <div class="unmanaged-item-card" id="unm-card-${item.id}" data-id="${item.id}">
-        <div class="unmanaged-item-header">
-          <div>
-            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 2px;">
-              <span class="unmanaged-item-title">${primaryTitle}</span>
-              ${item.category_name ? `
-                <span class="category-chip" style="--cat-color: ${item.category_color || '#7C3AED'}; font-size: 11px; padding: 2px 7px;">
-                  <span class="cat-dot" style="background: ${item.category_color || '#7C3AED'}"></span>
-                  ${item.category_name}
-                </span>
-              ` : ''}
-              ${item.space_name ? `<span class="space-chip" style="font-size: 11px; padding: 2px 6px;">${icon('box')} ${item.space_name}</span>` : ''}
-              ${item.artist_name ? `<span class="artist-chip" style="font-size: 11px; padding: 2px 6px;">${item.artist_name.split(' ')[0]}</span>` : ''}
-            </div>
-            <div class="unmanaged-item-meta">
-              <span>📅 ${dateFormatted} a las ${timeFormatted} hrs</span>
-              ${secondaryTitle ? `<span>· ${secondaryTitle}</span>` : ''}
-              ${price > 0 ? `<span>· <strong>${money(price)}</strong>${deposit > 0 ? ` (Abono: ${money(deposit)})` : ''}</span>` : ''}
-            </div>
-          </div>
-        </div>
-
-        <div class="unmanaged-actions-row" id="unm-actions-${item.id}">
-          <button type="button" class="unmanaged-btn-completed" data-unm-act="completed" data-id="${item.id}" title="Marcar como realizada con éxito">
-            ${icon('check')} <span>Efectuada</span>
-          </button>
-          <button type="button" class="unmanaged-btn-noshow" data-unm-act="no_show" data-id="${item.id}" title="El cliente no asistió">
-            <span>No asistió</span>
-          </button>
-          <button type="button" class="unmanaged-btn-cancelled" data-unm-act="cancelled" data-id="${item.id}" title="Cita cancelada">
-            <span>Cancelada</span>
-          </button>
-          <button type="button" class="unmanaged-btn-reschedule" data-unm-act="toggle-reschedule" data-id="${item.id}" title="Definir nueva fecha">
-            ${icon('calendar')} <span>Reprogramar</span>
-          </button>
-        </div>
-
-        <div class="unmanaged-reschedule-form" id="unm-resched-${item.id}">
-          <label style="font-size: 11px; font-weight: 600; color: #0369a1; display: block; margin-bottom: 4px;">Nueva fecha y horario:</label>
-          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-            <input type="datetime-local" id="unm-dt-${item.id}" value="${defaultDateTime}" style="font-size: 12px; height: 32px; flex: 1; min-width: 170px;" />
-            <button type="button" class="primary" data-unm-act="save-reschedule" data-id="${item.id}" style="background: #0284c7; border-color: #0284c7; font-size: 12px; padding: 5px 12px;">
-              Guardar
-            </button>
-            <button type="button" class="secondary" data-unm-act="cancel-reschedule" data-id="${item.id}" style="font-size: 12px; padding: 5px 10px;">
-              Volver
-            </button>
-          </div>
-        </div>
-
-        <div id="unm-badge-done-${item.id}" style="display: none; margin-top: 6px;"></div>
-      </div>
-    `;
-  }).join('');
-
-  openModal(`
-    <div class="unmanaged-modal-container">
-      <div>
-        <p class="eyebrow" style="color: #d97706; margin-bottom: 4px;">COMPROMISOS PENDIENTES DE GESTIÓN</p>
-        <h2 id="modal-title" style="margin: 0 0 6px 0;">¿Qué pasó con estas citas?</h2>
-        <p style="font-size: 13px; color: var(--muted); margin: 0;">
-          Tienes <strong id="unm-pending-counter" style="color: var(--ink);">${currentCount}</strong> ${currentCount === 1 ? 'compromiso anterior sin registrar' : 'compromisos anteriores sin registrar'}. Gestiona cada uno para mantener tus estadísticas y finanzas al día, o puedes omitir este paso para hacerlo luego.
-        </p>
-      </div>
-
-      <div class="unmanaged-list-scroll">
-        ${itemsHtml}
-      </div>
-
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line-soft);">
-        <button type="button" class="secondary" id="unm-close-skip" style="font-size: 13px;">
-          Omitir por ahora
-        </button>
-        <button type="button" class="primary" id="unm-close-done" style="font-size: 13px;">
-          Listo
-        </button>
-      </div>
-    </div>
-  `);
-
-  const updateCardStatus = (apptId, statusType, text, badgeClass) => {
-    hasMadeChanges = true;
-    const card = document.getElementById(`unm-card-${apptId}`);
-    const actionsRow = document.getElementById(`unm-actions-${apptId}`);
-    const reschedForm = document.getElementById(`unm-resched-${apptId}`);
-    const badgeDone = document.getElementById(`unm-badge-done-${apptId}`);
-
-    if (actionsRow) actionsRow.style.display = 'none';
-    if (reschedForm) reschedForm.style.display = 'none';
-    if (card) card.classList.add('is-resolved');
-    if (badgeDone) {
-      badgeDone.style.display = 'block';
-      badgeDone.innerHTML = `<span class="unmanaged-resolved-badge ${badgeClass}">${text}</span>`;
-    }
-
-    remainingCount--;
-    const counterEl = document.getElementById('unm-pending-counter');
-    if (counterEl) {
-      counterEl.textContent = Math.max(0, remainingCount);
-    }
-
-    if (remainingCount <= 0) {
-      const titleEl = document.getElementById('modal-title');
-      if (titleEl) titleEl.textContent = '¡Todos los compromisos han sido gestionados!';
-      setTimeout(async () => {
-        closeModal();
-        const activeView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'dashboard';
-        await render(activeView);
-      }, 1000);
-    }
-  };
-
-  // Event handlers
-  document.querySelectorAll('[data-unm-act="completed"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const id = e.currentTarget.dataset.id;
-      btn.disabled = true;
-      try {
-        await api(`/api/appointments/${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'completed' })
-        });
-        updateCardStatus(id, 'completed', '✓ Marcada como Efectuada', 'completed');
-      } catch (err) {
-        alert(err.message || 'Error al marcar la cita como efectuada');
-        btn.disabled = false;
-      }
-    });
-  });
-
-  document.querySelectorAll('[data-unm-act="no_show"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const id = e.currentTarget.dataset.id;
-      btn.disabled = true;
-      try {
-        await api(`/api/appointments/${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'no_show' })
-        });
-        updateCardStatus(id, 'no_show', 'Marcada como No asistió', 'noshow');
-      } catch (err) {
-        alert(err.message || 'Error al registrar no asistencia');
-        btn.disabled = false;
-      }
-    });
-  });
-
-  document.querySelectorAll('[data-unm-act="cancelled"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const id = e.currentTarget.dataset.id;
-      btn.disabled = true;
-      try {
-        await api(`/api/appointments/${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'cancelled' })
-        });
-        updateCardStatus(id, 'cancelled', 'Marcada como Cancelada', 'cancelled');
-      } catch (err) {
-        alert(err.message || 'Error al cancelar la cita');
-        btn.disabled = false;
-      }
-    });
-  });
-
-  document.querySelectorAll('[data-unm-act="toggle-reschedule"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const id = e.currentTarget.dataset.id;
-      const form = document.getElementById(`unm-resched-${id}`);
-      if (form) {
-        form.style.display = form.style.display === 'none' || !form.style.display ? 'block' : 'none';
-      }
-    });
-  });
-
-  document.querySelectorAll('[data-unm-act="cancel-reschedule"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const id = e.currentTarget.dataset.id;
-      const form = document.getElementById(`unm-resched-${id}`);
-      if (form) form.style.display = 'none';
-    });
-  });
-
-  document.querySelectorAll('[data-unm-act="save-reschedule"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const id = e.currentTarget.dataset.id;
-      const dtInput = document.getElementById(`unm-dt-${id}`);
-      const val = dtInput?.value;
-      if (!val) {
-        alert('Por favor selecciona una fecha y horario para reprogramar.');
-        return;
-      }
-      const selDate = new Date(val);
-      if (isNaN(selDate.getTime())) {
-        alert('La fecha seleccionada no es válida.');
-        return;
-      }
-      btn.disabled = true;
-      try {
-        await api(`/api/appointments/${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({
-            status: 'rescheduled',
-            startsAt: selDate.toISOString()
-          })
-        });
-        const formattedNew = formatDateISO(selDate) + ' a las ' + formatTime(selDate);
-        updateCardStatus(id, 'rescheduled', `✓ Reprogramada para ${formattedNew}`, 'rescheduled');
-      } catch (err) {
-        alert(err.message || 'Error al reprogramar la cita');
-        btn.disabled = false;
-      }
-    });
-  });
-
-  const handleClose = async () => {
-    closeModal();
-    if (hasMadeChanges) {
-      const activeView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'dashboard';
-      await render(activeView);
-    }
-  };
-
-  document.getElementById('unm-close-skip')?.addEventListener('click', handleClose);
-  document.getElementById('unm-close-done')?.addEventListener('click', handleClose);
 }
 
 function openAppointmentOutcomeModal(appt) {
@@ -4590,8 +4314,14 @@ async function renderCommunications() {
 
 // ---------------- INTEGRACIONES ----------------
 async function renderIntegrations() {
-  const stData = await api('/api/studio').catch(() => activeStudio);
+  const [stData, externalCals] = await Promise.all([
+    api('/api/studio').catch(() => activeStudio),
+    api('/api/calendar/external').catch(() => [])
+  ]);
   const studioName = stData?.name || activeStudio?.name || 'Ink Sanctuary';
+
+  const gCal = externalCals.find(c => c.provider === 'google');
+  const appleCal = externalCals.find(c => c.provider === 'apple');
 
   app.innerHTML = `
     <section class="page-heading">
@@ -4611,41 +4341,69 @@ async function renderIntegrations() {
             <h2>Sincronización de Agenda</h2>
           </div>
         </div>
-        <p class="lead" style="margin-bottom: 16px; font-size: 13.5px;">Conecta tus calendarios personales para bloquear horarios ocupados y evitar citas solapadas automáticamente.</p>
+        <p class="lead" style="margin-bottom: 16px; font-size: 13.5px;">
+          Enlaza tus agendas de Google o Apple Calendar. Al integrarlas por primera vez, Tatudin importará automáticamente tus eventos para bloquear los horarios y evitar citas solapadas.
+        </p>
 
         <div class="members-list">
+          <!-- Google Calendar -->
           <article class="setting-item">
             <div class="setting-item-icon" style="background: #4285F420; color: #4285F4; border-radius: 12px; display: grid; place-items: center; width: 44px; height: 44px; font-weight: 800; font-size: 16px;">G</div>
             <div class="setting-item-body">
               <div class="setting-item-top">
                 <div class="setting-item-title">
                   <h3>Google Calendar</h3>
-                  <span class="status-chip status-confirmed">Conectado</span>
+                  <span class="status-chip ${gCal ? 'status-confirmed' : 'status-inquiry'}">
+                    ${gCal ? 'Enlazado' : 'Disponible'}
+                  </span>
                 </div>
-                <div class="setting-item-action">
-                  <button class="member-toggle-btn" data-action="toggle-gcal-sync">Sincronizado</button>
+                <div class="setting-item-action" style="display: flex; gap: 6px;">
+                  ${gCal ? `
+                    <button class="primary small-btn" data-action="sync-ext-calendar" data-id="${gCal.id}">Sincronizar ahora</button>
+                    <button class="secondary small-btn" data-action="delete-ext-calendar" data-id="${gCal.id}" title="Desvincular">Desvincular</button>
+                  ` : `
+                    <button class="primary small-btn" data-action="open-connect-ext-modal" data-provider="google">Conectar e Importar</button>
+                  `}
                 </div>
               </div>
               <div class="setting-item-sub">
-                <span class="member-meta">Sincronización bidireccional activa con cuenta de estudio.</span>
+                <span class="member-meta">
+                  ${gCal 
+                    ? `Sincronizado: "${gCal.calendar_name}" · Última sync: ${gCal.last_synced_at ? new Date(gCal.last_synced_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : 'Reciente'}`
+                    : 'Importa tus eventos de Google Calendar para bloquear horarios automáticamente.'
+                  }
+                </span>
               </div>
             </div>
           </article>
 
+          <!-- Apple Calendar -->
           <article class="setting-item">
             <div class="setting-item-icon" style="background: #221C3520; color: var(--ink); border-radius: 12px; display: grid; place-items: center; width: 44px; height: 44px; font-weight: 800; font-size: 16px;"></div>
             <div class="setting-item-body">
               <div class="setting-item-top">
                 <div class="setting-item-title">
-                  <h3>Apple Calendar (iCal)</h3>
-                  <span class="status-chip status-inquiry">Disponible</span>
+                  <h3>Apple Calendar (iCloud)</h3>
+                  <span class="status-chip ${appleCal ? 'status-confirmed' : 'status-inquiry'}">
+                    ${appleCal ? 'Enlazado' : 'Disponible'}
+                  </span>
                 </div>
-                <div class="setting-item-action">
-                  <button class="primary small-btn" data-action="connect-ical">Conectar</button>
+                <div class="setting-item-action" style="display: flex; gap: 6px;">
+                  ${appleCal ? `
+                    <button class="primary small-btn" data-action="sync-ext-calendar" data-id="${appleCal.id}">Sincronizar ahora</button>
+                    <button class="secondary small-btn" data-action="delete-ext-calendar" data-id="${appleCal.id}" title="Desvincular">Desvincular</button>
+                  ` : `
+                    <button class="primary small-btn" data-action="open-connect-ext-modal" data-provider="apple">Conectar e Importar</button>
+                  `}
                 </div>
               </div>
               <div class="setting-item-sub">
-                <span class="member-meta">Exporta tus eventos mediante URL segura de suscripción iCal.</span>
+                <span class="member-meta">
+                  ${appleCal 
+                    ? `Sincronizado: "${appleCal.calendar_name}" · Última sync: ${appleCal.last_synced_at ? new Date(appleCal.last_synced_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : 'Reciente'}`
+                    : 'Conecta tu calendario de iCloud/Apple para importar tus citas personales.'
+                  }
+                </span>
               </div>
             </div>
           </article>
@@ -8821,35 +8579,155 @@ function spaceOptions() {
     : '<option value="">Sin boxes creados</option>';
 }
 
+function openLinkGeneratedModal(res, tokenDurationHours) {
+  openModal(`
+    <div style="text-align: center; margin-bottom: 20px;">
+      <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); color: #10b981; display: grid; place-items: center; margin: 0 auto 12px auto;">
+        ${icon('link')}
+      </div>
+      <p class="eyebrow">ENLACE PÚBLICO GENERADO</p>
+      <h2>Cita lista para enviar</h2>
+      <p class="lead" style="font-size: 13px;">El horario y box han quedado reservados provisionalmente. Comparte este enlace con tu cliente para que confirme sus datos y acepte los términos.</p>
+    </div>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+      <label style="font-size: 12px; font-weight: 700; color: var(--muted-light); margin-bottom: 6px; display: block;">Enlace exclusivo para el cliente:</label>
+      <div style="display: flex; gap: 8px;">
+        <input type="text" id="generated-booking-url" value="${res.shareUrl}" readonly style="font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.3);" />
+        <button type="button" class="primary small" id="copy-booking-url-btn" style="white-space: nowrap;">
+          ${icon('copy')} Copiar
+        </button>
+      </div>
+      <div style="display: flex; gap: 14px; margin-top: 10px; font-size: 11.5px; color: var(--muted-light);">
+        <span>⏱ Vigencia: <strong>${tokenDurationHours || 24} horas</strong></span>
+        <span>🔒 Límite: <strong>Máx. 2 aperturas</strong></span>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <a href="https://wa.me/?text=${encodeURIComponent(res.whatsappShareText)}" target="_blank" rel="noopener noreferrer" class="primary" style="background: #25D366; color: #ffffff; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; padding: 12px; border-radius: var(--radius-md);">
+        ${icon('whatsapp')} Compartir por WhatsApp
+      </a>
+      <button type="button" class="secondary" data-close-modal>Entendido, volver a la agenda</button>
+    </div>
+  `);
+
+  document.querySelector('#copy-booking-url-btn')?.addEventListener('click', async (e) => {
+    const urlInput = document.querySelector('#generated-booking-url');
+    if (urlInput) {
+      urlInput.select();
+      await navigator.clipboard.writeText(urlInput.value).catch(() => {});
+      e.target.innerHTML = '¡Copiado!';
+      setTimeout(() => { e.target.innerHTML = `${icon('copy')} Copiar`; }, 2000);
+    }
+  });
+}
+
 async function newBookingModal(preselectedClientId = null, preselectedDateTime = null) {
   try {
-    const [clData, memData, spData, catData] = await Promise.all([
+    const [clData, memData, spData, catData, stList] = await Promise.all([
       api('/api/clients').catch(() => []),
       api('/api/members').catch(() => []),
       api('/api/spaces').catch(() => []),
-      api('/api/categories').catch(() => [])
+      api('/api/categories').catch(() => []),
+      api('/api/auth/studios').catch(() => [])
     ]);
     clients = clData;
     members = memData;
     spaces = spData;
     categories = catData;
+    if (stList && stList.length) userStudios = stList;
+
+    const isIndependent = (activeStudio?.account_type === 'independent' || (!activeStudio && currentUser?.account_type === 'independent'));
+    const isResident = (!isIndependent && currentUser?.role === 'resident');
+    const isGuest = (!isIndependent && (currentUser?.role === 'guest' || currentUser?.role === 'nomad'));
+    const isOwnerOrAdmin = (!isIndependent && !isResident && !isGuest);
 
     const defaultDateTime = preselectedDateTime || getNextDefaultDateTime();
     const defaultCat = categories[0] || { id: '', name: 'Compromiso', kind: 'tattoo', color: '#7C3AED', requires_client: true, requires_space: false };
 
+    let roleBadgeHtml = '';
+    let roleEyebrow = 'AGENDA';
+    if (isIndependent) {
+      roleEyebrow = 'AGENDA · ARTISTA INDEPENDIENTE';
+      roleBadgeHtml = `
+        <div class="role-context-badge">
+          <span>👤 <strong>Modo Artista Independiente</strong></span>
+          <span style="color: var(--muted-light); font-size: 11.5px;">Agenda y enlaces directos</span>
+        </div>`;
+    } else if (isResident) {
+      roleEyebrow = 'AGENDA · ARTISTA RESIDENTE';
+      roleBadgeHtml = `
+        <div class="role-context-badge">
+          <span>🏢 <strong>Residente en ${escapeHtml(activeStudio?.name || 'Estudio')}</strong></span>
+          <span style="color: var(--muted-light); font-size: 11.5px;">Agenda con box de estudio</span>
+        </div>`;
+    } else if (isGuest) {
+      roleEyebrow = 'AGENDA · GUEST ARTIST';
+      roleBadgeHtml = `
+        <div class="role-context-badge">
+          <span>✈️ <strong>Guest Spot en ${escapeHtml(activeStudio?.name || 'Estudio anfitrión')}</strong></span>
+          <span style="color: var(--muted-light); font-size: 11.5px;">Cita de invitado</span>
+        </div>`;
+    } else {
+      roleEyebrow = 'AGENDA · GESTIÓN DE ESTUDIO';
+      roleBadgeHtml = `
+        <div class="role-context-badge">
+          <span>👑 <strong>Gestión de ${escapeHtml(activeStudio?.name || 'Estudio')}</strong></span>
+          <span style="color: var(--muted-light); font-size: 11.5px;">Asignación de equipo y boxes</span>
+        </div>`;
+    }
+
+    const multiStudioHtml = ((isResident || isGuest) && userStudios && userStudios.length > 1) ? `
+      <label style="margin-bottom: 12px;">Estudio donde realizarás la sesión:
+        <select name="studioId" id="booking-studio-select">
+          ${userStudios.map((s) => `<option value="${s.id}" ${Number(s.id) === Number(activeStudio?.id) ? 'selected' : ''}>${escapeHtml(s.name)} (${s.role || 'miembro'})</option>`).join('')}
+        </select>
+      </label>
+    ` : `<input type="hidden" name="studioId" value="${activeStudio?.id || ''}" />`;
+
+    // Artist and Space controls strictly tailored to role
+    let artistAndSpaceHtml = '';
+    if (isIndependent) {
+      // Independent artist has implicit currentUser as artist and NO boxes
+      artistAndSpaceHtml = `<input type="hidden" name="artistId" value="${currentUser?.id || ''}" />`;
+    } else if (isResident || isGuest) {
+      // Resident / Guest book for themselves; they only select the box/space
+      artistAndSpaceHtml = `
+        <input type="hidden" name="artistId" value="${currentUser?.id || ''}" />
+        <label id="booking-space-label">Box / Espacio en estudio
+          <select name="spaceId" id="booking-space-select">${spaceOptions()}</select>
+        </label>
+        <div id="booking-conflict-alert" style="display: none; margin-top: -6px; margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; font-size: 12px; background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);"></div>
+      `;
+    } else {
+      // Owner or Admin assigns team members and boxes
+      artistAndSpaceHtml = `
+        <div class="form-grid">
+          <label id="booking-artist-label">Artista / Responsable
+            <select name="artistId" id="booking-artist-select">${memberOptions()}</select>
+          </label>
+          <label id="booking-space-label">Box / Espacio
+            <select name="spaceId" id="booking-space-select">${spaceOptions()}</select>
+          </label>
+        </div>
+        <div id="booking-conflict-alert" style="display: none; margin-top: -6px; margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; font-size: 12px; background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);"></div>
+      `;
+    }
+
     openModal(`
-      <p class="eyebrow">AGENDA</p>
+      <p class="eyebrow">${roleEyebrow}</p>
       <h2 id="modal-title">Nuevo compromiso</h2>
-      
+      ${roleBadgeHtml}
+
       <!-- Category selector pills in modal -->
-      <div class="modal-category-picker">
-        <label class="picker-label">Categoría:</label>
+      <div class="modal-category-picker" style="margin-bottom: 12px;">
         <div class="category-radio-group">
           ${categories.map((c, i) => `
             <label class="category-pill-option ${i === 0 ? 'active' : ''}" style="--c-color: ${c.color}">
               <input type="radio" name="modalCategory" value="${c.id}" data-kind="${c.kind}" data-requires-client="${c.requires_client}" data-requires-space="${c.requires_space}" ${i === 0 ? 'checked' : ''} />
               <span class="cat-pill-circle" style="background:${c.color}"></span>
-              <span>${c.name}</span>
+              <span>${escapeHtml(c.name)}</span>
             </label>
           `).join('')}
         </div>
@@ -8857,77 +8735,342 @@ async function newBookingModal(preselectedClientId = null, preselectedDateTime =
 
       <form data-form="booking" class="booking-dynamic-form">
         <input type="hidden" name="categoryId" value="${defaultCat.id}" />
+        ${multiStudioHtml}
 
         <label>Título o motivo
-          <input name="title" required placeholder="Ej. Tatuaje Floral, Sesión de Fotos, Arriendo Box 1..." />
+          <input name="title" required placeholder="${isIndependent ? 'Ej. Tatuaje Floral antebrazo, Sesión Flash...' : 'Ej. Tatuaje Realismo, Cover up, Sesión 1...'}" />
         </label>
 
-        <!-- Dynamic Client section -->
-        <div id="booking-client-section" class="form-section ${defaultCat.requires_client ? '' : 'hidden'}">
-          <label>Cliente
+        <!-- 4-Way Client Handling Selector Pills -->
+        <div style="margin: 12px 0 8px 0;">
+          <label style="font-size: 12px; font-weight: 700; color: var(--muted-light); margin-bottom: 6px; display: block;">Modalidad de cliente:</label>
+          <div class="client-mode-pills">
+            <button type="button" class="client-mode-tab active" data-mode="link">
+              ${icon('link')} Enviar enlace
+            </button>
+            <button type="button" class="client-mode-tab" data-mode="existing">
+              ${icon('user')} Cliente registrado
+            </button>
+            <button type="button" class="client-mode-tab" data-mode="new">
+              ${icon('plus')} Nuevo directo
+            </button>
+            <button type="button" class="client-mode-tab" data-mode="none">
+              🚫 Sin cliente
+            </button>
+          </div>
+        </div>
+
+        <!-- Mode 1: Enviar Enlace -->
+        <div id="booking-mode-link" class="client-mode-content">
+          <div style="background: rgba(124, 58, 237, 0.08); border: 1px dashed rgba(124, 58, 237, 0.3); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+              <span style="font-size: 13px; font-weight: 700; color: #c4b5fd; display: inline-flex; align-items: center; gap: 6px;">
+                ${icon('link')} Formulario público para cliente
+              </span>
+              <span style="font-size: 11px; background: rgba(124, 58, 237, 0.2); color: #a78bfa; padding: 2px 8px; border-radius: 10px; font-weight: 600;">Máx. 2 aperturas</span>
+            </div>
+            <p style="font-size: 12px; color: var(--muted-light); margin: 0 0 10px 0; line-height: 1.4;">
+              Genera un enlace reservando este horario. El cliente completará sus datos reales (Nombre, RUT, Teléfono, Email) y aceptará los Términos de Servicio.
+            </p>
+            <label style="font-size: 12px; font-weight: 600;">Vigencia del enlace:
+              <select name="tokenDurationHours" style="margin-top: 4px;">
+                <option value="1">1 hora</option>
+                <option value="3">3 horas</option>
+                <option value="6">6 horas</option>
+                <option value="12">12 horas</option>
+                <option value="24" selected>24 horas (Recomendado)</option>
+                <option value="48">48 horas</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <!-- Mode 2: Cliente Registrado -->
+        <div id="booking-mode-existing" class="client-mode-content hidden">
+          <label>Seleccionar cliente
             <select name="clientId">
-              <option value="">Sin cliente asociado</option>
+              <option value="">Selecciona un cliente de la lista...</option>
               ${clientOptions(preselectedClientId)}
             </select>
           </label>
         </div>
 
-        <div class="form-grid">
-          <label id="booking-artist-label">Artista / Responsable
-            <select name="artistId">${memberOptions()}</select>
+        <!-- Mode 3: Nuevo Cliente Directo -->
+        <div id="booking-mode-new" class="client-mode-content hidden">
+          <label>Nombre completo del nuevo cliente *
+            <input name="newClientName" placeholder="Ej. Camila Silva Rojas" />
           </label>
-          <label id="booking-space-label">Box / Espacio
-            <select name="spaceId">${spaceOptions()}</select>
-          </label>
+          <div class="form-grid">
+            <label>Teléfono / WhatsApp *
+              <input name="newClientPhone" type="tel" placeholder="+56 9 1234 5678" />
+            </label>
+            <label>Correo electrónico
+              <input name="newClientEmail" type="email" placeholder="cliente@ejemplo.com" />
+            </label>
+          </div>
         </div>
 
-        <label>Fecha y hora de inicio
-          <input name="startsAt" type="datetime-local" value="${defaultDateTime}" required />
-        </label>
-
-        <div class="form-grid">
-          <label>Duración (min)
-            <input name="durationMinutes" type="number" value="120" min="15" step="15" />
-          </label>
-          <label id="booking-price-label">Precio / Cobro (CLP)
-            <input name="price" type="number" value="0" min="0" />
-          </label>
+        <!-- Mode 4: Bloqueo sin cliente -->
+        <div id="booking-mode-none" class="client-mode-content hidden">
+          <div style="background: var(--surface-low); border: 1px solid var(--line-soft); border-radius: 10px; padding: 12px; font-size: 12px; color: var(--muted-light); margin-bottom: 12px; line-height: 1.4;">
+            📅 <strong>Bloqueo de horario / Actividad interna:</strong> Este tramo se reservará en tu agenda sin asociar cliente (diseño, descanso, etc.).
+          </div>
         </div>
 
-        <div id="booking-deposit-section" class="form-section ${defaultCat.requires_client ? '' : 'hidden'}">
-          <label>Abono / Seña recibida (CLP)
-            <input name="deposit" type="number" value="0" min="0" />
-          </label>
+        ${artistAndSpaceHtml}
+
+        <!-- Dynamic Multi-Date & Slots Section -->
+        <div class="booking-dates-container" style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label style="font-size: 12px; font-weight: 700; color: var(--muted-light); margin: 0;">
+              Fecha y horario de la sesión / alternativas:
+            </label>
+            <button type="button" id="btn-add-date-slot" class="outline-button small" style="font-size: 11px; padding: 4px 8px; border-radius: 8px; border: 1px dashed rgba(139, 92, 246, 0.5); color: #c4b5fd; background: rgba(124, 58, 237, 0.1); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+              ${icon('plus')} Agregar otra fecha o alternativa
+            </button>
+          </div>
+
+          <div id="booking-slots-container">
+            <div class="booking-slot-row" data-slot-index="0" style="background: var(--surface-low); border: 1px solid var(--line-soft); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span class="slot-badge" style="font-size: 11px; font-weight: 700; color: #a78bfa;">Fecha principal / Sesión 1</span>
+                <button type="button" class="btn-remove-slot" style="display: none; background: none; border: none; color: #ef4444; font-size: 11.5px; cursor: pointer;">✕ Quitar</button>
+              </div>
+              <div class="form-grid">
+                <label style="margin: 0; font-size: 12px;">Fecha y hora de inicio
+                  <input type="datetime-local" class="slot-starts-at" name="startsAt" value="${defaultDateTime}" required />
+                </label>
+                <label style="margin: 0; font-size: 12px;">Duración (min)
+                  <input type="number" class="slot-duration" name="durationMinutes" value="120" min="15" step="15" required />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Multi-slot mode selector (visible only when > 1 slot) -->
+          <div id="multi-slot-mode-box" style="display: none; margin-top: 6px; background: rgba(124, 58, 237, 0.08); border: 1px dashed rgba(124, 58, 237, 0.3); border-radius: 10px; padding: 10px 12px;">
+            <span style="font-size: 11.5px; font-weight: 700; color: #c4b5fd; display: block; margin-bottom: 6px;">Propósito de las fechas agregadas:</span>
+            <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px;">
+              <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="radio" name="multiSlotMode" value="options" checked />
+                <span>Opciones para que el cliente elija (1 fecha)</span>
+              </label>
+              <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="radio" name="multiSlotMode" value="multi_session" />
+                <span>Proyecto multi-sesión (Todas se agendan)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div id="booking-financial-price-box">
+          <div class="form-grid">
+            <label id="booking-price-label">Precio / Cobro (${activeStudio?.currency || 'CLP'})
+              <input name="price" type="number" value="0" min="0" />
+            </label>
+            <div id="booking-financial-deposit-box">
+              <label>Abono / Seña (${activeStudio?.currency || 'CLP'})
+                <input name="deposit" type="number" value="0" min="0" />
+              </label>
+            </div>
+          </div>
         </div>
 
         <label>Notas y consideraciones
           <textarea name="notes" rows="2" placeholder="Detalles de la sesión, acuerdos, requerimientos especiales..."></textarea>
         </label>
 
-        <button class="primary" type="submit">${icon('plus')} Guardar en agenda</button>
-        <p class="form-error"></p>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;">
+          <button class="primary" type="submit" id="booking-submit-btn" style="flex: 1 1 200px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+            ${icon('link')} Generar y compartir enlace
+          </button>
+          <button class="secondary" type="button" data-close-modal style="flex: 0 0 auto;">Cancelar</button>
+        </div>
+        <p class="form-error" style="color: #ef4444; font-size: 12px; margin-top: 8px;"></p>
       </form>
     `);
 
+    // Category pills change
     document.querySelectorAll('.category-pill-option input[name="modalCategory"]').forEach((radio) => {
       radio.addEventListener('change', (e) => {
         document.querySelectorAll('.category-pill-option').forEach((p) => p.classList.remove('active'));
         e.target.closest('.category-pill-option')?.classList.add('active');
-
         const catId = e.target.value;
-        const requiresClient = e.target.dataset.requiresClient === 'true';
-        const kind = e.target.dataset.kind;
-
         const catIdInput = document.querySelector('form[data-form="booking"] input[name="categoryId"]');
         if (catIdInput) catIdInput.value = catId;
-
-        const clientSec = document.querySelector('#booking-client-section');
-        const depositSec = document.querySelector('#booking-deposit-section');
-
-        if (clientSec) clientSec.classList.toggle('hidden', !requiresClient && kind !== 'tattoo');
-        if (depositSec) depositSec.classList.toggle('hidden', !requiresClient && kind !== 'tattoo');
       });
     });
+
+    // Client mode tab switcher
+    document.querySelectorAll('.client-mode-tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.client-mode-tab').forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+        const currentMode = tab.dataset.mode;
+
+        document.querySelectorAll('.client-mode-content').forEach((el) => el.classList.add('hidden'));
+        const targetSection = document.querySelector(`#booking-mode-${currentMode}`);
+        if (targetSection) targetSection.classList.remove('hidden');
+
+        const submitBtn = document.querySelector('#booking-submit-btn');
+        const priceBox = document.querySelector('#booking-financial-price-box');
+
+        if (currentMode === 'link') {
+          if (submitBtn) submitBtn.innerHTML = `${icon('link')} Generar y compartir enlace`;
+          if (priceBox) priceBox.style.display = 'block';
+        } else if (currentMode === 'existing') {
+          if (submitBtn) submitBtn.innerHTML = `${icon('plus')} Guardar cita en agenda`;
+          if (priceBox) priceBox.style.display = 'block';
+        } else if (currentMode === 'new') {
+          if (submitBtn) submitBtn.innerHTML = `${icon('plus')} Guardar cliente y cita`;
+          if (priceBox) priceBox.style.display = 'block';
+        } else if (currentMode === 'none') {
+          if (submitBtn) submitBtn.innerHTML = `${icon('calendar')} Bloquear horario`;
+          if (priceBox) priceBox.style.display = 'none';
+        }
+      });
+    });
+
+    // Dynamic slot management
+    const slotsContainer = document.querySelector('#booking-slots-container');
+    const multiSlotBox = document.querySelector('#multi-slot-mode-box');
+    const addSlotBtn = document.querySelector('#btn-add-date-slot');
+
+    function updateSlotIndexes() {
+      const rows = document.querySelectorAll('.booking-slot-row');
+      rows.forEach((row, i) => {
+        row.dataset.slotIndex = i;
+        const badge = row.querySelector('.slot-badge');
+        const removeBtn = row.querySelector('.btn-remove-slot');
+        if (badge) badge.textContent = i === 0 ? 'Fecha principal / Sesión 1' : `Fecha / Sesión alternativa ${i + 1}`;
+        if (removeBtn) removeBtn.style.display = rows.length > 1 ? 'inline-block' : 'none';
+      });
+      if (multiSlotBox) multiSlotBox.style.display = rows.length > 1 ? 'block' : 'none';
+    }
+
+    addSlotBtn?.addEventListener('click', () => {
+      const rows = document.querySelectorAll('.booking-slot-row');
+      const lastRow = rows[rows.length - 1];
+      const lastDateVal = lastRow?.querySelector('.slot-starts-at')?.value || defaultDateTime;
+      const lastDate = new Date(lastDateVal);
+      const nextDate = new Date(lastDate.getTime() + 24 * 3600 * 1000);
+      const nextDateIso = nextDate.toISOString().slice(0, 16);
+
+      const newRow = document.createElement('div');
+      newRow.className = 'booking-slot-row';
+      newRow.dataset.slotIndex = rows.length;
+      newRow.style.cssText = 'background: var(--surface-low); border: 1px solid var(--line-soft); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;';
+      newRow.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span class="slot-badge" style="font-size: 11px; font-weight: 700; color: #a78bfa;">Fecha alternativa ${rows.length + 1}</span>
+          <button type="button" class="btn-remove-slot" style="background: none; border: none; color: #ef4444; font-size: 11.5px; cursor: pointer;">✕ Quitar</button>
+        </div>
+        <div class="form-grid">
+          <label style="margin: 0; font-size: 12px;">Fecha y hora de inicio
+            <input type="datetime-local" class="slot-starts-at" value="${nextDateIso}" required />
+          </label>
+          <label style="margin: 0; font-size: 12px;">Duración (min)
+            <input type="number" class="slot-duration" value="120" min="15" step="15" required />
+          </label>
+        </div>
+      `;
+      slotsContainer.appendChild(newRow);
+      updateSlotIndexes();
+
+      newRow.querySelector('.btn-remove-slot').addEventListener('click', () => {
+        newRow.remove();
+        updateSlotIndexes();
+        checkConflictsLive();
+      });
+
+      newRow.querySelectorAll('input').forEach((inp) => {
+        inp.addEventListener('change', checkConflictsLive);
+        inp.addEventListener('input', checkConflictsLive);
+      });
+
+      checkConflictsLive();
+    });
+
+    // Live conflict validation across all proposed dates
+    let conflictTimer = null;
+    async function checkConflictsLive() {
+      clearTimeout(conflictTimer);
+      conflictTimer = setTimeout(async () => {
+        const form = document.querySelector('form[data-form="booking"]');
+        if (!form) return;
+        const slotInputs = form.querySelectorAll('.slot-starts-at');
+        const durationInputs = form.querySelectorAll('.slot-duration');
+        const artistId = form.querySelector('[name="artistId"]')?.value || null;
+        const spaceId = form.querySelector('[name="spaceId"]')?.value || null;
+        const studioId = form.querySelector('[name="studioId"]')?.value || null;
+        const alertEl = document.querySelector('#booking-conflict-alert');
+
+        if (!slotInputs.length || (!spaceId && !artistId)) {
+          if (alertEl) { alertEl.style.display = 'none'; alertEl.textContent = ''; }
+          return;
+        }
+
+        let foundConflict = null;
+        for (let i = 0; i < slotInputs.length; i++) {
+          const sVal = slotInputs[i].value;
+          const dVal = durationInputs[i]?.value || 120;
+          if (!sVal) continue;
+          try {
+            const q = new URLSearchParams({
+              startsAt: new Date(sVal).toISOString(),
+              durationMinutes: dVal,
+              ...(artistId ? { artistId } : {}),
+              ...(spaceId ? { spaceId } : {}),
+              ...(studioId ? { studioId } : {})
+            });
+            const res = await api(`/api/appointments/check-conflict?${q.toString()}`);
+            if (res?.hasConflict) {
+              foundConflict = `Fecha ${i + 1}: ${res.message}`;
+              break;
+            }
+          } catch (e) {}
+        }
+
+        if (foundConflict) {
+          if (alertEl) {
+            alertEl.textContent = '⚠️ ' + foundConflict;
+            alertEl.style.display = 'block';
+          }
+        } else {
+          if (alertEl) {
+            alertEl.style.display = 'none';
+            alertEl.textContent = '';
+          }
+        }
+      }, 300);
+    }
+
+    ['#booking-space-select', '#booking-artist-select', '#booking-studio-select'].forEach((sel) => {
+      document.querySelector(sel)?.addEventListener('change', checkConflictsLive);
+      document.querySelector(sel)?.addEventListener('input', checkConflictsLive);
+    });
+    document.querySelectorAll('.slot-starts-at, .slot-duration').forEach((inp) => {
+      inp.addEventListener('change', checkConflictsLive);
+      inp.addEventListener('input', checkConflictsLive);
+    });
+
+    const studioSelect = document.querySelector('#booking-studio-select');
+    studioSelect?.addEventListener('change', async (e) => {
+      const chosenStudioId = e.target.value;
+      try {
+        const spRes = await api(`/api/public/studios/${chosenStudioId}/spaces`);
+        const spaceSelect = document.querySelector('#booking-space-select');
+        if (spaceSelect && spRes?.spaces) {
+          spaceSelect.innerHTML = `<option value="">Sin box específico</option>` +
+            spRes.spaces.map((s) => `<option value="${s.id}">${s.name} (${money(s.price_per_day)}/día)</option>`).join('');
+        }
+        checkConflictsLive();
+      } catch (err) {
+        console.warn('Error loading spaces for studio:', err);
+      }
+    });
+
+    if (preselectedDateTime) checkConflictsLive();
   } catch (err) {
     console.error('Error opening booking modal:', err);
     alert('Error al abrir formulario de agenda: ' + err.message);
@@ -10343,17 +10486,111 @@ document.addEventListener('click', async (event) => {
     return await copyToClipboard(textToCopy, copyTextBtn, '¡Copiado!');
   }
 
-  // Toggle GCal sync simulation
-  if (event.target.closest('[data-action="toggle-gcal-sync"]')) {
-    alert('Sincronización con Google Calendar actualizada.');
+  // Connect External Calendar Modal
+  const openConnBtn = event.target.closest('[data-action="open-connect-ext-modal"]');
+  if (openConnBtn) {
+    const provider = openConnBtn.dataset.provider;
+    const isGoogle = provider === 'google';
+    const providerName = isGoogle ? 'Google Calendar' : 'Apple Calendar (iCloud)';
+
+    openModal(`
+      <p class="eyebrow">INTEGRACIÓN DE AGENDA</p>
+      <h2>Conectar ${providerName}</h2>
+      <p class="lead" style="font-size: 13px;">
+        ${isGoogle 
+          ? 'Copia la <strong>Dirección secreta en formato iCal</strong> desde la configuración de tu Google Calendar para sincronizar e importar tus eventos.' 
+          : 'Copia el enlace de tu calendario compartido/público desde iCloud o la app Calendario de Apple.'}
+      </p>
+
+      <div style="background: rgba(124, 58, 237, 0.08); border-radius: 12px; padding: 14px; margin-bottom: 18px; font-size: 12.5px; color: var(--muted-light); line-height: 1.5;">
+        <strong style="color: #ffffff; display: block; margin-bottom: 4px;">¿Cómo obtener este enlace?</strong>
+        ${isGoogle ? `
+          1. Abre Google Calendar en tu computadora.<br>
+          2. En el panel izquierdo, busca tu calendario y haz clic en los tres puntos <strong>(⋮) > Configuración y uso compartido</strong>.<br>
+          3. Baja hasta <strong>"Integrar el calendario"</strong>.<br>
+          4. Copia la URL de <strong>"Dirección secreta en formato iCal"</strong>.
+        ` : `
+          1. Abre la app Calendario en tu Mac o entra a iCloud.com/calendar.<br>
+          2. Haz clic en el ícono de compartir junto al calendario que deseas enlazar.<br>
+          3. Activa la opción <strong>"Calendario público"</strong> y copia el enlace webcal:// generado.
+        `}
+      </div>
+
+      <form id="connect-external-cal-form">
+        <label>Nombre identificador del calendario:
+          <input name="calendarName" value="${isGoogle ? 'Google Calendar Personal' : 'Apple Calendar Personal'}" required />
+        </label>
+        <label style="margin-top: 10px;">URL secreta / feed iCal (.ics o webcal://):
+          <input name="feedUrl" placeholder="${isGoogle ? 'https://calendar.google.com/calendar/ical/.../basic.ics' : 'webcal://pXX-caldav.icloud.com/...'}" required style="font-family: monospace; font-size: 12px;" />
+        </label>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+          <button type="button" class="secondary" data-close-modal>Cancelar</button>
+          <button type="submit" class="primary" id="btn-submit-ext-cal">${icon('check')} Conectar e Importar</button>
+        </div>
+      </form>
+    `);
+
+    document.querySelector('#connect-external-cal-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = document.querySelector('#btn-submit-ext-cal');
+      const fd = new FormData(e.target);
+      const feedUrl = fd.get('feedUrl');
+      const calendarName = fd.get('calendarName');
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Importando eventos...';
+
+      try {
+        const res = await api('/api/calendar/external', {
+          method: 'POST',
+          body: JSON.stringify({ provider, feedUrl, calendarName })
+        });
+
+        closeModal();
+        const count = res.syncResult?.importedCount || 0;
+        alert(`¡${providerName} conectado exitosamente! Se importaron ${count} citas/bloqueos a tu agenda.`);
+        await renderIntegrations();
+      } catch (err) {
+        alert('Error al conectar calendario: ' + err.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Conectar e Importar';
+      }
+    });
     return;
   }
 
-  // Connect iCal simulation
-  const icalBtn = event.target.closest('[data-action="connect-ical"]');
-  if (icalBtn) {
-    const icalUrl = `webcal://${window.location.host}/api/public/calendar/${activeStudio?.id || 1}.ics`;
-    return await copyToClipboard(icalUrl, icalBtn, '¡URL copiada!');
+  // Sync external calendar on demand
+  const syncExtBtn = event.target.closest('[data-action="sync-ext-calendar"]');
+  if (syncExtBtn) {
+    const calId = syncExtBtn.dataset.id;
+    const originalText = syncExtBtn.textContent;
+    syncExtBtn.disabled = true;
+    syncExtBtn.textContent = 'Sincronizando...';
+    try {
+      const res = await api(`/api/calendar/external/${calId}/sync`, { method: 'POST' });
+      alert(`Sincronización completada: ${res.importedCount || 0} nuevos eventos importados, ${res.updatedCount || 0} actualizados.`);
+      await renderIntegrations();
+    } catch (err) {
+      alert('Error en sincronización: ' + err.message);
+      syncExtBtn.disabled = false;
+      syncExtBtn.textContent = originalText;
+    }
+    return;
+  }
+
+  // Delete/disconnect external calendar
+  const deleteExtBtn = event.target.closest('[data-action="delete-ext-calendar"]');
+  if (deleteExtBtn) {
+    const calId = deleteExtBtn.dataset.id;
+    if (!confirm('¿Deseas desvincular este calendario externo? Sus eventos importados se removerán de tu agenda.')) return;
+    try {
+      await api(`/api/calendar/external/${calId}`, { method: 'DELETE' });
+      alert('Calendario desvinculado exitosamente.');
+      await renderIntegrations();
+    } catch (err) {
+      alert('Error al desvincular calendario: ' + err.message);
+    }
+    return;
   }
 
   // Test consent form modal
@@ -11089,20 +11326,85 @@ document.addEventListener('submit', async (event) => {
 
   try {
     if (form.dataset.form === 'booking') {
+      const activeTab = form.querySelector('.client-mode-tab.active');
+      const mode = activeTab?.dataset.mode || 'link';
+
+      const slotRows = form.querySelectorAll('.booking-slot-row');
+      const proposedSlots = Array.from(slotRows).map((row, idx) => {
+        const startsVal = row.querySelector('.slot-starts-at')?.value;
+        return {
+          index: idx,
+          startsAt: startsVal ? new Date(startsVal).toISOString() : null,
+          durationMinutes: Number(row.querySelector('.slot-duration')?.value || 120)
+        };
+      }).filter((s) => Boolean(s.startsAt));
+
+      const isMultiSession = form.querySelector('input[name="multiSlotMode"]:checked')?.value === 'multi_session';
+
+      const startsAt = proposedSlots[0]?.startsAt || (body.startsAt ? new Date(body.startsAt).toISOString() : null);
+      if (!startsAt) throw new Error('Por favor selecciona la fecha y hora de la cita');
+      if (!body.title?.trim()) throw new Error('Por favor ingresa un título o motivo');
+
+      const studioId = body.studioId ? Number(body.studioId) : null;
+      const artistId = body.artistId ? Number(body.artistId) : null;
+      const spaceId = body.spaceId ? Number(body.spaceId) : null;
+      const durationMinutes = proposedSlots[0]?.durationMinutes || Number(body.durationMinutes || 120);
+      const price = mode === 'none' ? 0 : Number(body.price || 0);
+      const deposit = mode === 'none' ? 0 : Number(body.deposit || 0);
+      const notes = body.notes || '';
+
+      if (mode === 'link') {
+        const tokenDurationHours = Number(body.tokenDurationHours || 24);
+        const res = await api('/api/appointments/generate-link', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: body.title.trim(),
+            startsAt,
+            durationMinutes,
+            artistId,
+            spaceId,
+            studioId,
+            price,
+            deposit,
+            notes,
+            tokenDurationHours,
+            proposedSlots,
+            isMultiSession
+          })
+        });
+        openLinkGeneratedModal(res, tokenDurationHours);
+        const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'agenda';
+        return await render(currentActiveView);
+      }
+
+      let payload = {
+        title: body.title.trim(),
+        startsAt,
+        durationMinutes,
+        artistId,
+        spaceId,
+        studioId,
+        price,
+        deposit,
+        notes,
+        categoryId: body.categoryId ? Number(body.categoryId) : null
+      };
+
+      if (mode === 'existing') {
+        payload.clientId = body.clientId ? Number(body.clientId) : null;
+      } else if (mode === 'new') {
+        if (!body.newClientName?.trim()) throw new Error('Por favor ingresa el nombre del nuevo cliente');
+        if (!body.newClientPhone?.trim()) throw new Error('Por favor ingresa el teléfono o WhatsApp del nuevo cliente');
+        payload.newClientName = body.newClientName.trim();
+        payload.newClientPhone = body.newClientPhone.trim();
+        payload.newClientEmail = (body.newClientEmail || '').trim();
+      } else if (mode === 'none') {
+        payload.clientId = null;
+      }
+
       await api('/api/appointments', {
         method: 'POST',
-        body: JSON.stringify({
-          ...body,
-          startsAt: body.startsAt ? new Date(body.startsAt).toISOString() : null,
-          categoryId: body.categoryId ? Number(body.categoryId) : null,
-          clientId: body.clientId ? Number(body.clientId) : null,
-          artistId: body.artistId ? Number(body.artistId) : null,
-          spaceId: body.spaceId ? Number(body.spaceId) : null,
-          durationMinutes: Number(body.durationMinutes || 60),
-          price: Number(body.price || 0),
-          deposit: Number(body.deposit || 0),
-          notes: body.notes || ''
-        })
+        body: JSON.stringify(payload)
       });
       closeModal();
       const currentActiveView = document.querySelector('.mobile-nav a.active, .sidebar nav a.active')?.dataset.view || 'dashboard';
@@ -11598,8 +11900,484 @@ function initDynamicFavicon() {
 // Initialize dynamic animated favicon
 initDynamicFavicon();
 
+function validateRutClient(rutStr) {
+  if (!rutStr || typeof rutStr !== 'string') return false;
+  const clean = rutStr.replace(/[^0-9kK]/g, '').toUpperCase();
+  if (clean.length < 2) return false;
+  const body = clean.slice(0, -1);
+  const dv = clean.slice(-1);
+  let sum = 0;
+  let multiplier = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    sum += Number(body[i]) * multiplier;
+    multiplier = multiplier === 7 ? 2 : multiplier + 1;
+  }
+  const expectedDvNum = 11 - (sum % 11);
+  const expectedDv = expectedDvNum === 11 ? '0' : expectedDvNum === 10 ? 'K' : String(expectedDvNum);
+  return dv === expectedDv;
+}
+
+function openTermsModal() {
+  openModal(`
+    <div style="max-height: 80vh; display: flex; flex-direction: column;">
+      <div style="padding: 16px 20px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="brand-mark small" style="width: 28px; height: 28px; font-size: 14px;">t</span>
+          <strong style="font-size: 16px; color: #ffffff;">Términos de Servicio y Consentimiento</strong>
+        </div>
+        <span style="font-size: 11px; background: rgba(139, 92, 246, 0.2); color: #c4b5fd; padding: 3px 8px; border-radius: 8px;">Ley N° 19.628</span>
+      </div>
+      <div style="padding: 20px; overflow-y: auto; font-size: 13.5px; line-height: 1.6; color: #cbd5e1; flex: 1;">
+        <h4 style="color: #ffffff; margin: 0 0 8px 0;">1. Aceptación del Servicio</h4>
+        <p style="margin: 0 0 14px 0;">Al confirmar una cita en Tatudin, usted declara ser mayor de 18 años de edad (o contar con autorización legal expresa de su representante), y que los datos personales y de contacto proporcionados son verídicos, fidedignos y comprobables.</p>
+
+        <h4 style="color: #ffffff; margin: 0 0 8px 0;">2. Procedimiento de Tatuaje y Consentimiento</h4>
+        <p style="margin: 0 0 14px 0;">Usted comprende la naturaleza permanente e irreversible de los procedimientos corporales y artísticos. Es su responsabilidad informar al artista sobre condiciones médicas preexistentes, alergias a pigmentos o materiales, y seguir rigurosamente las pautas de cuidado e higiene posteriores.</p>
+
+        <h4 style="color: #ffffff; margin: 0 0 8px 0;">3. Protección de Datos Personales (Ley N° 19.628)</h4>
+        <p style="margin: 0 0 14px 0;">Tatudin recopila su nombre, RUT (o pasaporte), número de contacto y correo electrónico con el único y exclusivo fin de coordinar, respaldar y validar su cita con el artista y estudio correspondiente. Sus datos no serán comercializados ni transferidos a terceros no autorizados.</p>
+
+        <h4 style="color: #ffffff; margin: 0 0 8px 0;">4. Puntualidad y Política de Cancelación</h4>
+        <p style="margin: 0 0 14px 0;">Las reservas y abonos quedan sujetos a las políticas de cada artista y estudio. Le recomendamos presentarse con al menos 10 minutos de antelación en el estudio.</p>
+      </div>
+      <div style="padding: 14px 20px; border-top: 1px solid var(--line-soft); display: flex; justify-content: flex-end;">
+        <button type="button" class="primary" data-close-modal style="padding: 8px 20px; font-size: 13.5px;">
+          Entendido y volver a la reserva
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+async function renderPublicBookingConfirmationPage(token) {
+  const workspace = document.querySelector('#workspace');
+  if (workspace) workspace.style.display = 'none';
+  const splash = document.querySelector('#app-splash');
+  if (splash) splash.style.display = 'none';
+
+  const portal = document.querySelector('#public-portal');
+  if (!portal) return;
+  portal.style.display = 'flex';
+
+  portal.innerHTML = `
+    <header class="portal-brand-header">
+      <img src="/TatudinAzul.png" alt="Tatudin" class="portal-brand-logo" />
+      <p style="font-size: 13px; color: #94a3b8; margin: 0;">Portal de Reserva y Confirmación de Citas</p>
+    </header>
+    <div id="public-booking-container" class="portal-card">
+      <div style="text-align: center; padding: 40px 20px; color: #94a3b8;">
+        <div class="splash-spinner" style="margin: 0 auto 16px auto;"></div>
+        <span style="font-size: 14px;">Cargando detalles de tu cita...</span>
+      </div>
+    </div>
+  `;
+
+  const container = document.querySelector('#public-booking-container');
+
+  try {
+    const data = await api(`/api/public/booking-token/${token}`);
+
+    const formatSlotDateTime = (isoString) => {
+      const d = new Date(isoString);
+      const dateFormatted = d.toLocaleDateString('es-CL', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+      const timeFormatted = d.toLocaleTimeString('es-CL', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      return { dateFormatted, timeFormatted };
+    };
+
+    const mainSlot = formatSlotDateTime(data.startsAt);
+
+    if (data.status === 'confirmed') {
+      container.innerHTML = `
+        <div style="text-align: center;">
+          <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); color: #10b981; display: grid; place-items: center; margin: 0 auto 16px auto; font-size: 30px;">
+            ✓
+          </div>
+          <h2 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 8px 0;">Cita ya confirmada</h2>
+          <p style="color: #cbd5e1; font-size: 14px; margin: 0 0 24px 0; line-height: 1.5;">Esta cita en <strong>${data.studioName}</strong> ya fue confirmada previamente.</p>
+          
+          <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 18px; text-align: left; margin-bottom: 24px; font-size: 13.5px;">
+            <p style="margin: 6px 0;"><strong>Motivo:</strong> ${data.title}</p>
+            <p style="margin: 6px 0;"><strong>Artista:</strong> ${data.artistName}</p>
+            <p style="margin: 6px 0; text-transform: capitalize;"><strong>Fecha y Hora:</strong> ${mainSlot.dateFormatted} a las ${mainSlot.timeFormatted} hrs</p>
+            <p style="margin: 6px 0;"><strong>Duración:</strong> ${data.durationMinutes} minutos aprox.</p>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <a href="https://wa.me/?text=${encodeURIComponent(`¡Hola ${data.artistName}! Te contacto por mi cita "${data.title}" confirmada en ${data.studioName}.`)}" target="_blank" rel="noopener noreferrer" class="primary" style="padding: 14px; background: #25D366; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              ${icon('whatsapp')} Contactar al artista por WhatsApp
+            </a>
+            <button type="button" class="secondary" id="btn-view-terms-modal" style="padding: 12px; border-radius: 10px;">
+              Ver Términos de Servicio y Consentimiento
+            </button>
+          </div>
+        </div>
+      `;
+      document.querySelector('#btn-view-terms-modal')?.addEventListener('click', openTermsModal);
+      return;
+    }
+
+    const hasMultiSlots = Array.isArray(data.proposedSlots) && data.proposedSlots.length > 1;
+
+    let slotsHtml = '';
+    if (hasMultiSlots) {
+      if (data.isMultiSession) {
+        slotsHtml = `
+          <div style="margin-bottom: 20px;">
+            <label style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #c4b5fd; display: block; margin-bottom: 8px;">
+              📅 Proyecto Multi-Sesión (${data.proposedSlots.length} sesiones acordadas):
+            </label>
+            <div class="portal-slot-group">
+              ${data.proposedSlots.map((slot, idx) => {
+                const sDt = formatSlotDateTime(slot.startsAt);
+                return `
+                  <div class="portal-slot-card selected" style="cursor: default;">
+                    <div style="width: 24px; height: 24px; border-radius: 50%; background: #7c3aed; color: #ffffff; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; flex-shrink: 0;">
+                      ${idx + 1}
+                    </div>
+                    <div class="portal-slot-details">
+                      <div class="portal-slot-date" style="text-transform: capitalize;">${sDt.dateFormatted}</div>
+                      <div class="portal-slot-meta">
+                        <span>⏱ ${sDt.timeFormatted} hrs</span>
+                        <span>⏳ ${slot.durationMinutes || 120} min</span>
+                        <span style="color: #a78bfa; font-weight: 600;">Sesión ${idx + 1}</span>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      } else {
+        slotsHtml = `
+          <div style="margin-bottom: 20px;">
+            <label style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #c4b5fd; display: block; margin-bottom: 4px;">
+              📅 Selecciona tu fecha y horario preferido:
+            </label>
+            <p style="font-size: 12px; color: #cbd5e1; margin: 0 0 10px 0;">
+              Tu artista ha propuesto las siguientes alternativas. Selecciona la opción que más te acomode:
+            </p>
+            <div class="portal-slot-group" id="portal-slot-selection-group">
+              ${data.proposedSlots.map((slot, idx) => {
+                const sDt = formatSlotDateTime(slot.startsAt);
+                const isSelected = idx === 0;
+                return `
+                  <label class="portal-slot-card ${isSelected ? 'selected' : ''}" data-slot-index="${idx}">
+                    <input type="radio" name="selectedSlotIndex" value="${idx}" ${isSelected ? 'checked' : ''} style="position: absolute; opacity: 0; pointer-events: none;" />
+                    <div class="portal-slot-radio-circle"></div>
+                    <div class="portal-slot-details">
+                      <div class="portal-slot-date" style="text-transform: capitalize;">${sDt.dateFormatted}</div>
+                      <div class="portal-slot-meta">
+                        <span>⏱ ${sDt.timeFormatted} hrs</span>
+                        <span>⏳ ${slot.durationMinutes || 120} min</span>
+                        <span style="color: #a78bfa; font-weight: 600;">Opción ${idx + 1}</span>
+                      </div>
+                    </div>
+                  </label>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+    } else {
+      slotsHtml = `
+        <div style="background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 14px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #c4b5fd; margin: 0 0 10px 0;">
+            📅 Horario de la sesión:
+          </h3>
+          <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px;">
+            <div>
+              <span style="color: #94a3b8; display: block; font-size: 11.5px;">Fecha</span>
+              <strong style="color: #ffffff; text-transform: capitalize;">${mainSlot.dateFormatted}</strong>
+            </div>
+            <div>
+              <span style="color: #94a3b8; display: block; font-size: 11.5px;">Hora de inicio</span>
+              <strong style="color: #ffffff;">${mainSlot.timeFormatted} hrs</strong> (${data.durationMinutes} min)
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      <div style="margin-bottom: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 6px;">
+          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a78bfa;">${data.studioName}</span>
+          <span style="font-size: 11px; background: rgba(124, 58, 237, 0.2); color: #c4b5fd; padding: 3px 8px; border-radius: 10px; font-weight: 600;">
+            Apertura ${data.tokenViewsCount} de ${data.maxViews}
+          </span>
+        </div>
+        <h2 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 6px 0;">${data.title}</h2>
+        <p style="color: #94a3b8; font-size: 13px; margin: 0;">Artista responsable: <strong style="color: #ffffff;">${data.artistName}</strong></p>
+      </div>
+
+      ${slotsHtml}
+
+      ${(Number(data.price) > 0 || Number(data.deposit) > 0) ? `
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; display: flex; gap: 20px; flex-wrap: wrap;">
+          ${Number(data.price) > 0 ? `
+            <div>
+              <span style="color: #94a3b8; display: block; font-size: 11.5px;">Valor total estimado</span>
+              <strong style="color: #10b981; font-size: 15px;">$${Number(data.price).toLocaleString('es-CL')} CLP</strong>
+            </div>
+          ` : ''}
+          ${Number(data.deposit) > 0 ? `
+            <div>
+              <span style="color: #94a3b8; display: block; font-size: 11.5px;">Seña / Abono</span>
+              <strong style="color: #38bdf8; font-size: 15px;">$${Number(data.deposit).toLocaleString('es-CL')} CLP</strong>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+
+      ${data.notes ? `
+        <div style="background: rgba(167, 139, 250, 0.06); border: 1px dashed rgba(167, 139, 250, 0.25); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: #cbd5e1;">
+          <strong style="color: #c4b5fd; display: block; margin-bottom: 4px;">Indicaciones de tu artista:</strong>
+          ${data.notes}
+        </div>
+      ` : ''}
+
+      <!-- Client Details Form -->
+      <form id="public-client-confirmation-form">
+        <h3 style="font-size: 15px; font-weight: 700; color: #ffffff; margin: 0 0 14px 0;">Completa tus datos para confirmar:</h3>
+        
+        <div class="portal-grid-two">
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600;">
+            Nombres:
+            <input name="name" type="text" class="portal-input" placeholder="Ej. Camila" required autocomplete="given-name" />
+          </label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600;">
+            Apellidos:
+            <input name="lastName" type="text" class="portal-input" placeholder="Ej. Silva Morales" required autocomplete="family-name" />
+          </label>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+            <label for="client-rut-field" style="font-size: 12.5px; font-weight: 600;">RUT Chileno:</label>
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #a78bfa; cursor: pointer;">
+              <input type="checkbox" id="client-has-no-rut" name="hasNoRut" />
+              <span>No tengo RUT (Extranjero / Pasaporte)</span>
+            </label>
+          </div>
+          <input id="client-rut-field" name="rut" type="text" class="portal-input" placeholder="12.345.678-K" style="font-family: monospace;" />
+          <span id="rut-error-msg" style="display: none; font-size: 11.5px; color: #ef4444; margin-top: 4px;"></span>
+        </div>
+
+        <div class="portal-grid-two">
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600;">
+            Teléfono / WhatsApp:
+            <input name="phone" type="tel" class="portal-input" placeholder="+56 9 1234 5678" required autocomplete="tel" />
+          </label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600;">
+            Correo electrónico:
+            <input name="email" type="email" class="portal-input" placeholder="tu@correo.com" required autocomplete="email" />
+          </label>
+        </div>
+
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600; margin-bottom: 16px;">
+          Notas o comentarios para tu artista (opcional):
+          <textarea name="clientNotes" rows="2" class="portal-input" placeholder="Alergias, dudas o requerimientos especiales..." style="font-family: inherit; resize: vertical; min-height: 60px;"></textarea>
+        </label>
+
+        <!-- Terms of Service checkbox -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px 14px; margin-bottom: 20px;">
+          <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 12.5px; line-height: 1.5; color: #cbd5e1; cursor: pointer;">
+            <input type="checkbox" name="acceptTerms" required style="margin-top: 3px; accent-color: #7c3aed; width: 16px; height: 16px;" />
+            <span>
+              He leído y acepto los <a href="#" id="link-show-terms" style="color: #a78bfa; font-weight: 700; text-decoration: underline;">Términos de Servicio y Consentimiento Informado</a> de Tatudin. Declaro ser mayor de edad y que los datos ingresados son verídicos.
+            </span>
+          </label>
+        </div>
+
+        <div id="form-error-container" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 12px; font-size: 13px; color: #fca5a5; margin-bottom: 16px; line-height: 1.4;"></div>
+
+        <button type="submit" id="btn-submit-confirm-booking" class="primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700; border-radius: 12px; background: #7c3aed; color: #ffffff; cursor: pointer; border: none; transition: background 0.2s;">
+          Confirmar y Agendar mi Cita
+        </button>
+      </form>
+    `;
+
+    // Radio slot card interaction
+    document.querySelectorAll('#portal-slot-selection-group .portal-slot-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('#portal-slot-selection-group .portal-slot-card').forEach((c) => c.classList.remove('selected'));
+        card.classList.add('selected');
+        const radio = card.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+      });
+    });
+
+    // Live RUT formatting & checkbox handling
+    const rutInput = document.querySelector('#client-rut-field');
+    const hasNoRutCheck = document.querySelector('#client-has-no-rut');
+    const rutError = document.querySelector('#rut-error-msg');
+
+    hasNoRutCheck?.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        rutInput.value = '';
+        rutInput.disabled = true;
+        rutInput.placeholder = 'Extranjero / Sin RUT chileno';
+        rutError.style.display = 'none';
+      } else {
+        rutInput.disabled = false;
+        rutInput.placeholder = '12.345.678-K';
+      }
+    });
+
+    rutInput?.addEventListener('input', (e) => {
+      if (hasNoRutCheck?.checked) return;
+      const clean = e.target.value.replace(/[^0-9kK]/g, '').toUpperCase();
+      if (clean.length > 1) {
+        const body = clean.slice(0, -1);
+        const dv = clean.slice(-1);
+        let formatted = '';
+        let c = 0;
+        for (let i = body.length - 1; i >= 0; i--) {
+          formatted = body[i] + formatted;
+          c++;
+          if (c % 3 === 0 && i !== 0) formatted = '.' + formatted;
+        }
+        e.target.value = `${formatted}-${dv}`;
+      }
+    });
+
+    document.querySelector('#link-show-terms')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      openTermsModal();
+    });
+
+    const form = document.querySelector('#public-client-confirmation-form');
+    const submitBtn = document.querySelector('#btn-submit-confirm-booking');
+    const errorBox = document.querySelector('#form-error-container');
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.style.display = 'none';
+
+      const fd = new FormData(form);
+      const hasNoRut = hasNoRutCheck?.checked || false;
+      const rutVal = fd.get('rut');
+
+      if (!hasNoRut) {
+        if (!rutVal || !validateRutClient(rutVal)) {
+          errorBox.textContent = 'El RUT ingresado no es válido. Verifica el número y dígito verificador, o marca "No tengo RUT" si eres extranjero.';
+          errorBox.style.display = 'block';
+          return;
+        }
+      }
+
+      const selectedSlotRadio = document.querySelector('input[name="selectedSlotIndex"]:checked');
+      const selectedSlotIndex = selectedSlotRadio ? Number(selectedSlotRadio.value) : 0;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Confirmando tu cita...';
+
+      try {
+        const confirmRes = await api(`/api/public/booking-token/${token}/confirm`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: fd.get('name'),
+            lastName: fd.get('lastName'),
+            rut: hasNoRut ? null : rutVal,
+            hasNoRut,
+            phone: fd.get('phone'),
+            email: fd.get('email'),
+            clientNotes: fd.get('clientNotes'),
+            acceptTerms: Boolean(fd.get('acceptTerms')),
+            selectedSlotIndex
+          })
+        });
+
+        // Determine final confirmed slot date
+        let confirmedDateStr = mainSlot.dateFormatted;
+        let confirmedTimeStr = mainSlot.timeFormatted;
+        if (data.proposedSlots && data.proposedSlots[selectedSlotIndex]) {
+          const chosenDt = formatSlotDateTime(data.proposedSlots[selectedSlotIndex].startsAt);
+          confirmedDateStr = chosenDt.dateFormatted;
+          confirmedTimeStr = chosenDt.timeFormatted;
+        }
+
+        // Show official confirmation screen
+        container.innerHTML = `
+          <div style="text-align: center;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); color: #10b981; display: grid; place-items: center; margin: 0 auto 16px auto; font-size: 32px;">
+              ✓
+            </div>
+            <h2 style="font-size: 24px; font-weight: 800; color: #ffffff; margin: 0 0 8px 0;">¡Cita Confirmada!</h2>
+            <p style="color: #cbd5e1; font-size: 14.5px; margin: 0 0 24px 0; line-height: 1.5;">
+              Hola <strong style="color: #ffffff;">${fd.get('name')}</strong>, tu cita para <strong>"${data.title}"</strong> con <strong>${data.artistName}</strong> en <strong>${data.studioName}</strong> ha sido agendada con éxito.
+            </p>
+
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 24px; text-align: left; font-size: 13.5px;">
+              <p style="margin: 4px 0; color: #ffffff; text-transform: capitalize;">📅 <strong>${confirmedDateStr}</strong></p>
+              <p style="margin: 4px 0; color: #ffffff;">⏱ <strong>${confirmedTimeStr} hrs</strong></p>
+              <p style="margin: 4px 0; color: #cbd5e1;">✉ Hemos enviado un correo de confirmación a <strong>${fd.get('email')}</strong> con consideraciones clave y recomendaciones para tu sesión.</p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <a href="https://wa.me/?text=${encodeURIComponent(`¡Hola ${data.artistName}! Acabo de confirmar mi cita para el ${confirmedDateStr} a las ${confirmedTimeStr} hrs a nombre de ${fd.get('name')} ${fd.get('lastName')}.`)}" target="_blank" rel="noopener noreferrer" class="primary" style="padding: 14px; background: #25D366; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                ${icon('whatsapp')} Contactar al artista por WhatsApp
+              </a>
+              <button type="button" class="secondary" id="btn-goto-terms-modal" style="padding: 12px; border-radius: 10px;">
+                Ver Términos de Servicio y Consentimiento
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.querySelector('#btn-goto-terms-modal')?.addEventListener('click', openTermsModal);
+
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirmar y Agendar mi Cita';
+        errorBox.textContent = err.message || 'Error al confirmar la cita';
+        errorBox.style.display = 'block';
+      }
+    });
+
+  } catch (error) {
+    const isExpired = error.code === 'EXPIRED';
+    const isMaxViews = error.code === 'MAX_VIEWS_REACHED';
+
+    container.innerHTML = `
+      <div style="text-align: center; padding: 20px;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: ${isExpired || isMaxViews ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; color: ${isExpired || isMaxViews ? '#ef4444' : '#94a3b8'}; display: grid; place-items: center; margin: 0 auto 16px auto;">
+          ${icon('lock')}
+        </div>
+        <h2 style="font-size: 20px; color: #ffffff; margin-bottom: 8px;">
+          ${isExpired ? 'Enlace Expirado' : isMaxViews ? 'Límite de aperturas alcanzado' : 'Enlace no disponible'}
+        </h2>
+        <p style="color: #cbd5e1; font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
+          ${error.message || 'El enlace que intentas abrir no es válido o ha concluido su período de reserva.'}
+        </p>
+        <p style="font-size: 12.5px; color: #94a3b8;">
+          Por favor comunícate directamente con tu tatuador o estudio para que te emitan un nuevo enlace de cita.
+        </p>
+      </div>
+    `;
+  }
+}
+
 function checkUrlHash() {
   const hash = window.location.hash || '';
+  if (hash.startsWith('#completar-cita/')) {
+    const token = hash.replace('#completar-cita/', '').trim();
+    if (token) {
+      hideSplash();
+      renderPublicBookingConfirmationPage(token);
+      return true;
+    }
+  }
   if (hash.startsWith('#reset-password')) {
     const params = new URLSearchParams(hash.replace('#reset-password?', ''));
     const token = params.get('token');

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tatudin-shell-v62';
+const CACHE_NAME = 'tatudin-shell-v63';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -8,7 +8,8 @@ const PRECACHE_ASSETS = [
   '/favicon-32.png',
   '/icon-192.png',
   '/icon-512.png',
-  '/TatudinGris.png'
+  '/TatudinGris.png',
+  '/TatudinAzul.png'
 ];
 
 self.addEventListener('install', (event) => {

@@ -264,27 +264,41 @@ svg {
 
 .brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
   padding: 6px 0 16px 0;
+  text-align: center;
 }
 
 .sidebar-brand-logo {
-  height: 58px;
+  height: 68px;
   width: auto;
-  max-width: 170px;
+  max-width: 190px;
   object-fit: contain;
   display: block;
   margin: 0 auto;
 }
 
 .mobile-brand-logo {
-  height: 34px;
+  height: 40px;
   width: auto;
-  max-width: 150px;
+  max-width: 160px;
   object-fit: contain;
   display: block;
+}
+
+.sidebar-studio-name {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  letter-spacing: 0.02em;
 }
 
 .brand-mark {
@@ -3577,6 +3591,59 @@ textarea {
 
 .category-pill-option.active .cat-pill-circle {
   box-shadow: 0 0 0 2px #ffffff;
+}
+
+/* Modal Client Mode Switcher */
+.client-mode-pills {
+  display: flex;
+  gap: 4px;
+  background: var(--surface-low);
+  padding: 4px;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--line-soft);
+  margin-bottom: 12px;
+}
+
+.client-mode-tab {
+  flex: 1;
+  padding: 7px 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: calc(var(--radius-md, 10px) - 3px);
+  border: none;
+  background: transparent;
+  color: var(--muted-light);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.client-mode-tab:hover {
+  color: var(--ink);
+  background: var(--surface-high);
+}
+
+.client-mode-tab.active {
+  background: var(--primary, #7C3AED);
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
+}
+
+.role-context-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-low);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md, 10px);
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
 }
 
 /* Color Picker Grid */
@@ -8394,4 +8461,167 @@ textarea {
   background: #e0f2fe;
   color: #075985;
 }
+
+/* ==========================================================================
+   Public Booking Confirmation Portal (Responsive UI/UX)
+   ========================================================================== */
+.public-portal-root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #090514;
+  background: radial-gradient(circle at 50% 0%, #1e1145 0%, #090514 70%);
+  color: #f3f0ff;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 32px 16px 64px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  font-family: inherit;
+}
+
+.portal-brand-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.portal-brand-logo {
+  height: 52px;
+  max-width: 220px;
+  object-fit: contain;
+  margin-bottom: 6px;
+}
+
+.portal-card {
+  width: min(100%, 600px);
+  background: #140d2d;
+  border: 1px solid rgba(139, 92, 246, 0.24);
+  border-radius: 20px;
+  padding: 28px 24px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .portal-card {
+    padding: 20px 16px;
+    border-radius: 16px;
+  }
+}
+
+.portal-slot-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.portal-slot-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.portal-slot-card:hover {
+  border-color: rgba(139, 92, 246, 0.5);
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.portal-slot-card.selected {
+  border-color: #8b5cf6;
+  background: rgba(124, 58, 237, 0.15);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.25);
+}
+
+.portal-slot-radio-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.portal-slot-card.selected .portal-slot-radio-circle {
+  border-color: #a78bfa;
+  background: #7c3aed;
+}
+
+.portal-slot-card.selected .portal-slot-radio-circle::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.portal-slot-details {
+  flex: 1;
+}
+
+.portal-slot-date {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 2px;
+  text-transform: capitalize;
+}
+
+.portal-slot-meta {
+  font-size: 12px;
+  color: #94a3b8;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.portal-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #0c071d;
+  color: #ffffff;
+  font-size: 15px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.portal-input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.portal-input:disabled {
+  opacity: 0.5;
+  background: #18122c;
+  cursor: not-allowed;
+}
+
+.portal-grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 520px) {
+  .portal-grid-two {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
 
