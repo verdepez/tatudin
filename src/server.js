@@ -1930,7 +1930,7 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
 
     const [appointments, unmanagedAppointments, stats, studio] = await Promise.all([
       pool.query(`SELECT a.id, a.title, a.notes, a.starts_at, a.duration_minutes, a.status, a.price, a.deposit,
-        c.name AS client_name, c.phone AS client_phone, u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
+        TRIM(CONCAT(c.name, ' ', COALESCE(c.last_name, ''))) AS client_name, c.name AS client_first_name, c.last_name AS client_last_name, c.phone AS client_phone, u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
         cc.name AS category_name, cc.color AS category_color, cc.icon AS category_icon, cc.kind AS category_kind
         FROM appointments a
         LEFT JOIN commitment_categories cc ON cc.id = a.category_id
@@ -1943,7 +1943,7 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
           AND a.status NOT IN ('cancelled', 'no_show') 
         ORDER BY a.starts_at ASC`, params),
       pool.query(`SELECT a.id, a.title, a.notes, a.starts_at, a.duration_minutes, a.status, a.price, a.deposit,
-        c.name AS client_name, c.phone AS client_phone, u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
+        TRIM(CONCAT(c.name, ' ', COALESCE(c.last_name, ''))) AS client_name, c.name AS client_first_name, c.last_name AS client_last_name, c.phone AS client_phone, u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
         cc.name AS category_name, cc.color AS category_color, cc.icon AS category_icon, cc.kind AS category_kind
         FROM appointments a
         LEFT JOIN commitment_categories cc ON cc.id = a.category_id
@@ -1981,7 +1981,7 @@ app.get('/api/appointments', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
     const { artistId, spaceId, categoryId, date, startDate, endDate, status, unmanaged } = request.query;
-    let query = `SELECT a.*, c.name AS client_name, c.phone AS client_phone,
+    let query = `SELECT a.*, TRIM(CONCAT(c.name, ' ', COALESCE(c.last_name, ''))) AS client_name, c.name AS client_first_name, c.last_name AS client_last_name, c.phone AS client_phone,
       u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
       cc.name AS category_name, cc.color AS category_color, cc.icon AS category_icon, cc.kind AS category_kind,
       cc.requires_client, cc.requires_space
@@ -2039,7 +2039,7 @@ app.get('/api/appointments/:id', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
     const result = await pool.query(`
-      SELECT a.*, c.name AS client_name, c.phone AS client_phone, c.email AS client_email,
+      SELECT a.*, TRIM(CONCAT(c.name, ' ', COALESCE(c.last_name, ''))) AS client_name, c.name AS client_first_name, c.last_name AS client_last_name, c.phone AS client_phone, c.email AS client_email,
       u.full_name AS artist_name, sm.role AS artist_role, sp.name AS space_name,
       cc.name AS category_name, cc.color AS category_color, cc.icon AS category_icon, cc.kind AS category_kind,
       cc.requires_client, cc.requires_space
@@ -2058,7 +2058,7 @@ app.get('/api/appointments/:id', requireAuth, async (request, response) => {
 
 app.post('/api/appointments', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
-  const { categoryId = null, clientId = null, artistId = null, spaceId = null, title, notes = '', startsAt, durationMinutes = 60, status = 'confirmed', price = 0, deposit = 0, newClientName = null, newClientPhone = '', newClientEmail = '', studioId = null } = request.body;
+  const { categoryId = null, clientId = null, artistId = null, spaceId = null, title, notes = '', startsAt, durationMinutes = 60, status = 'confirmed', price = 0, deposit = 0, newClientName = null, newClientLastName = null, newClientPhone = '', newClientEmail = '', studioId = null } = request.body;
   if (!title?.trim() || !startsAt) return response.status(400).json({ error: 'Título y fecha/hora son obligatorios' });
   
   try {
@@ -2082,9 +2082,16 @@ app.post('/api/appointments', requireAuth, async (request, response) => {
       const clientCheck = await pool.query('SELECT id FROM clients WHERE id = $1 AND studio_id = $2', [Number(clientId), effectiveStudioId]);
       if (clientCheck.rowCount) validClientId = clientCheck.rows[0].id;
     } else if (newClientName && newClientName.trim()) {
+      let firstName = newClientName.trim();
+      let lastName = (newClientLastName || '').trim();
+      if (!lastName && firstName.includes(' ')) {
+        const parts = firstName.split(/\s+/);
+        firstName = parts[0];
+        lastName = parts.slice(1).join(' ');
+      }
       const newCl = await pool.query(
-        'INSERT INTO clients (studio_id, name, phone, email) VALUES ($1, $2, $3, $4) RETURNING id',
-        [effectiveStudioId, newClientName.trim(), (newClientPhone || '').trim(), (newClientEmail || '').trim()]
+        'INSERT INTO clients (studio_id, name, last_name, phone, email) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+        [effectiveStudioId, firstName, lastName || '', (newClientPhone || '').trim(), (newClientEmail || '').trim()]
       );
       validClientId = newCl.rows[0].id;
     }
@@ -3033,7 +3040,7 @@ app.get('/api/calendar/feed/:token.ics', publicApiRateLimiter, async (request, r
 
     const studio = studioRes.rows[0];
     const apptsRes = await pool.query(`
-      SELECT a.*, c.name AS client_name, c.phone AS client_phone,
+      SELECT a.*, TRIM(CONCAT(c.name, ' ', COALESCE(c.last_name, ''))) AS client_name, c.name AS client_first_name, c.last_name AS client_last_name, c.phone AS client_phone,
              u.full_name AS artist_name, cc.name AS category_name
       FROM appointments a
       LEFT JOIN clients c ON c.id = a.client_id
@@ -3709,10 +3716,12 @@ app.get('/api/clients', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
   try {
     const search = request.query.search || '';
-    const result = await pool.query(`SELECT c.*, COUNT(a.id)::integer AS appointment_count,
+    const result = await pool.query(`SELECT c.*,
+      TRIM(CONCAT(c.name, ' ', COALESCE(c.last_name, ''))) AS full_name,
+      COUNT(a.id)::integer AS appointment_count,
       COALESCE(SUM(a.price), 0)::numeric AS total_spent
       FROM clients c LEFT JOIN appointments a ON a.client_id = c.id
-      WHERE c.studio_id = $1 AND (c.name ILIKE $2 OR COALESCE(c.email, '') ILIKE $2 OR COALESCE(c.phone, '') ILIKE $2)
+      WHERE c.studio_id = $1 AND (c.name ILIKE $2 OR COALESCE(c.last_name, '') ILIKE $2 OR COALESCE(c.email, '') ILIKE $2 OR COALESCE(c.phone, '') ILIKE $2 OR COALESCE(c.rut, '') ILIKE $2)
       GROUP BY c.id ORDER BY c.name`, [request.studioId, `%${search}%`]);
     return response.json(result.rows);
   } catch (error) { return response.status(500).json({ error: error.message }); }
@@ -3736,6 +3745,7 @@ app.get('/api/clients/:id', requireAuth, async (request, response) => {
 
     return response.json({
       ...client.rows[0],
+      full_name: `${client.rows[0].name} ${client.rows[0].last_name || ''}`.trim(),
       appointments: appointments.rows,
       total_spent: appointments.rows.reduce((sum, item) => sum + Number(item.price || 0), 0)
     });
@@ -3744,27 +3754,38 @@ app.get('/api/clients/:id', requireAuth, async (request, response) => {
 
 app.post('/api/clients', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
-  const { name, email = '', phone = '', notes = '' } = request.body;
+  const { name, lastName = '', last_name = '', email = '', phone = '', notes = '', rut = null, hasNoRut = false } = request.body;
   if (!name?.trim()) return response.status(400).json({ error: 'El nombre es obligatorio' });
   try {
-    const result = await pool.query(`INSERT INTO clients (studio_id, name, email, phone, notes)
-      VALUES ($1, $2, $3, $4, $5) RETURNING *`, [request.studioId, name.trim(), email.trim(), phone.trim(), notes.trim()]);
+    let finalFirstName = name.trim();
+    let finalLastName = (lastName || last_name || '').trim();
+    if (!finalLastName && finalFirstName.includes(' ')) {
+      const parts = finalFirstName.split(/\s+/);
+      finalFirstName = parts[0];
+      finalLastName = parts.slice(1).join(' ');
+    }
+    const result = await pool.query(`INSERT INTO clients (studio_id, name, last_name, email, phone, notes, rut, has_no_rut)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`, [request.studioId, finalFirstName, finalLastName, email.trim(), phone.trim(), notes.trim(), rut, Boolean(hasNoRut)]);
     return response.status(201).json(result.rows[0]);
   } catch (error) { return response.status(500).json({ error: error.message }); }
 });
 
 app.patch('/api/clients/:id', requireAuth, async (request, response) => {
   if (!pool) return response.status(503).json({ error: 'Database not configured' });
-  const { name, email, phone, notes } = request.body;
+  const { name, lastName, last_name, email, phone, notes, rut, hasNoRut } = request.body;
   try {
+    const finalLastName = lastName !== undefined ? lastName : (last_name !== undefined ? last_name : null);
     const result = await pool.query(`
       UPDATE clients SET
         name = COALESCE($1, name),
-        email = COALESCE($2, email),
-        phone = COALESCE($3, phone),
-        notes = COALESCE($4, notes)
-      WHERE id = $5 AND studio_id = $6 RETURNING *
-    `, [name ? name.trim() : null, email !== undefined ? email.trim() : null, phone !== undefined ? phone.trim() : null, notes !== undefined ? notes.trim() : null, request.params.id, request.studioId]);
+        last_name = COALESCE($2, last_name),
+        email = COALESCE($3, email),
+        phone = COALESCE($4, phone),
+        notes = COALESCE($5, notes),
+        rut = CASE WHEN $6::text IS NOT NULL THEN $6 ELSE rut END,
+        has_no_rut = CASE WHEN $7::boolean IS NOT NULL THEN $7 ELSE has_no_rut END
+      WHERE id = $8 AND studio_id = $9 RETURNING *
+    `, [name ? name.trim() : null, finalLastName !== null ? finalLastName.trim() : null, email !== undefined ? email.trim() : null, phone !== undefined ? phone.trim() : null, notes !== undefined ? notes.trim() : null, rut !== undefined ? rut : null, hasNoRut !== undefined ? Boolean(hasNoRut) : null, request.params.id, request.studioId]);
     if (!result.rowCount) return response.status(404).json({ error: 'Cliente no encontrado' });
     return response.json(result.rows[0]);
   } catch (error) { return response.status(500).json({ error: error.message }); }

@@ -1386,6 +1386,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                       </div>
                       <strong class="event-block-title">${a.title}</strong>
                       ${a.client_name ? `<span class="event-client-name">${a.client_name}</span>` : ''}
+                      ${a.status === 'confirmed' ? `<span class="event-status-label">CONFIRMADA</span>` : ''}
                     </div>
                   `;
                 }).join('')}
@@ -1444,6 +1445,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                     </div>
                     <strong class="event-block-title">${a.title}</strong>
                     ${a.client_name ? `<span class="event-client-name">${a.client_name}</span>` : ''}
+                    ${a.status === 'confirmed' ? `<span class="event-status-label">CONFIRMADA</span>` : ''}
                   </div>
                 `;
               }).join('')}
@@ -1498,6 +1500,7 @@ function renderWeeklyTimeGrid(rangeInfo, appointments, schedules, todayISO, inte
                     </div>
                     <strong class="event-block-title">${a.title}</strong>
                     ${a.client_name ? `<span class="event-client-name">${a.client_name}</span>` : ''}
+                    ${a.status === 'confirmed' ? `<span class="event-status-label">CONFIRMADA</span>` : ''}
                   </div>
                 `;
               }).join('')}
@@ -8563,7 +8566,7 @@ function closeModal() {
 
 function clientOptions(selectedId = null) {
   return clients && clients.length
-    ? clients.map((client) => `<option value="${client.id}" ${Number(selectedId) === Number(client.id) ? 'selected' : ''}>${client.name}</option>`).join('')
+    ? clients.map((client) => `<option value="${client.id}" ${Number(selectedId) === Number(client.id) ? 'selected' : ''}>${client.full_name || `${client.name} ${client.last_name || ''}`.trim()}</option>`).join('')
     : '<option value="">Primero crea un cliente</option>';
 }
 
@@ -11920,28 +11923,28 @@ function validateRutClient(rutStr) {
 function openTermsModal() {
   openModal(`
     <div style="max-height: 80vh; display: flex; flex-direction: column;">
-      <div style="padding: 16px 20px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; justify-content: space-between;">
+      <div style="padding: 16px 20px; border-bottom: 1px solid var(--line-soft, #e2e8f0); display: flex; align-items: center; justify-content: space-between;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span class="brand-mark small" style="width: 28px; height: 28px; font-size: 14px;">t</span>
-          <strong style="font-size: 16px; color: #ffffff;">Términos de Servicio y Consentimiento</strong>
+          <strong style="font-size: 16px; color: var(--ink, #0f172a); font-weight: 800;">Términos de Servicio y Consentimiento</strong>
         </div>
-        <span style="font-size: 11px; background: rgba(139, 92, 246, 0.2); color: #c4b5fd; padding: 3px 8px; border-radius: 8px;">Ley N° 19.628</span>
+        <span style="font-size: 11px; background: rgba(124, 58, 237, 0.12); color: #7c3aed; padding: 4px 10px; border-radius: 8px; font-weight: 700;">Ley N° 19.628</span>
       </div>
-      <div style="padding: 20px; overflow-y: auto; font-size: 13.5px; line-height: 1.6; color: #cbd5e1; flex: 1;">
-        <h4 style="color: #ffffff; margin: 0 0 8px 0;">1. Aceptación del Servicio</h4>
-        <p style="margin: 0 0 14px 0;">Al confirmar una cita en Tatudin, usted declara ser mayor de 18 años de edad (o contar con autorización legal expresa de su representante), y que los datos personales y de contacto proporcionados son verídicos, fidedignos y comprobables.</p>
+      <div style="padding: 20px; overflow-y: auto; font-size: 13.5px; line-height: 1.6; color: var(--muted, #475569); flex: 1;">
+        <h4 style="color: var(--ink, #0f172a); margin: 0 0 8px 0; font-size: 14.5px; font-weight: 700;">1. Aceptación del Servicio</h4>
+        <p style="margin: 0 0 16px 0; color: var(--muted, #475569);">Al confirmar una cita en Tatudin, usted declara ser mayor de 18 años de edad (o contar con autorización legal expresa de su representante), y que los datos personales y de contacto proporcionados son verídicos, fidedignos y comprobables.</p>
 
-        <h4 style="color: #ffffff; margin: 0 0 8px 0;">2. Procedimiento de Tatuaje y Consentimiento</h4>
-        <p style="margin: 0 0 14px 0;">Usted comprende la naturaleza permanente e irreversible de los procedimientos corporales y artísticos. Es su responsabilidad informar al artista sobre condiciones médicas preexistentes, alergias a pigmentos o materiales, y seguir rigurosamente las pautas de cuidado e higiene posteriores.</p>
+        <h4 style="color: var(--ink, #0f172a); margin: 0 0 8px 0; font-size: 14.5px; font-weight: 700;">2. Procedimiento de Tatuaje y Consentimiento</h4>
+        <p style="margin: 0 0 16px 0; color: var(--muted, #475569);">Usted comprende la naturaleza permanente e irreversible de los procedimientos corporales y artísticos. Es su responsabilidad informar al artista sobre condiciones médicas preexistentes, alergias a pigmentos o materiales, y seguir rigurosamente las pautas de cuidado e higiene posteriores.</p>
 
-        <h4 style="color: #ffffff; margin: 0 0 8px 0;">3. Protección de Datos Personales (Ley N° 19.628)</h4>
-        <p style="margin: 0 0 14px 0;">Tatudin recopila su nombre, RUT (o pasaporte), número de contacto y correo electrónico con el único y exclusivo fin de coordinar, respaldar y validar su cita con el artista y estudio correspondiente. Sus datos no serán comercializados ni transferidos a terceros no autorizados.</p>
+        <h4 style="color: var(--ink, #0f172a); margin: 0 0 8px 0; font-size: 14.5px; font-weight: 700;">3. Protección de Datos Personales (Ley N° 19.628)</h4>
+        <p style="margin: 0 0 16px 0; color: var(--muted, #475569);">Tatudin recopila su nombre, RUT (o pasaporte), número de contacto y correo electrónico con el único y exclusivo fin de coordinar, respaldar y validar su cita con el artista y estudio correspondiente. Sus datos no serán comercializados ni transferidos a terceros no autorizados.</p>
 
-        <h4 style="color: #ffffff; margin: 0 0 8px 0;">4. Puntualidad y Política de Cancelación</h4>
-        <p style="margin: 0 0 14px 0;">Las reservas y abonos quedan sujetos a las políticas de cada artista y estudio. Le recomendamos presentarse con al menos 10 minutos de antelación en el estudio.</p>
+        <h4 style="color: var(--ink, #0f172a); margin: 0 0 8px 0; font-size: 14.5px; font-weight: 700;">4. Puntualidad y Política de Cancelación</h4>
+        <p style="margin: 0 0 16px 0; color: var(--muted, #475569);">Las reservas y abonos quedan sujetos a las políticas de cada artista y estudio. Le recomendamos presentarse con al menos 10 minutos de antelación en el estudio.</p>
       </div>
-      <div style="padding: 14px 20px; border-top: 1px solid var(--line-soft); display: flex; justify-content: flex-end;">
-        <button type="button" class="primary" data-close-modal style="padding: 8px 20px; font-size: 13.5px;">
+      <div style="padding: 14px 20px; border-top: 1px solid var(--line-soft, #e2e8f0); display: flex; justify-content: flex-end;">
+        <button type="button" class="primary" data-close-modal style="padding: 10px 22px; font-size: 13.5px; font-weight: 700; border-radius: var(--radius-md);">
           Entendido y volver a la reserva
         </button>
       </div>

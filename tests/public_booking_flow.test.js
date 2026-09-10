@@ -223,6 +223,12 @@ test('Public Booking Flow: Propose multiple slot options and client selects opti
   // Ensure the appointment's final starts_at matches slot2
   assert.equal(new Date(confirmRes.data.appointment.starts_at).getTime(), new Date(slot2).getTime());
   assert.equal(confirmRes.data.appointment.duration_minutes, 120);
+
+  // Verify that querying the appointment includes the client's last name in client_name
+  const apptRes = await request(`/api/appointments/${confirmRes.data.appointment.id}`);
+  assert.equal(apptRes.status, 200);
+  assert.equal(apptRes.data.client_name, 'Sofía Valenzuela');
+  assert.equal(apptRes.data.client_last_name, 'Valenzuela');
 });
 
 test.after(() => {
