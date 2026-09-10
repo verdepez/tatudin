@@ -11961,13 +11961,13 @@ async function renderPublicBookingConfirmationPage(token) {
 
   portal.innerHTML = `
     <header class="portal-brand-header">
-      <img src="/TatudinAzul.png" alt="Tatudin" class="portal-brand-logo" />
-      <p style="font-size: 13px; color: #94a3b8; margin: 0;">Portal de Reserva y Confirmación de Citas</p>
+      <img src="/TatudinGris.png" alt="Tatudin" class="portal-brand-logo" />
+      <p class="portal-brand-subtitle">Portal de Reserva y Confirmación de Citas</p>
     </header>
     <div id="public-booking-container" class="portal-card">
-      <div style="text-align: center; padding: 40px 20px; color: #94a3b8;">
+      <div style="text-align: center; padding: 40px 20px; color: #cbd5e1;">
         <div class="splash-spinner" style="margin: 0 auto 16px auto;"></div>
-        <span style="font-size: 14px;">Cargando detalles de tu cita...</span>
+        <span style="font-size: 14px; font-weight: 600;">Cargando detalles de tu cita...</span>
       </div>
     </div>
   `;
@@ -11979,15 +11979,17 @@ async function renderPublicBookingConfirmationPage(token) {
 
     const formatSlotDateTime = (isoString) => {
       const d = new Date(isoString);
-      const dateFormatted = d.toLocaleDateString('es-CL', {
+      const rawDate = d.toLocaleDateString('es-CL', {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
         year: 'numeric'
       });
+      const dateFormatted = rawDate.charAt(0).toUpperCase() + rawDate.slice(1);
       const timeFormatted = d.toLocaleTimeString('es-CL', {
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        hour12: false
       });
       return { dateFormatted, timeFormatted };
     };
@@ -12001,12 +12003,12 @@ async function renderPublicBookingConfirmationPage(token) {
             ✓
           </div>
           <h2 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 8px 0;">Cita ya confirmada</h2>
-          <p style="color: #cbd5e1; font-size: 14px; margin: 0 0 24px 0; line-height: 1.5;">Esta cita en <strong>${data.studioName}</strong> ya fue confirmada previamente.</p>
+          <p style="color: #cbd5e1; font-size: 14px; margin: 0 0 24px 0; line-height: 1.5;">Esta cita en <strong>${escapeHtml(data.studioName)}</strong> ya fue confirmada previamente.</p>
           
           <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 18px; text-align: left; margin-bottom: 24px; font-size: 13.5px;">
-            <p style="margin: 6px 0;"><strong>Motivo:</strong> ${data.title}</p>
-            <p style="margin: 6px 0;"><strong>Artista:</strong> ${data.artistName}</p>
-            <p style="margin: 6px 0; text-transform: capitalize;"><strong>Fecha y Hora:</strong> ${mainSlot.dateFormatted} a las ${mainSlot.timeFormatted} hrs</p>
+            <p style="margin: 6px 0;"><strong>Motivo:</strong> ${escapeHtml(data.title)}</p>
+            <p style="margin: 6px 0;"><strong>Artista:</strong> ${escapeHtml(data.artistName)}</p>
+            <p style="margin: 6px 0;"><strong>Fecha y Hora:</strong> ${mainSlot.dateFormatted} a las ${mainSlot.timeFormatted} hrs</p>
             <p style="margin: 6px 0;"><strong>Duración:</strong> ${data.durationMinutes} minutos aprox.</p>
           </div>
 
@@ -12031,7 +12033,7 @@ async function renderPublicBookingConfirmationPage(token) {
       if (data.isMultiSession) {
         slotsHtml = `
           <div style="margin-bottom: 20px;">
-            <label style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #c4b5fd; display: block; margin-bottom: 8px;">
+            <label style="font-size: 12.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #ddd6fe; display: block; margin-bottom: 8px;">
               📅 Proyecto Multi-Sesión (${data.proposedSlots.length} sesiones acordadas):
             </label>
             <div class="portal-slot-group">
@@ -12039,15 +12041,15 @@ async function renderPublicBookingConfirmationPage(token) {
                 const sDt = formatSlotDateTime(slot.startsAt);
                 return `
                   <div class="portal-slot-card selected" style="cursor: default;">
-                    <div style="width: 24px; height: 24px; border-radius: 50%; background: #7c3aed; color: #ffffff; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; flex-shrink: 0;">
+                    <div style="width: 26px; height: 26px; border-radius: 50%; background: #7c3aed; color: #ffffff; display: grid; place-items: center; font-size: 12px; font-weight: 800; flex-shrink: 0;">
                       ${idx + 1}
                     </div>
                     <div class="portal-slot-details">
-                      <div class="portal-slot-date" style="text-transform: capitalize;">${sDt.dateFormatted}</div>
+                      <div class="portal-slot-date">${sDt.dateFormatted}</div>
                       <div class="portal-slot-meta">
-                        <span>⏱ ${sDt.timeFormatted} hrs</span>
-                        <span>⏳ ${slot.durationMinutes || 120} min</span>
-                        <span style="color: #a78bfa; font-weight: 600;">Sesión ${idx + 1}</span>
+                        <span class="portal-slot-meta-pill">⏱ ${sDt.timeFormatted} hrs</span>
+                        <span class="portal-slot-meta-pill">⏳ ${slot.durationMinutes || 120} min</span>
+                        <span class="portal-slot-option-badge">Sesión ${idx + 1}</span>
                       </div>
                     </div>
                   </div>
@@ -12059,10 +12061,10 @@ async function renderPublicBookingConfirmationPage(token) {
       } else {
         slotsHtml = `
           <div style="margin-bottom: 20px;">
-            <label style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #c4b5fd; display: block; margin-bottom: 4px;">
+            <label style="font-size: 12.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #ddd6fe; display: block; margin-bottom: 6px;">
               📅 Selecciona tu fecha y horario preferido:
             </label>
-            <p style="font-size: 12px; color: #cbd5e1; margin: 0 0 10px 0;">
+            <p style="font-size: 13px; color: #cbd5e1; margin: 0 0 12px 0;">
               Tu artista ha propuesto las siguientes alternativas. Selecciona la opción que más te acomode:
             </p>
             <div class="portal-slot-group" id="portal-slot-selection-group">
@@ -12074,11 +12076,11 @@ async function renderPublicBookingConfirmationPage(token) {
                     <input type="radio" name="selectedSlotIndex" value="${idx}" ${isSelected ? 'checked' : ''} style="position: absolute; opacity: 0; pointer-events: none;" />
                     <div class="portal-slot-radio-circle"></div>
                     <div class="portal-slot-details">
-                      <div class="portal-slot-date" style="text-transform: capitalize;">${sDt.dateFormatted}</div>
+                      <div class="portal-slot-date">${sDt.dateFormatted}</div>
                       <div class="portal-slot-meta">
-                        <span>⏱ ${sDt.timeFormatted} hrs</span>
-                        <span>⏳ ${slot.durationMinutes || 120} min</span>
-                        <span style="color: #a78bfa; font-weight: 600;">Opción ${idx + 1}</span>
+                        <span class="portal-slot-meta-pill">⏱ ${sDt.timeFormatted} hrs</span>
+                        <span class="portal-slot-meta-pill">⏳ ${slot.durationMinutes || 120} min</span>
+                        <span class="portal-slot-option-badge">Opción ${idx + 1}</span>
                       </div>
                     </div>
                   </label>
@@ -12090,18 +12092,18 @@ async function renderPublicBookingConfirmationPage(token) {
       }
     } else {
       slotsHtml = `
-        <div style="background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 14px; padding: 16px; margin-bottom: 20px;">
-          <h3 style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #c4b5fd; margin: 0 0 10px 0;">
+        <div style="background: rgba(124, 58, 237, 0.12); border: 1.5px solid rgba(167, 139, 250, 0.3); border-radius: 14px; padding: 16px 18px; margin-bottom: 20px;">
+          <h3 style="font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #ddd6fe; margin: 0 0 10px 0; font-weight: 800;">
             📅 Horario de la sesión:
           </h3>
-          <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px;">
+          <div style="display: flex; gap: 24px; flex-wrap: wrap; font-size: 14px;">
             <div>
-              <span style="color: #94a3b8; display: block; font-size: 11.5px;">Fecha</span>
-              <strong style="color: #ffffff; text-transform: capitalize;">${mainSlot.dateFormatted}</strong>
+              <span style="color: #cbd5e1; display: block; font-size: 12px; font-weight: 600;">Fecha</span>
+              <strong style="color: #ffffff; font-size: 15px;">${mainSlot.dateFormatted}</strong>
             </div>
             <div>
-              <span style="color: #94a3b8; display: block; font-size: 11.5px;">Hora de inicio</span>
-              <strong style="color: #ffffff;">${mainSlot.timeFormatted} hrs</strong> (${data.durationMinutes} min)
+              <span style="color: #cbd5e1; display: block; font-size: 12px; font-weight: 600;">Hora de inicio</span>
+              <strong style="color: #ffffff; font-size: 15px;">${mainSlot.timeFormatted} hrs</strong> <span style="color: #c4b5fd;">(${data.durationMinutes} min)</span>
             </div>
           </div>
         </div>
@@ -12109,99 +12111,99 @@ async function renderPublicBookingConfirmationPage(token) {
     }
 
     container.innerHTML = `
-      <div style="margin-bottom: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 6px;">
-          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a78bfa;">${data.studioName}</span>
-          <span style="font-size: 11px; background: rgba(124, 58, 237, 0.2); color: #c4b5fd; padding: 3px 8px; border-radius: 10px; font-weight: 600;">
+      <div style="margin-bottom: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px;">
+          <span style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: #c4b5fd;">${escapeHtml(data.studioName)}</span>
+          <span style="font-size: 11.5px; background: rgba(139, 92, 246, 0.28); border: 1px solid rgba(167, 139, 250, 0.35); color: #ede9fe; padding: 4px 10px; border-radius: 12px; font-weight: 700;">
             Apertura ${data.tokenViewsCount} de ${data.maxViews}
           </span>
         </div>
-        <h2 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 6px 0;">${data.title}</h2>
-        <p style="color: #94a3b8; font-size: 13px; margin: 0;">Artista responsable: <strong style="color: #ffffff;">${data.artistName}</strong></p>
+        <h2 style="font-size: 23px; font-weight: 800; color: #ffffff; line-height: 1.25; margin: 0 0 6px 0;">${escapeHtml(data.title)}</h2>
+        <p style="color: #cbd5e1; font-size: 13.5px; margin: 0;">Artista responsable: <strong style="color: #ffffff;">${escapeHtml(data.artistName)}</strong></p>
       </div>
 
       ${slotsHtml}
 
       ${(Number(data.price) > 0 || Number(data.deposit) > 0) ? `
-        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; display: flex; gap: 20px; flex-wrap: wrap;">
+        <div class="portal-price-box">
           ${Number(data.price) > 0 ? `
-            <div>
-              <span style="color: #94a3b8; display: block; font-size: 11.5px;">Valor total estimado</span>
-              <strong style="color: #10b981; font-size: 15px;">$${Number(data.price).toLocaleString('es-CL')} CLP</strong>
+            <div class="portal-price-col">
+              <span class="portal-price-label">Valor total estimado</span>
+              <strong class="portal-price-val-total">$${Number(data.price).toLocaleString('es-CL')} CLP</strong>
             </div>
           ` : ''}
           ${Number(data.deposit) > 0 ? `
-            <div>
-              <span style="color: #94a3b8; display: block; font-size: 11.5px;">Seña / Abono</span>
-              <strong style="color: #38bdf8; font-size: 15px;">$${Number(data.deposit).toLocaleString('es-CL')} CLP</strong>
+            <div class="portal-price-col">
+              <span class="portal-price-label">Seña / Abono</span>
+              <strong class="portal-price-val-deposit">$${Number(data.deposit).toLocaleString('es-CL')} CLP</strong>
             </div>
           ` : ''}
         </div>
       ` : ''}
 
       ${data.notes ? `
-        <div style="background: rgba(167, 139, 250, 0.06); border: 1px dashed rgba(167, 139, 250, 0.25); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: #cbd5e1;">
-          <strong style="color: #c4b5fd; display: block; margin-bottom: 4px;">Indicaciones de tu artista:</strong>
-          ${data.notes}
+        <div class="portal-artist-notes-box">
+          <strong class="portal-artist-notes-title">Indicaciones de tu artista:</strong>
+          <p class="portal-artist-notes-content">${escapeHtml(data.notes)}</p>
         </div>
       ` : ''}
 
-      <!-- Client Details Form -->
-      <form id="public-client-confirmation-form">
-        <h3 style="font-size: 15px; font-weight: 700; color: #ffffff; margin: 0 0 14px 0;">Completa tus datos para confirmar:</h3>
+      <!-- Client Details Form (novalidate to prevent native English browser tooltips) -->
+      <form id="public-client-confirmation-form" novalidate>
+        <h3 class="portal-form-title">Completa tus datos para confirmar:</h3>
         
         <div class="portal-grid-two">
-          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600;">
+          <label class="portal-field-label">
             Nombres:
-            <input name="name" type="text" class="portal-input" placeholder="Ej. Camila" required autocomplete="given-name" />
+            <input name="name" type="text" class="portal-input" placeholder="Ej. Camila" autocomplete="given-name" />
           </label>
-          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600;">
+          <label class="portal-field-label">
             Apellidos:
-            <input name="lastName" type="text" class="portal-input" placeholder="Ej. Silva Morales" required autocomplete="family-name" />
+            <input name="lastName" type="text" class="portal-input" placeholder="Ej. Silva Morales" autocomplete="family-name" />
           </label>
         </div>
 
         <div style="margin-bottom: 14px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
-            <label for="client-rut-field" style="font-size: 12.5px; font-weight: 600;">RUT Chileno:</label>
-            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #a78bfa; cursor: pointer;">
-              <input type="checkbox" id="client-has-no-rut" name="hasNoRut" />
+          <div class="portal-rut-header">
+            <label for="client-rut-field" class="portal-field-label-bold">RUT Chileno:</label>
+            <label class="portal-foreign-check-label">
+              <input type="checkbox" id="client-has-no-rut" name="hasNoRut" class="portal-checkbox" />
               <span>No tengo RUT (Extranjero / Pasaporte)</span>
             </label>
           </div>
-          <input id="client-rut-field" name="rut" type="text" class="portal-input" placeholder="12.345.678-K" style="font-family: monospace;" />
-          <span id="rut-error-msg" style="display: none; font-size: 11.5px; color: #ef4444; margin-top: 4px;"></span>
+          <input id="client-rut-field" name="rut" type="text" class="portal-input portal-rut-input" placeholder="12.345.678-K" />
+          <span id="rut-error-msg" style="display: none; font-size: 11.5px; color: #f87171; margin-top: 5px; font-weight: 600;"></span>
         </div>
 
         <div class="portal-grid-two">
-          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600;">
+          <label class="portal-field-label">
             Teléfono / WhatsApp:
-            <input name="phone" type="tel" class="portal-input" placeholder="+56 9 1234 5678" required autocomplete="tel" />
+            <input name="phone" type="tel" class="portal-input" placeholder="+56 9 1234 5678" autocomplete="tel" />
           </label>
-          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600;">
+          <label class="portal-field-label">
             Correo electrónico:
-            <input name="email" type="email" class="portal-input" placeholder="tu@correo.com" required autocomplete="email" />
+            <input name="email" type="email" class="portal-input" placeholder="tu@correo.com" autocomplete="email" />
           </label>
         </div>
 
-        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600; margin-bottom: 16px;">
+        <label class="portal-field-label" style="margin-bottom: 18px;">
           Notas o comentarios para tu artista (opcional):
-          <textarea name="clientNotes" rows="2" class="portal-input" placeholder="Alergias, dudas o requerimientos especiales..." style="font-family: inherit; resize: vertical; min-height: 60px;"></textarea>
+          <textarea name="clientNotes" rows="2" class="portal-input portal-textarea" placeholder="Alergias, dudas o requerimientos especiales..."></textarea>
         </label>
 
         <!-- Terms of Service checkbox -->
-        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px 14px; margin-bottom: 20px;">
-          <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 12.5px; line-height: 1.5; color: #cbd5e1; cursor: pointer;">
-            <input type="checkbox" name="acceptTerms" required style="margin-top: 3px; accent-color: #7c3aed; width: 16px; height: 16px;" />
+        <div id="terms-container" class="portal-terms-box">
+          <label class="portal-terms-label">
+            <input type="checkbox" id="client-accept-terms" name="acceptTerms" class="portal-terms-checkbox" />
             <span>
-              He leído y acepto los <a href="#" id="link-show-terms" style="color: #a78bfa; font-weight: 700; text-decoration: underline;">Términos de Servicio y Consentimiento Informado</a> de Tatudin. Declaro ser mayor de edad y que los datos ingresados son verídicos.
+              He leído y acepto los <a href="#" id="link-show-terms" class="portal-terms-link">Términos de Servicio y Consentimiento Informado</a> de Tatudin. Declaro ser mayor de edad y que los datos ingresados son verídicos.
             </span>
           </label>
         </div>
 
-        <div id="form-error-container" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 12px; font-size: 13px; color: #fca5a5; margin-bottom: 16px; line-height: 1.4;"></div>
+        <div id="form-error-container" class="portal-error-alert" style="display: none;"></div>
 
-        <button type="submit" id="btn-submit-confirm-booking" class="primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700; border-radius: 12px; background: #7c3aed; color: #ffffff; cursor: pointer; border: none; transition: background 0.2s;">
+        <button type="submit" id="btn-submit-confirm-booking" class="portal-submit-btn">
           Confirmar y Agendar mi Cita
         </button>
       </form>
@@ -12226,8 +12228,9 @@ async function renderPublicBookingConfirmationPage(token) {
       if (e.target.checked) {
         rutInput.value = '';
         rutInput.disabled = true;
-        rutInput.placeholder = 'Extranjero / Sin RUT chileno';
-        rutError.style.display = 'none';
+        rutInput.placeholder = 'Extranjero / Pasaporte (sin RUT chileno)';
+        rutInput.classList.remove('input-error');
+        if (rutError) rutError.style.display = 'none';
       } else {
         rutInput.disabled = false;
         rutInput.placeholder = '12.345.678-K';
@@ -12236,6 +12239,7 @@ async function renderPublicBookingConfirmationPage(token) {
 
     rutInput?.addEventListener('input', (e) => {
       if (hasNoRutCheck?.checked) return;
+      rutInput.classList.remove('input-error');
       const clean = e.target.value.replace(/[^0-9kK]/g, '').toUpperCase();
       if (clean.length > 1) {
         const body = clean.slice(0, -1);
@@ -12251,6 +12255,20 @@ async function renderPublicBookingConfirmationPage(token) {
       }
     });
 
+    // Clear input errors when user types or changes
+    document.querySelectorAll('#public-client-confirmation-form input, #public-client-confirmation-form textarea').forEach((input) => {
+      input.addEventListener('input', () => {
+        input.classList.remove('input-error');
+        const errBox = document.querySelector('#form-error-container');
+        if (errBox) errBox.style.display = 'none';
+      });
+    });
+    document.querySelector('#client-accept-terms')?.addEventListener('change', () => {
+      document.querySelector('#terms-container')?.classList.remove('terms-error');
+      const errBox = document.querySelector('#form-error-container');
+      if (errBox) errBox.style.display = 'none';
+    });
+
     document.querySelector('#link-show-terms')?.addEventListener('click', (e) => {
       e.preventDefault();
       openTermsModal();
@@ -12260,20 +12278,95 @@ async function renderPublicBookingConfirmationPage(token) {
     const submitBtn = document.querySelector('#btn-submit-confirm-booking');
     const errorBox = document.querySelector('#form-error-container');
 
+    const showError = (msg) => {
+      errorBox.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>${msg}</span>
+        </div>
+      `;
+      errorBox.style.display = 'block';
+      errorBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorBox.style.display = 'none';
+      errorBox.textContent = '';
+      document.querySelectorAll('.portal-input.input-error').forEach(el => el.classList.remove('input-error'));
+      document.querySelector('#terms-container')?.classList.remove('terms-error');
 
       const fd = new FormData(form);
-      const hasNoRut = hasNoRutCheck?.checked || false;
-      const rutVal = fd.get('rut');
+      const nameInput = form.querySelector('input[name="name"]');
+      const lastNameInput = form.querySelector('input[name="lastName"]');
+      const phoneInput = form.querySelector('input[name="phone"]');
+      const emailInput = form.querySelector('input[name="email"]');
+      const termsCheckbox = form.querySelector('input[name="acceptTerms"]');
+      const termsContainer = document.querySelector('#terms-container');
 
+      const nameVal = (nameInput?.value || '').trim();
+      const lastNameVal = (lastNameInput?.value || '').trim();
+      const hasNoRut = hasNoRutCheck?.checked || false;
+      const rutVal = (rutInput?.value || '').trim();
+      const phoneVal = (phoneInput?.value || '').trim();
+      const emailVal = (emailInput?.value || '').trim();
+      const acceptTerms = Boolean(termsCheckbox?.checked);
+
+      // 1. Validar Nombres
+      if (!nameVal) {
+        nameInput?.classList.add('input-error');
+        nameInput?.focus();
+        showError('Por favor, ingresa tu nombre.');
+        return;
+      }
+
+      // 2. Validar Apellidos
+      if (!lastNameVal) {
+        lastNameInput?.classList.add('input-error');
+        lastNameInput?.focus();
+        showError('Por favor, ingresa tus apellidos.');
+        return;
+      }
+
+      // 3. Validar RUT
       if (!hasNoRut) {
-        if (!rutVal || !validateRutClient(rutVal)) {
-          errorBox.textContent = 'El RUT ingresado no es válido. Verifica el número y dígito verificador, o marca "No tengo RUT" si eres extranjero.';
-          errorBox.style.display = 'block';
+        if (!rutVal) {
+          rutInput?.classList.add('input-error');
+          rutInput?.focus();
+          showError('Por favor, ingresa tu RUT chileno (ej: 12.345.678-K) o marca la casilla si eres extranjero.');
           return;
         }
+        if (!validateRutClient(rutVal)) {
+          rutInput?.classList.add('input-error');
+          rutInput?.focus();
+          showError('El RUT ingresado no es válido. Revisa el número y dígito verificador, o marca la opción si eres extranjero.');
+          return;
+        }
+      }
+
+      // 4. Validar Teléfono
+      if (!phoneVal) {
+        phoneInput?.classList.add('input-error');
+        phoneInput?.focus();
+        showError('Por favor, ingresa un número de teléfono o WhatsApp de contacto.');
+        return;
+      }
+
+      // 5. Validar Correo Electrónico
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailVal || !emailRegex.test(emailVal)) {
+        emailInput?.classList.add('input-error');
+        emailInput?.focus();
+        showError('Por favor, ingresa un correo electrónico válido para enviarte el comprobante de cita.');
+        return;
+      }
+
+      // 6. Validar Aceptación de Términos
+      if (!acceptTerms) {
+        termsContainer?.classList.add('terms-error');
+        termsCheckbox?.focus();
+        showError('Debes leer y aceptar los Términos de Servicio y Consentimiento Informado para continuar.');
+        return;
       }
 
       const selectedSlotRadio = document.querySelector('input[name="selectedSlotIndex"]:checked');
@@ -12286,14 +12379,14 @@ async function renderPublicBookingConfirmationPage(token) {
         const confirmRes = await api(`/api/public/booking-token/${token}/confirm`, {
           method: 'POST',
           body: JSON.stringify({
-            name: fd.get('name'),
-            lastName: fd.get('lastName'),
+            name: nameVal,
+            lastName: lastNameVal,
             rut: hasNoRut ? null : rutVal,
             hasNoRut,
-            phone: fd.get('phone'),
-            email: fd.get('email'),
+            phone: phoneVal,
+            email: emailVal,
             clientNotes: fd.get('clientNotes'),
-            acceptTerms: Boolean(fd.get('acceptTerms')),
+            acceptTerms: true,
             selectedSlotIndex
           })
         });
@@ -12315,17 +12408,17 @@ async function renderPublicBookingConfirmationPage(token) {
             </div>
             <h2 style="font-size: 24px; font-weight: 800; color: #ffffff; margin: 0 0 8px 0;">¡Cita Confirmada!</h2>
             <p style="color: #cbd5e1; font-size: 14.5px; margin: 0 0 24px 0; line-height: 1.5;">
-              Hola <strong style="color: #ffffff;">${fd.get('name')}</strong>, tu cita para <strong>"${data.title}"</strong> con <strong>${data.artistName}</strong> en <strong>${data.studioName}</strong> ha sido agendada con éxito.
+              Hola <strong style="color: #ffffff;">${escapeHtml(nameVal)}</strong>, tu cita para <strong>"${escapeHtml(data.title)}"</strong> con <strong>${escapeHtml(data.artistName)}</strong> en <strong>${escapeHtml(data.studioName)}</strong> ha sido agendada con éxito.
             </p>
 
-            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 24px; text-align: left; font-size: 13.5px;">
-              <p style="margin: 4px 0; color: #ffffff; text-transform: capitalize;">📅 <strong>${confirmedDateStr}</strong></p>
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 14px; padding: 18px; margin-bottom: 24px; text-align: left; font-size: 13.5px;">
+              <p style="margin: 4px 0; color: #ffffff;">📅 <strong>${confirmedDateStr}</strong></p>
               <p style="margin: 4px 0; color: #ffffff;">⏱ <strong>${confirmedTimeStr} hrs</strong></p>
-              <p style="margin: 4px 0; color: #cbd5e1;">✉ Hemos enviado un correo de confirmación a <strong>${fd.get('email')}</strong> con consideraciones clave y recomendaciones para tu sesión.</p>
+              <p style="margin: 4px 0; color: #cbd5e1;">✉ Hemos enviado un correo de confirmación a <strong>${escapeHtml(emailVal)}</strong> con consideraciones clave y recomendaciones para tu sesión.</p>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 10px;">
-              <a href="https://wa.me/?text=${encodeURIComponent(`¡Hola ${data.artistName}! Acabo de confirmar mi cita para el ${confirmedDateStr} a las ${confirmedTimeStr} hrs a nombre de ${fd.get('name')} ${fd.get('lastName')}.`)}" target="_blank" rel="noopener noreferrer" class="primary" style="padding: 14px; background: #25D366; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              <a href="https://wa.me/?text=${encodeURIComponent(`¡Hola ${data.artistName}! Acabo de confirmar mi cita para el ${confirmedDateStr} a las ${confirmedTimeStr} hrs a nombre de ${nameVal} ${lastNameVal}.`)}" target="_blank" rel="noopener noreferrer" class="primary" style="padding: 14px; background: #25D366; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
                 ${icon('whatsapp')} Contactar al artista por WhatsApp
               </a>
               <button type="button" class="secondary" id="btn-goto-terms-modal" style="padding: 12px; border-radius: 10px;">
@@ -12340,8 +12433,7 @@ async function renderPublicBookingConfirmationPage(token) {
       } catch (err) {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Confirmar y Agendar mi Cita';
-        errorBox.textContent = err.message || 'Error al confirmar la cita';
-        errorBox.style.display = 'block';
+        showError(err.message || 'Ocurrió un error al confirmar la cita. Por favor intenta nuevamente.');
       }
     });
 
