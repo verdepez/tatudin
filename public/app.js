@@ -1003,7 +1003,10 @@ async function render(view = 'dashboard', options = {}) {
 
     try {
       if (view === 'agenda') return await renderAgenda();
-      if (view === 'schedule-configurator') return await renderScheduleConfigurator();
+      if (view === 'schedule-configurator') {
+        await renderAgenda();
+        return await openScheduleModal();
+      }
       if (view === 'clientes') return await renderClients();
       if (view === 'comunicaciones') return await renderCommunications();
       if (view === 'finanzas') return await renderFinances();
@@ -2095,12 +2098,8 @@ async function openCalendarSyncModal() {
   }
 }
 
-async function renderScheduleConfigurator(scheduleId = null) {
+async function openScheduleModal(scheduleId = null) {
   closeMobileDrawer();
-  currentAppView = 'schedule-configurator';
-  document.querySelectorAll('[data-view]').forEach((link) => {
-    link.classList.toggle('active', link.dataset.view === 'agenda');
-  });
 
   let schedule = null;
   if (scheduleId) {
@@ -2119,7 +2118,7 @@ async function renderScheduleConfigurator(scheduleId = null) {
     { dow: 0, name: 'Domingo', short: 'Dom' }
   ];
 
-  let currentRules = schedule?.rules ? JSON.parse(JSON.stringify(schedule.rules)) : [
+  let currentRules = schedule?.rules && schedule.rules.length ? JSON.parse(JSON.stringify(schedule.rules)) : [
     { day_of_week: 1, start_time: '09:00', end_time: '17:00' },
     { day_of_week: 2, start_time: '09:00', end_time: '17:00' },
     { day_of_week: 3, start_time: '09:00', end_time: '17:00' },
@@ -2129,35 +2128,15 @@ async function renderScheduleConfigurator(scheduleId = null) {
 
   activeEditingSchedule = {
     id: schedule?.id || null,
-    title: schedule?.title || 'Citas de Tatuaje',
+    title: schedule?.title || (scheduleId ? '' : 'Citas de Tatuaje'),
     color: schedule?.color || '#7C3AED',
-    durationMinutes: schedule?.duration_minutes || 60,
-    isLocked: schedule?.is_locked || false,
-    minLeadHours: schedule?.min_lead_hours || 4,
-    maxAdvanceDays: schedule?.max_advance_days || 60,
+    durationMinutes: Number(schedule?.duration_minutes) || 60,
+    isLocked: Boolean(schedule?.is_locked),
+    minLeadHours: Number(schedule?.min_lead_hours) || 4,
+    maxAdvanceDays: Number(schedule?.max_advance_days) || 60,
     instructions: schedule?.instructions || '',
     rules: currentRules
   };
-
-  const weekRange = getWeekRange(new Date());
-  const todayISO = formatDateISO(new Date());
-  const rangeParams = new URLSearchParams({
-    startDate: weekRange.startDateISO,
-    endDate: weekRange.endDateISO
-  });
-  const weekAppts = await api(`/api/appointments?${rangeParams.toString()}`).catch(() => []);
-
-  function getPreviewSchedules() {
-    return [{
-      id: activeEditingSchedule.id || 'preview',
-      title: activeEditingSchedule.title || 'Agenda de citas',
-      color: activeEditingSchedule.color || '#7C3AED',
-      duration_minutes: activeEditingSchedule.durationMinutes,
-      is_locked: activeEditingSchedule.isLocked,
-      is_active: true,
-      rules: activeEditingSchedule.rules
-    }];
-  }
 
   function renderDaysHtml() {
     return DAYS.map((d) => {
@@ -2167,16 +2146,18 @@ async function renderScheduleConfigurator(scheduleId = null) {
         <div class="sched-day-editor-item ${isAvailable ? 'is-enabled' : 'is-disabled'}" data-dow="${d.dow}">
           <div class="sched-day-head">
             <span class="sched-day-title">${d.name}</span>
-            ${!isAvailable ? `
-              <span class="sched-not-avail-tag">No disponible</span>
-              <button type="button" class="icon-circle-btn micro-btn" data-action="enable-day" data-dow="${d.dow}" title="Habilitar día">
-                ${icon('plus')}
-              </button>
-            ` : `
-              <button type="button" class="icon-circle-btn micro-btn" data-action="disable-day" data-dow="${d.dow}" title="Deshabilitar día">
-                ${icon('trash')}
-              </button>
-            `}
+            <div style="display: flex; align-items: center; gap: 8px;">
+              ${!isAvailable ? `
+                <span class="sched-not-avail-tag">No disponible</span>
+                <button type="button" class="icon-circle-btn micro-btn" data-action="enable-day" data-dow="${d.dow}" title="Habilitar día">
+                  ${icon('plus')}
+                </button>
+              ` : `
+                <button type="button" class="icon-circle-btn micro-btn" data-action="disable-day" data-dow="${d.dow}" title="Deshabilitar día">
+                  ${icon('trash')}
+                </button>
+              `}
+            </div>
           </div>
 
           ${isAvailable ? `
@@ -2208,47 +2189,33 @@ async function renderScheduleConfigurator(scheduleId = null) {
     }).join('');
   }
 
-  app.innerHTML = `
-    <section class="schedule-configurator-shell">
-      <div class="configurator-topbar">
-        <div class="config-topbar-left">
-          <button type="button" class="back-link-btn" data-action="back-to-agenda">
-            ${icon('back')} <span>Volver a la agenda</span>
-          </button>
-          <span class="config-topbar-badge">CONFIGURAR CITAS DISPONIBLES</span>
+  openModal(`
+    <div class="schedule-modal-container">
+      <p class="eyebrow">AGENDA DE CITAS</p>
+      <h2 id="modal-title">${activeEditingSchedule.id ? 'Editar agenda de citas' : 'Nueva agenda de citas'}</h2>
+      <p class="lead" style="font-size: 13px; margin: -6px 0 16px; color: var(--muted);">
+        Configura el título, color, duración y disponibilidad semanal de tus citas.
+      </p>
+
+      <form id="sched-modal-form" onsubmit="return false;">
+        <label style="display: block; margin-bottom: 14px;">
+          <span style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px;">Título de la agenda</span>
+          <input type="text" id="sched-title-input" class="config-input-title" placeholder="Añade un título (Ej. Citas de Tatuaje)" value="${escapeHtml(activeEditingSchedule.title)}" required />
+        </label>
+
+        <div style="margin-bottom: 14px;">
+          <span style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px;">Color distintivo de la agenda</span>
+          <div class="config-palette-row" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            ${PALETTE.map((col) => `
+              <button type="button" class="palette-swatch ${col === activeEditingSchedule.color ? 'is-selected' : ''}" style="background: ${col}; width: 28px; height: 28px; border-radius: 50%; border: 2px solid ${col === activeEditingSchedule.color ? 'var(--ink)' : 'transparent'}; cursor: pointer;" data-action="select-palette-color" data-color="${col}"></button>
+            `).join('')}
+            <input type="color" id="sched-custom-color" value="${activeEditingSchedule.color}" title="Color personalizado" style="width: 28px; height: 28px; padding: 0; border: none; border-radius: 50%; cursor: pointer;" />
+          </div>
         </div>
-        <div class="config-topbar-right">
-          <button type="button" class="secondary" data-action="back-to-agenda">Cancelar</button>
-          <button type="button" class="primary" data-action="save-schedule-config">
-            ${icon('check')} <span>Guardar agenda</span>
-          </button>
-        </div>
-      </div>
 
-      <div class="schedule-split-layout">
-        <aside class="schedule-config-sidebar panel">
-          <div class="config-section-title">
-            <p class="eyebrow" style="margin: 0; font-size: 10.5px;">AGENDA DE CITAS</p>
-            <h2 style="margin: 2px 0 0; font-size: 18px; font-weight: 800;">Detalles y Disponibilidad</h2>
-          </div>
-
-          <div class="config-field">
-            <label class="config-label">Título de la agenda</label>
-            <input type="text" id="sched-title-input" class="config-input-title" placeholder="Añade un título (Ej. Citas de Tatuaje)" value="${activeEditingSchedule.title}" />
-          </div>
-
-          <div class="config-field">
-            <label class="config-label">Color distintivo de la agenda</label>
-            <div class="config-palette-row">
-              ${PALETTE.map((col) => `
-                <button type="button" class="palette-swatch ${col === activeEditingSchedule.color ? 'is-selected' : ''}" style="background: ${col};" data-action="select-palette-color" data-color="${col}"></button>
-              `).join('')}
-              <input type="color" id="sched-custom-color" value="${activeEditingSchedule.color}" title="Color personalizado" style="width: 32px; height: 32px; padding: 0; border: none; border-radius: 50%; cursor: pointer;" />
-            </div>
-          </div>
-
-          <div class="config-field">
-            <label class="config-label">Duración de la cita</label>
+        <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+          <label style="margin: 0;">
+            <span style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px;">Duración de la cita</span>
             <select id="sched-duration-select" class="config-select">
               <option value="30" ${activeEditingSchedule.durationMinutes === 30 ? 'selected' : ''}>30 minutos</option>
               <option value="45" ${activeEditingSchedule.durationMinutes === 45 ? 'selected' : ''}>45 minutos</option>
@@ -2258,135 +2225,85 @@ async function renderScheduleConfigurator(scheduleId = null) {
               <option value="180" ${activeEditingSchedule.durationMinutes === 180 ? 'selected' : ''}>3 horas</option>
               <option value="240" ${activeEditingSchedule.durationMinutes === 240 ? 'selected' : ''}>4 horas</option>
             </select>
-          </div>
+          </label>
 
-          <div class="config-field sched-lock-card ${activeEditingSchedule.isLocked ? 'is-locked-state' : ''}">
-            <div class="sched-lock-info">
-              <strong style="font-size: 13px; display: flex; align-items: center; gap: 6px;">
-                ${activeEditingSchedule.isLocked ? `${icon('lock')} Agenda bloqueada` : `${icon('unlock')} Agenda activa`}
-              </strong>
-              <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--muted);">
-                ${activeEditingSchedule.isLocked ? 'Pausada: no acepta reservas de clientes.' : 'Habilitada: visible y abierta para clientes.'}
-              </p>
+          <div>
+            <span style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px;">Estado de reservas</span>
+            <div class="sched-lock-card ${activeEditingSchedule.isLocked ? 'is-locked-state' : ''}" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: var(--radius-sm); border: 1.5px solid ${activeEditingSchedule.isLocked ? '#fca5a5' : 'var(--line-soft)'}; background: ${activeEditingSchedule.isLocked ? '#fee2e2' : 'var(--surface-high)'};">
+              <span class="sched-lock-status-label" style="font-size: 11.5px; font-weight: 700; color: ${activeEditingSchedule.isLocked ? '#991b1b' : '#166534'}; display: inline-flex; align-items: center; gap: 4px;">
+                ${activeEditingSchedule.isLocked ? `${icon('lock')} Pausada` : `${icon('unlock')} Activa`}
+              </span>
+              <button type="button" class="secondary sched-lock-toggle-btn" data-action="toggle-sched-lock-edit" style="padding: 4px 8px; font-size: 11px; font-weight: 700;">
+                ${activeEditingSchedule.isLocked ? 'Activar' : 'Pausar'}
+              </button>
             </div>
-            <button type="button" class="secondary sched-lock-toggle-btn" data-action="toggle-sched-lock-edit">
-              ${activeEditingSchedule.isLocked ? 'Desbloquear' : 'Bloquear'}
+          </div>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <span style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 2px;">Disponibilidad general</span>
+          <p style="margin: 0 0 10px; font-size: 12px; color: var(--muted);">
+            Indica qué días y franjas horarias sueles tener disponibles para reservas de citas cada semana.
+          </p>
+          <div class="sched-days-editor-list" id="sched-days-editor-list">
+            ${renderDaysHtml()}
+          </div>
+        </div>
+
+        <div class="config-note-box" style="margin-bottom: 14px;">
+          <span>Zona horaria: <strong>(GMT-04:00) Hora de Chile</strong></span>
+        </div>
+
+        <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+          <label style="margin: 0;">
+            <span style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px;">Antelación mínima</span>
+            <select id="sched-lead-hours" class="config-select">
+              <option value="2" ${activeEditingSchedule.minLeadHours === 2 ? 'selected' : ''}>2 horas</option>
+              <option value="4" ${activeEditingSchedule.minLeadHours === 4 ? 'selected' : ''}>4 horas</option>
+              <option value="12" ${activeEditingSchedule.minLeadHours === 12 ? 'selected' : ''}>12 horas</option>
+              <option value="24" ${activeEditingSchedule.minLeadHours === 24 ? 'selected' : ''}>24 horas (1 día)</option>
+              <option value="48" ${activeEditingSchedule.minLeadHours === 48 ? 'selected' : ''}>48 horas (2 días)</option>
+            </select>
+          </label>
+          <label style="margin: 0;">
+            <span style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px;">Antelación máxima</span>
+            <select id="sched-advance-days" class="config-select">
+              <option value="14" ${activeEditingSchedule.maxAdvanceDays === 14 ? 'selected' : ''}>14 días</option>
+              <option value="30" ${activeEditingSchedule.maxAdvanceDays === 30 ? 'selected' : ''}>30 días</option>
+              <option value="60" ${activeEditingSchedule.maxAdvanceDays === 60 ? 'selected' : ''}>60 días (2 meses)</option>
+              <option value="90" ${activeEditingSchedule.maxAdvanceDays === 90 ? 'selected' : ''}>90 días (3 meses)</option>
+            </select>
+          </label>
+        </div>
+
+        <label style="display: block; margin-bottom: 16px;">
+          <span style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px;">Instrucciones para el cliente (opcional)</span>
+          <textarea id="sched-instructions" rows="2" class="config-textarea" placeholder="Ej: Venir descansado, con ropa cómoda y sin acompañantes.">${escapeHtml(activeEditingSchedule.instructions)}</textarea>
+        </label>
+
+        <div class="modal-actions" style="display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-top: 16px; border-top: 1px solid var(--line-soft); padding-top: 14px; flex-wrap: wrap;">
+          <div>
+            ${activeEditingSchedule.id ? `
+              <button type="button" class="text-button" data-action="delete-schedule-modal" style="color: #dc2626; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                ${icon('trash')} <span>Eliminar agenda</span>
+              </button>
+            ` : ''}
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
+            <button type="button" class="secondary" data-close-modal>Cancelar</button>
+            <button type="button" class="primary" data-action="save-schedule-modal" style="display: inline-flex; align-items: center; gap: 6px;">
+              ${icon('check')} <span>Guardar agenda</span>
             </button>
           </div>
+        </div>
+      </form>
+    </div>
+  `);
 
-          <div class="config-divider"></div>
+  const modalForm = document.querySelector('#sched-modal-form');
+  if (!modalForm) return;
 
-          <div class="config-field">
-            <label class="config-label" style="margin-bottom: 2px;">Disponibilidad general</label>
-            <p style="margin: 0 0 10px; font-size: 12px; color: var(--muted);">
-              Indica qué disponibilidad sueles tener para citas cada semana.
-            </p>
-            <div class="sched-days-editor-list" id="sched-days-editor-list">
-              ${renderDaysHtml()}
-            </div>
-          </div>
-
-          <div class="config-note-box">
-            <span>Zona horaria: <strong>(GMT-04:00) Hora de Chile</strong></span>
-          </div>
-
-          <div class="config-field">
-            <label class="config-label">Franja de programación</label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-              <label style="font-size: 11.5px; color: var(--muted);">
-                Antelación mínima
-                <select id="sched-lead-hours" class="config-select" style="margin-top: 4px;">
-                  <option value="2" ${activeEditingSchedule.minLeadHours === 2 ? 'selected' : ''}>2 horas</option>
-                  <option value="4" ${activeEditingSchedule.minLeadHours === 4 ? 'selected' : ''}>4 horas</option>
-                  <option value="12" ${activeEditingSchedule.minLeadHours === 12 ? 'selected' : ''}>12 horas</option>
-                  <option value="24" ${activeEditingSchedule.minLeadHours === 24 ? 'selected' : ''}>24 horas (1 día)</option>
-                  <option value="48" ${activeEditingSchedule.minLeadHours === 48 ? 'selected' : ''}>48 horas (2 días)</option>
-                </select>
-              </label>
-              <label style="font-size: 11.5px; color: var(--muted);">
-                Antelación máxima
-                <select id="sched-advance-days" class="config-select" style="margin-top: 4px;">
-                  <option value="14" ${activeEditingSchedule.maxAdvanceDays === 14 ? 'selected' : ''}>14 días</option>
-                  <option value="30" ${activeEditingSchedule.maxAdvanceDays === 30 ? 'selected' : ''}>30 días</option>
-                  <option value="60" ${activeEditingSchedule.maxAdvanceDays === 60 ? 'selected' : ''}>60 días (2 meses)</option>
-                  <option value="90" ${activeEditingSchedule.maxAdvanceDays === 90 ? 'selected' : ''}>90 días (3 meses)</option>
-                </select>
-              </label>
-            </div>
-          </div>
-
-          <div class="config-field">
-            <label class="config-label">Instrucciones para el cliente (opcional)</label>
-            <textarea id="sched-instructions" rows="2" class="config-textarea" placeholder="Ej: Venir descansado, con ropa cómoda y sin acompañantes.">${activeEditingSchedule.instructions}</textarea>
-          </div>
-
-          <div style="margin-top: 14px;">
-            <button type="button" class="primary" style="width: 100%; justify-content: center;" data-action="save-schedule-config">
-              ${icon('check')} Guardar agenda de citas
-            </button>
-          </div>
-        </aside>
-
-        <main class="schedule-preview-area panel">
-          <div class="preview-area-header">
-            <div>
-              <strong style="font-size: 14.5px; font-weight: 800;">Vista previa de disponibilidad en tiempo real</strong>
-              <p style="margin: 2px 0 0; font-size: 12px; color: var(--muted);">
-                Semana actual (${weekRange.label}): los bloques coloreados representan los horarios abiertos para citas.
-              </p>
-            </div>
-            <div class="preview-color-pill" id="sched-preview-pill" style="--live-color: ${activeEditingSchedule.color};">
-              <span class="live-dot" style="background: ${activeEditingSchedule.color};"></span>
-              <span class="live-title-preview">${activeEditingSchedule.title || 'Agenda de citas'}</span>
-            </div>
-          </div>
-
-          <div class="live-timegrid-wrap" id="sched-live-timegrid-wrap">
-            ${renderWeeklyTimeGrid(weekRange, weekAppts, getPreviewSchedules(), todayISO, false)}
-          </div>
-        </main>
-      </div>
-    </section>
-  `;
-
-  const titleInput = document.querySelector('#sched-title-input');
-  titleInput?.addEventListener('input', (e) => {
-    activeEditingSchedule.title = e.target.value;
-    const pillTitle = document.querySelector('.live-title-preview');
-    if (pillTitle) pillTitle.textContent = e.target.value || 'Agenda de citas';
-    updatePreviewGridOnly();
-  });
-
-  const durationSelect = document.querySelector('#sched-duration-select');
-  durationSelect?.addEventListener('change', (e) => {
-    activeEditingSchedule.durationMinutes = Number(e.target.value);
-    updatePreviewGridOnly();
-  });
-
-  const customColor = document.querySelector('#sched-custom-color');
-  customColor?.addEventListener('input', (e) => {
-    activeEditingSchedule.color = e.target.value;
-    document.querySelectorAll('.palette-swatch').forEach(s => s.classList.remove('is-selected'));
-    updatePreviewGridOnly();
-  });
-
-  function updatePreviewGridOnly() {
-    const previewContainer = document.querySelector('#sched-live-timegrid-wrap');
-    if (previewContainer) {
-      previewContainer.innerHTML = renderWeeklyTimeGrid(weekRange, weekAppts, getPreviewSchedules(), todayISO, false);
-    }
-    const colorPill = document.querySelector('#sched-preview-pill');
-    if (colorPill) {
-      colorPill.style.setProperty('--live-color', activeEditingSchedule.color);
-      const dot = colorPill.querySelector('.live-dot');
-      if (dot) dot.style.background = activeEditingSchedule.color;
-      const titleEl = colorPill.querySelector('.live-title-preview');
-      if (titleEl) titleEl.textContent = activeEditingSchedule.title || 'Agenda de citas';
-    }
-  }
-
-  const configShell = document.querySelector('.schedule-configurator-shell');
-  configShell?.addEventListener('input', (e) => {
+  modalForm.addEventListener('input', (e) => {
     const timeInput = e.target.closest('.sched-time-input');
     if (timeInput) {
       const dow = Number(timeInput.dataset.dow);
@@ -2397,44 +2314,47 @@ async function renderScheduleConfigurator(scheduleId = null) {
         if (field === 'start') matched[ruleIdx].start_time = timeInput.value;
         if (field === 'end') matched[ruleIdx].end_time = timeInput.value;
       }
-      updatePreviewGridOnly();
     }
   });
 
-  configShell?.addEventListener('click', async (e) => {
+  modalForm.addEventListener('change', (e) => {
+    if (e.target.id === 'sched-duration-select') {
+      activeEditingSchedule.durationMinutes = Number(e.target.value);
+    }
+    if (e.target.id === 'sched-custom-color') {
+      activeEditingSchedule.color = e.target.value;
+      modalForm.querySelectorAll('.palette-swatch').forEach(s => s.classList.remove('is-selected'));
+    }
+  });
+
+  modalForm.addEventListener('click', async (e) => {
     const paletteBtn = e.target.closest('[data-action="select-palette-color"]');
     if (paletteBtn) {
       const color = paletteBtn.dataset.color;
       activeEditingSchedule.color = color;
-      document.querySelectorAll('.palette-swatch').forEach(s => {
+      modalForm.querySelectorAll('.palette-swatch').forEach(s => {
         s.classList.toggle('is-selected', s.dataset.color === color);
       });
-      const customCol = document.querySelector('#sched-custom-color');
+      const customCol = modalForm.querySelector('#sched-custom-color');
       if (customCol) customCol.value = color;
-      updatePreviewGridOnly();
       return;
     }
 
     if (e.target.closest('[data-action="toggle-sched-lock-edit"]')) {
       activeEditingSchedule.isLocked = !activeEditingSchedule.isLocked;
-      const lockCard = document.querySelector('.sched-lock-card');
+      const lockCard = modalForm.querySelector('.sched-lock-card');
       if (lockCard) {
         lockCard.classList.toggle('is-locked-state', activeEditingSchedule.isLocked);
-        const lockInfo = lockCard.querySelector('.sched-lock-info');
-        if (lockInfo) {
-          lockInfo.innerHTML = `
-            <strong style="font-size: 13px; display: flex; align-items: center; gap: 6px;">
-              ${activeEditingSchedule.isLocked ? `${icon('lock')} Agenda bloqueada` : `${icon('unlock')} Agenda activa`}
-            </strong>
-            <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--muted);">
-              ${activeEditingSchedule.isLocked ? 'Pausada: no acepta reservas de clientes.' : 'Habilitada: visible y abierta para clientes.'}
-            </p>
-          `;
+        lockCard.style.borderColor = activeEditingSchedule.isLocked ? '#fca5a5' : 'var(--line-soft)';
+        lockCard.style.background = activeEditingSchedule.isLocked ? '#fee2e2' : 'var(--surface-high)';
+        const label = lockCard.querySelector('.sched-lock-status-label');
+        if (label) {
+          label.style.color = activeEditingSchedule.isLocked ? '#991b1b' : '#166534';
+          label.innerHTML = activeEditingSchedule.isLocked ? `${icon('lock')} Pausada` : `${icon('unlock')} Activa`;
         }
         const lockBtn = lockCard.querySelector('.sched-lock-toggle-btn');
-        if (lockBtn) lockBtn.textContent = activeEditingSchedule.isLocked ? 'Desbloquear' : 'Bloquear';
+        if (lockBtn) lockBtn.textContent = activeEditingSchedule.isLocked ? 'Activar' : 'Pausar';
       }
-      updatePreviewGridOnly();
       return;
     }
 
@@ -2442,9 +2362,8 @@ async function renderScheduleConfigurator(scheduleId = null) {
     if (enableBtn) {
       const dow = Number(enableBtn.dataset.dow);
       activeEditingSchedule.rules.push({ day_of_week: dow, start_time: '09:00', end_time: '17:00' });
-      const daysContainer = document.querySelector('#sched-days-editor-list');
+      const daysContainer = modalForm.querySelector('#sched-days-editor-list');
       if (daysContainer) daysContainer.innerHTML = renderDaysHtml();
-      updatePreviewGridOnly();
       return;
     }
 
@@ -2452,9 +2371,8 @@ async function renderScheduleConfigurator(scheduleId = null) {
     if (disableBtn) {
       const dow = Number(disableBtn.dataset.dow);
       activeEditingSchedule.rules = activeEditingSchedule.rules.filter(r => Number(r.day_of_week) !== dow);
-      const daysContainer = document.querySelector('#sched-days-editor-list');
+      const daysContainer = modalForm.querySelector('#sched-days-editor-list');
       if (daysContainer) daysContainer.innerHTML = renderDaysHtml();
-      updatePreviewGridOnly();
       return;
     }
 
@@ -2462,9 +2380,8 @@ async function renderScheduleConfigurator(scheduleId = null) {
     if (addSlotBtn) {
       const dow = Number(addSlotBtn.dataset.dow);
       activeEditingSchedule.rules.push({ day_of_week: dow, start_time: '14:00', end_time: '18:00' });
-      const daysContainer = document.querySelector('#sched-days-editor-list');
+      const daysContainer = modalForm.querySelector('#sched-days-editor-list');
       if (daysContainer) daysContainer.innerHTML = renderDaysHtml();
-      updatePreviewGridOnly();
       return;
     }
 
@@ -2477,9 +2394,8 @@ async function renderScheduleConfigurator(scheduleId = null) {
       if (targetRule) {
         activeEditingSchedule.rules = activeEditingSchedule.rules.filter(r => r !== targetRule);
       }
-      const daysContainer = document.querySelector('#sched-days-editor-list');
+      const daysContainer = modalForm.querySelector('#sched-days-editor-list');
       if (daysContainer) daysContainer.innerHTML = renderDaysHtml();
-      updatePreviewGridOnly();
       return;
     }
 
@@ -2498,23 +2414,38 @@ async function renderScheduleConfigurator(scheduleId = null) {
             });
           });
         }
-        const daysContainer = document.querySelector('#sched-days-editor-list');
+        const daysContainer = modalForm.querySelector('#sched-days-editor-list');
         if (daysContainer) daysContainer.innerHTML = renderDaysHtml();
-        updatePreviewGridOnly();
       }
       return;
     }
 
-    if (e.target.closest('[data-action="save-schedule-config"]')) {
-      const titleVal = (document.querySelector('#sched-title-input')?.value || '').trim();
+    const deleteBtn = e.target.closest('[data-action="delete-schedule-modal"]');
+    if (deleteBtn && activeEditingSchedule.id) {
+      if (!confirm('¿Estás seguro de que deseas eliminar esta agenda de citas?')) return;
+      try {
+        await api(`/api/schedules/${activeEditingSchedule.id}`, { method: 'DELETE' });
+        closeModal();
+        appointmentSchedules = await api('/api/schedules', { skipCache: true }).catch(() => []);
+        if (currentAppView === 'agenda') {
+          await renderAgenda();
+        }
+      } catch (err) {
+        alert(`Error al eliminar agenda: ${err.message}`);
+      }
+      return;
+    }
+
+    if (e.target.closest('[data-action="save-schedule-modal"]')) {
+      const titleVal = (modalForm.querySelector('#sched-title-input')?.value || '').trim();
       if (!titleVal) {
         alert('Por favor añade un título a la agenda.');
         return;
       }
       activeEditingSchedule.title = titleVal;
-      activeEditingSchedule.instructions = document.querySelector('#sched-instructions')?.value || '';
-      activeEditingSchedule.minLeadHours = Number(document.querySelector('#sched-lead-hours')?.value || 4);
-      activeEditingSchedule.maxAdvanceDays = Number(document.querySelector('#sched-advance-days')?.value || 60);
+      activeEditingSchedule.instructions = modalForm.querySelector('#sched-instructions')?.value || '';
+      activeEditingSchedule.minLeadHours = Number(modalForm.querySelector('#sched-lead-hours')?.value || 4);
+      activeEditingSchedule.maxAdvanceDays = Number(modalForm.querySelector('#sched-advance-days')?.value || 60);
 
       const payload = {
         title: activeEditingSchedule.title,
@@ -2526,6 +2457,12 @@ async function renderScheduleConfigurator(scheduleId = null) {
         instructions: activeEditingSchedule.instructions,
         rules: activeEditingSchedule.rules
       };
+
+      const saveBtn = modalForm.querySelector('[data-action="save-schedule-modal"]');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Guardando...';
+      }
 
       try {
         if (activeEditingSchedule.id && activeEditingSchedule.id !== 'preview') {
@@ -2539,17 +2476,25 @@ async function renderScheduleConfigurator(scheduleId = null) {
             body: JSON.stringify(payload)
           });
         }
-        await renderAgenda();
+        closeModal();
+        appointmentSchedules = await api('/api/schedules', { skipCache: true }).catch(() => []);
+        if (currentAppView === 'agenda') {
+          await renderAgenda();
+        }
       } catch (err) {
         alert(`Error al guardar agenda: ${err.message}`);
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = `${icon('check')} <span>Guardar agenda</span>`;
+        }
       }
       return;
     }
-
-    if (e.target.closest('[data-action="back-to-agenda"]')) {
-      return await renderAgenda();
-    }
   });
+}
+
+async function renderScheduleConfigurator(scheduleId = null) {
+  return await openScheduleModal(scheduleId);
 }
 
 async function renderAgenda() {
@@ -10854,20 +10799,18 @@ document.addEventListener('click', async (event) => {
     return newQuickTaskModal();
   }
   if (event.target.closest('[data-action="open-schedule-configurator"]')) {
-    closeModal();
     if (createMenuDropdown) {
       createMenuDropdown.classList.remove('is-open');
       createMenuDropdown.classList.add('hidden');
     }
-    return await renderScheduleConfigurator();
+    return await openScheduleModal();
   }
   if (event.target.closest('[data-action="open-booking-pages-modal"]')) {
     return openBookingPagesModal();
   }
   const editSchedBtn = event.target.closest('[data-action="edit-schedule"]');
   if (editSchedBtn) {
-    closeModal();
-    return await renderScheduleConfigurator(editSchedBtn.dataset.scheduleId);
+    return await openScheduleModal(editSchedBtn.dataset.scheduleId);
   }
   const lockSchedBtn = event.target.closest('[data-action="toggle-schedule-lock"]');
   if (lockSchedBtn) {

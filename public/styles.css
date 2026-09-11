@@ -7898,32 +7898,59 @@ textarea {
   gap: 6px;
 }
 
+.schedule-modal-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.schedule-modal-container .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .schedule-modal-container .form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+}
+
 .sched-slot-row {
   display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .sched-time-input {
-  padding: 5px 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
   border-radius: 6px;
   border: 1px solid var(--line-soft);
   background: var(--surface);
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--ink);
+  box-sizing: border-box;
 }
 
 .sched-time-sep {
   color: var(--muted);
   font-size: 12px;
+  flex-shrink: 0;
 }
 
 .sched-remove-slot-btn, .sched-copy-all-btn {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
   border: 1px solid var(--line-soft);
   background: var(--surface);

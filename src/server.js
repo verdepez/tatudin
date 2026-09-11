@@ -2268,7 +2268,7 @@ app.post('/api/schedules', requireAuth, async (request, response) => {
     const insertSchedule = await pool.query(`
       INSERT INTO appointment_schedules
         (studio_id, artist_id, category_id, title, slug, duration_minutes, color, is_locked, is_active, min_lead_hours, max_advance_days, instructions)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, TRUE, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, $9, $10, $11)
       RETURNING *
     `, [
       request.studioId,
@@ -2278,6 +2278,7 @@ app.post('/api/schedules', requireAuth, async (request, response) => {
       uniqueSlug,
       Math.max(15, Number(durationMinutes || 60)),
       color || '#7C3AED',
+      Boolean(request.body.isLocked || false),
       Math.max(0, Number(minLeadHours || 4)),
       Math.max(1, Number(maxAdvanceDays || 60)),
       instructions ? instructions.trim() : ''
