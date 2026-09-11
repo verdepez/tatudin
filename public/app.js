@@ -8557,11 +8557,15 @@ function showReceiptConfirmationModal(data) {
 function openModal(content) {
   modalContent.innerHTML = content;
   modal.hidden = false;
+  document.body.classList.add('modal-open');
+  const modalSection = modal.querySelector('.modal');
+  if (modalSection) modalSection.scrollTop = 0;
 }
 
 function closeModal() {
   stopCameraStream();
   modal.hidden = true;
+  document.body.classList.remove('modal-open');
 }
 
 function clientOptions(selectedId = null) {
@@ -8766,7 +8770,7 @@ async function newBookingModal(preselectedClientId = null, preselectedDateTime =
         <!-- Mode 1: Enviar Enlace -->
         <div id="booking-mode-link" class="client-mode-content">
           <div style="background: rgba(124, 58, 237, 0.08); border: 1px dashed rgba(124, 58, 237, 0.3); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
               <span style="font-size: 13px; font-weight: 700; color: #c4b5fd; display: inline-flex; align-items: center; gap: 6px;">
                 ${icon('link')} Formulario público para cliente
               </span>
@@ -8824,18 +8828,18 @@ async function newBookingModal(preselectedClientId = null, preselectedDateTime =
 
         <!-- Dynamic Multi-Date & Slots Section -->
         <div class="booking-dates-container" style="margin-bottom: 12px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
             <label style="font-size: 12px; font-weight: 700; color: var(--muted-light); margin: 0;">
               Fecha y horario de la sesión / alternativas:
             </label>
-            <button type="button" id="btn-add-date-slot" class="outline-button small" style="font-size: 11px; padding: 4px 8px; border-radius: 8px; border: 1px dashed rgba(139, 92, 246, 0.5); color: #c4b5fd; background: rgba(124, 58, 237, 0.1); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+            <button type="button" id="btn-add-date-slot" class="outline-button small" style="font-size: 11px; padding: 5px 10px; border-radius: 8px; border: 1px dashed rgba(139, 92, 246, 0.5); color: #c4b5fd; background: rgba(124, 58, 237, 0.1); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
               ${icon('plus')} Agregar otra fecha o alternativa
             </button>
           </div>
 
           <div id="booking-slots-container">
             <div class="booking-slot-row" data-slot-index="0" style="background: var(--surface-low); border: 1px solid var(--line-soft); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
                 <span class="slot-badge" style="font-size: 11px; font-weight: 700; color: #a78bfa;">Fecha principal / Sesión 1</span>
                 <button type="button" class="btn-remove-slot" style="display: none; background: none; border: none; color: #ef4444; font-size: 11.5px; cursor: pointer;">✕ Quitar</button>
               </div>
